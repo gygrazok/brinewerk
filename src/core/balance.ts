@@ -13,13 +13,22 @@ export const PICKUP_SIZE_SCALE = 20;
 export const PICKUP_ARMS_SCALE = 10;
 export const PICKUP_RARE_MULTIPLIER = 2.5;
 
-/** Algae Colony */
-export const ALGAE_COLONY_COST = 500;
-export const ALGAE_COLONY_MULTIPLIER = 2.0; // 2x adjacent plankton output
-
 /** Blobid symbiosis */
 export const BLOBID_SYMBIOSIS_BASE = 0.15; // +15% minimum
 export const BLOBID_SYMBIOSIS_SCALE = 0.10; // +10% per tentacles gene
 
 /** Initial game state */
 export const INITIAL_PLANKTON = 50;
+
+/** Upgrade: Algae Colony */
+export const UPGRADE_ALGAE_COLONY_COST = 200;
+export const UPGRADE_ALGAE_COLONY_BONUS = 0.25; // +25% production
+
+/** Pool expansion costs by slot count tier */
+export function getExpansionCost(currentSlotCount: number): { plankton: number; minerite: number; lux: number } {
+  if (currentSlotCount < 4) return { plankton: 50, minerite: 0, lux: 0 };
+  if (currentSlotCount < 9) return { plankton: 150, minerite: 0, lux: 0 };
+  if (currentSlotCount < 16) return { plankton: 500, minerite: 50, lux: 0 };
+  if (currentSlotCount < 25) return { plankton: 2000, minerite: 200, lux: 0 };
+  return { plankton: 5000, minerite: 500, lux: 50 };
+}

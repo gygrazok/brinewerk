@@ -1,24 +1,26 @@
 import type { GameState } from '../core/game-state';
 import type { Creature } from '../creatures/creature';
 import { CreatureType } from '../creatures/types';
+import { getSlot, setSlot, allSlots, slotCount, getExpansionCandidates } from './coords';
+import { getExpansionCost } from '../core/balance';
 
 /** Place a creature in a specific pool slot */
 export function placeCreature(state: GameState, creature: Creature, row: number, col: number): boolean {
-  if (row < 0 || row >= state.pool.length || col < 0 || col >= state.pool[0].length) return false;
-  if (state.pool[row][col].creatureId !== null) return false;
+  const slot = getSlot(state.pool, row, col);
+  if (!slot || slot.creatureId !== null) return false;
 
   // Add creature to creatures array if not already there
   if (!state.creatures.find((c) => c.id === creature.id)) {
     state.creatures.push(creature);
   }
 
-  state.pool[row][col].creatureId = creature.id;
+  slot.creatureId = creature.id;
   return true;
 }
 
 /** Remove a creature from the pool */
 export function removeCreature(state: GameState, row: number, col: number): Creature | null {
-  const slot = state.pool[row]?.[col];
+  const slot = getSlot(state.pool, row, col);
   if (!slot || !slot.creatureId) return null;
 
   const creature = state.creatures.find((c) => c.id === slot.creatureId) ?? null;
@@ -28,12 +30,11 @@ export function removeCreature(state: GameState, row: number, col: number): Crea
 
 /** Get orthogonally adjacent creatures for a given slot */
 export function getAdjacentCreatures(state: GameState, row: number, col: number): Creature[] {
-  const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  const directions: [number, number][] = [[-1, 0], [1, 0], [0, -1], [0, 1]];
   const adjacent: Creature[] = [];
 
   for (const [dr, dc] of directions) {
-    const r = row + dr, c = col + dc;
-    const slot = state.pool[r]?.[c];
+    const slot = getSlot(state.pool, row + dr, col + dc);
     if (slot?.creatureId) {
       const creature = state.creatures.find((cr) => cr.id === slot.creatureId);
       if (creature) adjacent.push(creature);
@@ -60,27 +61,46 @@ export function calculateAdjacencyBonus(state: GameState, row: number, col: numb
 
 /** Find the slot position [row, col] of a creature in the pool */
 export function findCreatureSlot(state: GameState, creatureId: string): [number, number] | null {
-  for (let r = 0; r < state.pool.length; r++) {
-    for (let c = 0; c < state.pool[r].length; c++) {
-      if (state.pool[r][c].creatureId === creatureId) return [r, c];
-    }
+  for (const [r, c, slot] of allSlots(state.pool)) {
+    if (slot.creatureId === creatureId) return [r, c];
   }
   return null;
 }
 
 /** Find first empty slot in the pool */
 export function findEmptySlot(state: GameState): [number, number] | null {
-  for (let r = 0; r < state.pool.length; r++) {
-    for (let c = 0; c < state.pool[r].length; c++) {
-      if (state.pool[r][c].creatureId === null) return [r, c];
-    }
+  for (const [r, c, slot] of allSlots(state.pool)) {
+    if (slot.creatureId === null) return [r, c];
   }
   return null;
 }
 
 /** Get creature at a specific slot */
 export function getCreatureAt(state: GameState, row: number, col: number): Creature | null {
-  const slot = state.pool[row]?.[col];
+  const slot = getSlot(state.pool, row, col);
   if (!slot?.creatureId) return null;
   return state.creatures.find((c) => c.id === slot.creatureId) ?? null;
+}
+
+/** Expand the pool by adding a new slot at (r, c). Deducts resources. */
+export function expandPool(state: GameState, r: number, c: number): boolean {
+  // Validate this is a valid expansion candidate
+  const candidates = getExpansionCandidates(state.pool);
+  const isCandidate = candidates.some(([cr, cc]) => cr === r && cc === c);
+  if (!isCandidate) return false;
+
+  // Check cost
+  const cost = getExpansionCost(slotCount(state.pool));
+  if (state.resources.plankton < cost.plankton) return false;
+  if (state.resources.minerite < cost.minerite) return false;
+  if (state.resources.lux < cost.lux) return false;
+
+  // Deduct cost
+  state.resources.plankton -= cost.plankton;
+  state.resources.minerite -= cost.minerite;
+  state.resources.lux -= cost.lux;
+
+  // Add slot
+  setSlot(state.pool, r, c, { creatureId: null });
+  return true;
 }

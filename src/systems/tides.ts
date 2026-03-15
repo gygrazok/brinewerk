@@ -2,6 +2,7 @@ import type { GameState } from '../core/game-state';
 import { type Creature, createCreature } from '../creatures/creature';
 import { CreatureType } from '../creatures/types';
 import { TIDE_INTERVAL_MIN, TIDE_INTERVAL_MAX } from '../core/balance';
+import { allSlots } from './coords';
 
 const SHORE_CAPACITY = 3;
 
@@ -58,7 +59,7 @@ export function pickUpCreature(state: GameState, shoreIndex: number): Creature |
 
 /** Force a tide (for initial game start) */
 export function forceInitialTide(state: GameState): void {
-  const hasPoolCreatures = state.pool.some((row) => row.some((s) => s.creatureId !== null));
+  const hasPoolCreatures = allSlots(state.pool).some(([, , s]) => s.creatureId !== null);
 
   if (hasPoolCreatures) return; // already playing
 
@@ -71,9 +72,9 @@ export function forceInitialTide(state: GameState): void {
     state.lastTideTimestamp = Date.now();
   }
 
-  // Always ensure enough plankton to pick up the cheapest shore creature
+  // Always ensure enough plankton to pick up the cheapest shore creature + first expansion
   if (state.shore.length > 0) {
     const cheapest = Math.min(...state.shore.map(calculatePickupCost));
-    state.resources.plankton = Math.max(state.resources.plankton, cheapest + 10);
+    state.resources.plankton = Math.max(state.resources.plankton, cheapest + 80);
   }
 }
