@@ -115,8 +115,13 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
         const y = SLOT_PAD + r * (SLOT_SIZE + SLOT_PAD) + (SLOT_SIZE - CREATURE_DISPLAY) / 2;
         visual.sprite.x = x;
         visual.sprite.y = y;
-        visual.sprite.width = CREATURE_DISPLAY;
-        visual.sprite.height = CREATURE_DISPLAY;
+        // Scale children to fit the slot display size
+        visual.mainSprite.width = CREATURE_DISPLAY;
+        visual.mainSprite.height = CREATURE_DISPLAY;
+        if (visual.glowSprite) {
+          visual.glowSprite.width = CREATURE_DISPLAY;
+          visual.glowSprite.height = CREATURE_DISPLAY;
+        }
         poolView.gridContainer.addChild(visual.sprite);
         poolView.visuals.set(creature.id, visual);
       }

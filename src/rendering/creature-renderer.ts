@@ -1,4 +1,4 @@
-import { Sprite, Texture, Filter } from 'pixi.js';
+import { Sprite, Texture, Container, BlurFilter, ColorMatrixFilter, Filter } from 'pixi.js';
 import type { Creature } from '../creatures/creature';
 import { CreatureType } from '../creatures/types';
 import { renderStellarid } from './types/stellarid';
@@ -6,7 +6,7 @@ import { renderBlobid } from './types/blobid';
 import { renderCorallid } from './types/corallid';
 import { renderNucleid } from './types/nucleid';
 import { type PixelGrid, CANVAS_PX, BLOCK_PX, GRID_SIZE, renderGridToCanvas } from './pixel-grid';
-import { getRareFilter, createGlowFilter } from './shader-loader';
+import { getRareFilter } from './shader-loader';
 import { getPalette } from './palette';
 
 type TypeRenderer = (genes: Creature['genes'], time: number, seed: number) => PixelGrid;
@@ -19,48 +19,24 @@ const TYPE_RENDERERS: Record<CreatureType, TypeRenderer> = {
 };
 
 export interface CreatureVisual {
-  sprite: Sprite;
+  /** The root container (holds glowSprite behind + main sprite on top) */
+  sprite: Container;
   creature: Creature;
+  /** The main creature sprite */
+  mainSprite: Sprite;
+  /** Optional blurred glow sprite behind main */
+  glowSprite: Sprite | null;
   /** Offscreen canvas for real-time pixel grid rendering */
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
   /** The single texture backed by the canvas — updated every frame */
   texture: Texture;
-  glowFilter: Filter | null;
   timeOffset: number;
 }
 
-/** Hex color to [r, g, b, a] normalized */
-function hexToVec4(hex: string, alpha: number = 1): [number, number, number, number] {
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
-  return [r, g, b, alpha];
-}
-
-/** Build the filter chain for a creature sprite */
-function buildFilterChain(creature: Creature): {
-  filters: Filter[];
-  glowFilter: Filter | null;
-} {
-  const filters: Filter[] = [];
-  const texelSize: [number, number] = [1 / CANVAS_PX, 1 / CANVAS_PX];
-
-  // Glow (if gene glow > 0.5)
-  let glowFilter: Filter | null = null;
-  if (creature.genes.glow > 0.5) {
-    const pal = getPalette(creature.genes.palette1);
-    const glowColor = hexToVec4(pal.accent, 0.7);
-    glowFilter = createGlowFilter(glowColor, creature.genes.glow, texelSize);
-    filters.push(glowFilter);
-  }
-
-  // Rare effect (if present)
-  if (creature.rare) {
-    filters.push(getRareFilter(creature.rare));
-  }
-
-  return { filters, glowFilter };
+/** Parse hex color to 0xRRGGBB number */
+function hexToNum(hex: string): number {
+  return parseInt(hex.slice(1), 16);
 }
 
 /** Create a renderable creature visual with real-time rendering */
@@ -76,22 +52,66 @@ export function createCreatureVisual(creature: Creature): CreatureVisual {
   const grid = renderer(creature.genes, 0, creature.seed);
   renderGridToCanvas(grid, ctx);
 
-  // Create texture from canvas — PixiJS will use this canvas as source
+  // Create texture from canvas
   const texture = Texture.from(canvas);
-  const sprite = new Sprite(texture);
-  sprite.width = GRID_SIZE * BLOCK_PX;
-  sprite.height = GRID_SIZE * BLOCK_PX;
+  const displaySize = GRID_SIZE * BLOCK_PX; // 120
 
-  const { filters, glowFilter } = buildFilterChain(creature);
-  sprite.filters = filters;
+  // Main sprite
+  const mainSprite = new Sprite(texture);
+  mainSprite.width = displaySize;
+  mainSprite.height = displaySize;
+
+  // Rare effect filter on main sprite
+  const mainFilters: Filter[] = [];
+  if (creature.rare) {
+    mainFilters.push(getRareFilter(creature.rare));
+  }
+  if (mainFilters.length > 0) {
+    mainSprite.filters = mainFilters;
+  }
+
+  // Container to hold glow + main
+  const container = new Container();
+
+  // Glow: a second sprite with BlurFilter + color tint, rendered behind
+  let glowSprite: Sprite | null = null;
+  if (creature.genes.glow > 0.5) {
+    const pal = getPalette(creature.genes.palette1);
+
+    glowSprite = new Sprite(texture); // shares same texture
+    glowSprite.width = displaySize;
+    glowSprite.height = displaySize;
+
+    // Tint to glow color
+    glowSprite.tint = hexToNum(pal.accent);
+    // Intensity based on glow gene (0.5-1.0 → 0.2-0.5 alpha)
+    glowSprite.alpha = 0.2 + (creature.genes.glow - 0.5) * 0.6;
+
+    // Real multi-pass gaussian blur
+    const blurFilter = new BlurFilter({
+      strength: 6,
+      quality: 4,
+    });
+
+    // Brighten so the tinted blur is visible
+    const brighten = new ColorMatrixFilter();
+    brighten.brightness(1.8, false);
+
+    glowSprite.filters = [brighten, blurFilter];
+
+    container.addChild(glowSprite); // behind
+  }
+
+  container.addChild(mainSprite); // on top
 
   return {
-    sprite,
+    sprite: container,
     creature,
+    mainSprite,
+    glowSprite,
     canvas,
     ctx,
     texture,
-    glowFilter,
     timeOffset: Math.random() * 100,
   };
 }
@@ -108,14 +128,16 @@ export function updateCreatureVisual(visual: CreatureVisual, _deltaSec: number, 
   // Tell PixiJS the texture source has changed
   visual.texture.source.update();
 
-  // Update glow filter time
-  if (visual.glowFilter) {
-    visual.glowFilter.resources.glowUniforms.uniforms.uTime = time;
+  // Subtle glow pulse
+  if (visual.glowSprite) {
+    const baseAlpha = 0.2 + (visual.creature.genes.glow - 0.5) * 0.6;
+    const pulse = Math.sin(time * 2.0) * 0.06 + 1.0;
+    visual.glowSprite.alpha = baseAlpha * pulse;
   }
 }
 
 /** Destroy a creature visual and free resources */
 export function destroyCreatureVisual(visual: CreatureVisual): void {
-  visual.sprite.destroy();
+  visual.sprite.destroy({ children: true });
   visual.texture.destroy(true);
 }

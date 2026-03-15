@@ -60,7 +60,7 @@ export function getRareFilter(rare: RareEffect): Filter {
   const fragment = RARE_FRAG[rare];
   filter = new Filter({
     glProgram: new GlProgram({ vertex: defaultVertex, fragment }),
-    padding: 0,
+    padding: 12,
     resources: {
       rareUniforms: {
         uTime: { value: 0, type: 'f32' },
@@ -97,7 +97,7 @@ export function createGlowFilter(
 ): Filter {
   return new Filter({
     glProgram: new GlProgram({ vertex: defaultVertex, fragment: glowFrag }),
-    padding: 4,
+    padding: 16,
     resources: {
       glowUniforms: {
         uGlowColor: { value: new Float32Array(color), type: 'vec4<f32>' },
