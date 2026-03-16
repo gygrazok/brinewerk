@@ -18,5 +18,5 @@
     "resolveJsonModule": true,
     "esModuleInterop": true
   },
-  "include": ["src", "src/glsl.d.ts"]
+  "include": ["src", "src/glsl.d.ts", "node_modules/vite/client.d.ts"]
 }

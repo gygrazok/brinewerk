@@ -9,6 +9,7 @@ import { renderShore, setOnPickUp } from './ui/tide-shore';
 import { updateHud } from './ui/hud';
 import { installUpgrade } from './economy/upgrades';
 import { showUpgradeModal } from './ui/upgrade-modal';
+import { initDebugMenu } from './ui/debug-menu';
 
 const app = new Application();
 
@@ -117,6 +118,19 @@ async function init() {
       updateHud(state);
     }
   });
+
+  // Debug menu (dev only)
+  if (import.meta.env.DEV) {
+    initDebugMenu(
+      state,
+      () => {
+        syncPoolVisuals(poolView, state);
+        renderShore(state);
+        updateHud(state);
+      },
+      () => window.location.reload(),
+    );
+  }
 
   console.log('Brinewerk initialized');
 }
