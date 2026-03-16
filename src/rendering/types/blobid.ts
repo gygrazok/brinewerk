@@ -1,6 +1,6 @@
 import type { Genotype } from '../../creatures/creature';
 import { getPalette } from '../palette';
-import { type PixelGrid, setPixel, addEyes, _sr } from '../pixel-grid';
+import { type PixelGrid, setPixel, addEyes, spatialRandom } from '../pixel-grid';
 
 export function renderBlobid(genes: Genotype, time: number, seed: number): PixelGrid {
   const grid: PixelGrid = {};
@@ -24,7 +24,7 @@ export function renderBlobid(genes: Genotype, time: number, seed: number): Pixel
         const o = d > 0.85;
         let c = o ? pal.outline : pal.body;
         if (!o && pattern >= 1 && Math.abs(dy) % 3 === 0) c = pal.accent;
-        if (!o && pattern >= 2 && _sr(dx, dy, seed) > 0.8) c = pal2.body;
+        if (!o && pattern >= 2 && spatialRandom(dx, dy, seed) > 0.8) c = pal2.body;
         if (!o && pattern >= 3 && dy < -hh * 0.5 && Math.abs(dx) < hw * 0.3) c = pal2.accent;
         setPixel(grid, cx + dx, cy + dy, c);
       }
@@ -40,7 +40,7 @@ export function renderBlobid(genes: Genotype, time: number, seed: number): Pixel
   // Tentacles
   for (let i = 0; i < tentacles; i++) {
     const tx = cx + Math.round(-hw + 2 + (i / (tentacles - 1 || 1)) * (hw * 2 - 4));
-    const tLen = Math.round(size * 0.8 + _sr(i, 0, seed) * size * 0.5);
+    const tLen = Math.round(size * 0.8 + spatialRandom(i, 0, seed) * size * 0.5);
     const sway = Math.sin(time * 1.8 + i * 2.1) * wobble * 1.2;
 
     for (let t = 0; t < tLen; t++) {

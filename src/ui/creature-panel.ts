@@ -269,7 +269,7 @@ export async function showCreaturePanel(creature: Creature, adjacencyBonus: numb
   const container = document.getElementById('preview-container')!;
   const app = await createPreviewApp(container);
 
-  previewVisual = createCreatureVisual(creature);
+  previewVisual = createCreatureVisual(creature, true /* own filters — not shared with game view */);
   // Scale children to fill the preview area
   previewVisual.mainSprite.width = PREVIEW_SIZE;
   previewVisual.mainSprite.height = PREVIEW_SIZE;

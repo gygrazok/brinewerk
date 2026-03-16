@@ -1,6 +1,6 @@
 import type { Genotype } from '../../creatures/creature';
 import { getPalette } from '../palette';
-import { type PixelGrid, setPixel, addEyes, _sr } from '../pixel-grid';
+import { type PixelGrid, setPixel, addEyes, spatialRandom } from '../pixel-grid';
 
 export function renderStellarid(genes: Genotype, time: number, seed: number): PixelGrid {
   const grid: PixelGrid = {};
@@ -59,7 +59,7 @@ export function renderStellarid(genes: Genotype, time: number, seed: number): Pi
         const o = d > bodyR - 1.2;
         let c = o ? pal.outline : pal.body;
         if (!o && pattern >= 1 && (dx + dy) % 3 === 0) c = pal.accent;
-        if (!o && pattern >= 2 && _sr(dx, dy, seed) > 0.75) c = pal2.body;
+        if (!o && pattern >= 2 && spatialRandom(dx, dy, seed) > 0.75) c = pal2.body;
         if (!o && pattern >= 3 && Math.abs(dx) < 2) c = pal2.accent;
         setPixel(grid, cx + dx, cy + dy, c);
       }

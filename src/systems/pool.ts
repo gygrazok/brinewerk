@@ -2,7 +2,7 @@ import type { GameState } from '../core/game-state';
 import type { Creature } from '../creatures/creature';
 import { CreatureType } from '../creatures/types';
 import { getSlotById, unlockedSlots, getNearbySlots, slotCount } from './coords';
-import { getExpansionCost } from '../core/balance';
+import { getExpansionCost, BLOBID_SYMBIOSIS_BASE, BLOBID_SYMBIOSIS_SCALE } from '../core/balance';
 
 /** Adjacency radius for proximity-based bonuses (px in world space) */
 const ADJACENCY_RADIUS = 120;
@@ -56,7 +56,7 @@ export function calculateAdjacencyBonus(state: GameState, slotId: string): numbe
   let bonus = 0;
   for (const adj of adjacent) {
     if (adj.type === CreatureType.Blobid) {
-      bonus += 0.15 + adj.genes.tentacles * 0.10;
+      bonus += BLOBID_SYMBIOSIS_BASE + adj.genes.tentacles * BLOBID_SYMBIOSIS_SCALE;
     }
   }
   return bonus;

@@ -6,8 +6,8 @@ import { renderBlobid } from './types/blobid';
 import { renderCorallid } from './types/corallid';
 import { renderNucleid } from './types/nucleid';
 import { type PixelGrid, CANVAS_PX, BLOCK_PX, GRID_SIZE, renderGridToCanvas } from './pixel-grid';
-import { getRareFilter } from './shader-loader';
-import { getPixelEffect } from './effects';
+import { getRareFilter, createRareFilter } from './shader-loader';
+import { getPixelEffect, cleanupEffectState } from './effects';
 import { getPalette } from './palette';
 
 type TypeRenderer = (genes: Creature['genes'], time: number, seed: number) => PixelGrid;
@@ -33,6 +33,12 @@ export interface CreatureVisual {
   /** The single texture backed by the canvas — updated every frame */
   texture: Texture;
   timeOffset: number;
+  /** Private filter owned by this visual (if any) — destroyed with the visual */
+  _ownedFilter: Filter | null;
+  /** Key used for per-creature effect state (frost twinkles, toxic bubbles).
+   *  Defaults to creature.id; preview visuals use a unique suffix to avoid
+   *  sharing mutable state with the game visual. */
+  effectKey: string;
 }
 
 /** Parse hex color to 0xRRGGBB number */
@@ -40,8 +46,12 @@ function hexToNum(hex: string): number {
   return parseInt(hex.slice(1), 16);
 }
 
-/** Create a renderable creature visual with real-time rendering */
-export function createCreatureVisual(creature: Creature): CreatureVisual {
+/**
+ * Create a renderable creature visual with real-time rendering.
+ * @param ownFilters If true, creates private filter instances owned by this visual
+ *                   (for ephemeral views like panels). Defaults to false (shared cache).
+ */
+export function createCreatureVisual(creature: Creature, ownFilters = false): CreatureVisual {
   // Create offscreen canvas for pixel grid rendering
   const canvas = document.createElement('canvas');
   canvas.width = CANVAS_PX;
@@ -64,10 +74,14 @@ export function createCreatureVisual(creature: Creature): CreatureVisual {
   mainSprite.height = displaySize;
 
   // Rare effect filter on main sprite
+  let ownedFilter: Filter | null = null;
   const mainFilters: Filter[] = [];
   if (creature.rare) {
-    const rf = getRareFilter(creature.rare);
-    if (rf) mainFilters.push(rf);
+    const rf = ownFilters ? createRareFilter(creature.rare) : getRareFilter(creature.rare);
+    if (rf) {
+      mainFilters.push(rf);
+      if (ownFilters) ownedFilter = rf;
+    }
   }
   if (mainFilters.length > 0) {
     mainSprite.filters = mainFilters;
@@ -116,6 +130,8 @@ export function createCreatureVisual(creature: Creature): CreatureVisual {
     ctx,
     texture,
     timeOffset: Math.random() * 100,
+    _ownedFilter: ownedFilter,
+    effectKey: ownFilters ? `${creature.id}_preview` : creature.id,
   };
 }
 
@@ -130,13 +146,18 @@ export function updateCreatureVisual(visual: CreatureVisual, _deltaSec: number, 
   // Apply pixel-level rare effect (if any)
   if (visual.creature.rare) {
     const fx = getPixelEffect(visual.creature.rare);
-    if (fx) fx(grid, time, visual.creature.id);
+    if (fx) fx(grid, time, visual.effectKey);
   }
 
   renderGridToCanvas(grid, visual.ctx);
 
   // Tell PixiJS the texture source has changed
   visual.texture.source.update();
+
+  // Update uTime on privately-owned filter (preview panels)
+  if (visual._ownedFilter) {
+    visual._ownedFilter.resources.rareUniforms.uniforms.uTime = time;
+  }
 
   // Subtle glow pulse
   if (visual.glowSprite) {
@@ -148,6 +169,13 @@ export function updateCreatureVisual(visual: CreatureVisual, _deltaSec: number, 
 
 /** Destroy a creature visual and free resources */
 export function destroyCreatureVisual(visual: CreatureVisual): void {
+  // Destroy privately-owned filter (preview panels)
+  if (visual._ownedFilter) {
+    visual._ownedFilter.destroy();
+    visual._ownedFilter = null;
+  }
+  // Clean up per-visual effect state (frost twinkles, toxic bubbles)
+  cleanupEffectState(visual.effectKey);
   visual.sprite.destroy({ children: true });
   visual.texture.destroy(true);
 }

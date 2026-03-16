@@ -1,7 +1,7 @@
 import { Application } from 'pixi.js';
 import { initGameLoop, getState, getClock, onTide } from './core/game-loop';
 import { initRenderer } from './rendering/renderer';
-import { createPoolView, syncPoolVisuals, updatePoolVisuals } from './ui/pool-view';
+import { createPoolView, destroyPoolView, syncPoolVisuals, updatePoolVisuals } from './ui/pool-view';
 import { showCreaturePanel, hideCreaturePanel } from './ui/creature-panel';
 import { getCreatureAt, calculateAdjacencyBonus, placeCreature, removeCreature, findEmptySlot, expandPool } from './systems/pool';
 import { forceInitialTide } from './systems/tides';
@@ -12,8 +12,10 @@ import { showUpgradeModal } from './ui/upgrade-modal';
 import { initDebugMenu } from './ui/debug-menu';
 import { injectTheme } from './ui/theme';
 import { loadRenderSettings } from './rendering/render-settings';
+import { destroyRareFilterCache } from './rendering/shader-loader';
 
 const app = new Application();
+let currentPoolView: import('./ui/pool-view').PoolView | null = null;
 
 async function init() {
   // Load render settings before anything renders
@@ -43,6 +45,7 @@ async function init() {
   forceInitialTide(state);
 
   const poolView = createPoolView(app, state);
+  currentPoolView = poolView;
 
   // Handle slot clicks
   let heldCreature: import('./creatures/creature').Creature | null = null;
@@ -154,6 +157,21 @@ async function init() {
   console.log('Brinewerk initialized');
 }
 
+/** Tear down all game resources (for HMR or full app destroy) */
+function cleanup(): void {
+  if (currentPoolView) {
+    destroyPoolView(currentPoolView);
+    currentPoolView = null;
+  }
+  destroyRareFilterCache();
+  hideCreaturePanel();
+}
+
 init();
+
+// Vite HMR: clean up before hot-reloading to prevent listener leaks
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => cleanup());
+}
 
 export { app };

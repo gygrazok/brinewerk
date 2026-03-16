@@ -1,13 +1,27 @@
 import type { GameState } from '../core/game-state';
 import { type Creature, createCreature } from '../creatures/creature';
 import { CreatureType } from '../creatures/types';
-import { TIDE_INTERVAL_MIN, TIDE_INTERVAL_MAX } from '../core/balance';
+import {
+  TIDE_INTERVAL_MIN, TIDE_INTERVAL_MAX,
+  PICKUP_BASE_COST, PICKUP_SIZE_SCALE, PICKUP_ARMS_SCALE, PICKUP_RARE_MULTIPLIER,
+} from '../core/balance';
 import { allSlots } from './coords';
 
 const SHORE_CAPACITY = 3;
 
 /** Phase 1 creature types available from tides */
 const TIDE_TYPES = [CreatureType.Stellarid, CreatureType.Blobid];
+
+/** Generate 1-3 random tide creatures */
+function generateTideCreatures(): Creature[] {
+  const count = 1 + Math.floor(Math.random() * 3);
+  const creatures: Creature[] = [];
+  for (let i = 0; i < Math.min(count, SHORE_CAPACITY); i++) {
+    const type = TIDE_TYPES[Math.floor(Math.random() * TIDE_TYPES.length)];
+    creatures.push(createCreature(type));
+  }
+  return creatures;
+}
 
 /** Check if a new tide should arrive */
 export function checkTide(state: GameState, now: number): boolean {
@@ -16,29 +30,21 @@ export function checkTide(state: GameState, now: number): boolean {
 
   if (elapsed < interval) return false;
 
-  // Generate tide creatures
-  const count = 1 + Math.floor(Math.random() * 3); // 1-3
-  state.shore = []; // wash away old ones
-
-  for (let i = 0; i < Math.min(count, SHORE_CAPACITY); i++) {
-    const type = TIDE_TYPES[Math.floor(Math.random() * TIDE_TYPES.length)];
-    state.shore.push(createCreature(type));
-  }
-
+  state.shore = generateTideCreatures();
   state.lastTideTimestamp = now;
   return true;
 }
 
 /** Calculate plankton cost to pick up a creature from shore */
 export function calculatePickupCost(creature: Creature): number {
-  let baseCost = 30;
+  let baseCost = PICKUP_BASE_COST;
 
   // Scale with creature quality
-  baseCost += creature.genes.size * 20;
-  baseCost += creature.genes.arms * 10;
+  baseCost += creature.genes.size * PICKUP_SIZE_SCALE;
+  baseCost += creature.genes.arms * PICKUP_ARMS_SCALE;
 
   // Rare creatures cost more
-  if (creature.rare) baseCost *= 2.5;
+  if (creature.rare) baseCost *= PICKUP_RARE_MULTIPLIER;
 
   return Math.round(baseCost);
 }
@@ -59,12 +65,7 @@ export function pickUpCreature(state: GameState, shoreIndex: number): Creature |
 
 /** Force a tide immediately (debug / manual trigger) */
 export function forceTide(state: GameState): void {
-  const count = 1 + Math.floor(Math.random() * 3);
-  state.shore = [];
-  for (let i = 0; i < Math.min(count, SHORE_CAPACITY); i++) {
-    const type = TIDE_TYPES[Math.floor(Math.random() * TIDE_TYPES.length)];
-    state.shore.push(createCreature(type));
-  }
+  state.shore = generateTideCreatures();
   state.lastTideTimestamp = Date.now();
 }
 

@@ -1,5 +1,5 @@
 import { type PixelGrid, GRID_SIZE, setPixel } from '../pixel-grid';
-import { rgbHex, effectHash } from './util';
+import { rgbHex, effectHash, findTopPixels } from './util';
 
 const MAX_BUBBLES = 6;
 const BUBBLE_LIFE = 1.8;
@@ -20,20 +20,17 @@ interface BubbleCtx { bubbles: ToxicBubble[]; lastSpawnTime: number; }
 /** Per-creature toxic bubble state, keyed by creature id */
 const bubbleState = new Map<string, BubbleCtx>();
 
+/** Remove state for a creature that no longer exists */
+export function cleanupToxicState(creatureId: string): void {
+  bubbleState.delete(creatureId);
+}
+
 /**
  * Pixel-level toxic bubbles rising from creature body.
  * Spawns small green bubbles that float upward with slight lateral drift.
  */
 export function applyToxicEffect(grid: PixelGrid, time: number, creatureId: string): void {
-  // Find top pixels per column (surface of the body)
-  const topPixels = new Map<number, number>();
-  for (const key in grid) {
-    const [x, y] = key.split(',').map(Number);
-    const cur = topPixels.get(x);
-    if (cur === undefined || y < cur) {
-      topPixels.set(x, y);
-    }
-  }
+  const topPixels = findTopPixels(grid);
 
   if (topPixels.size === 0) return;
 

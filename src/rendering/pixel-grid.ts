@@ -1,6 +1,5 @@
 import type { Palette } from './palette';
 import type { Genotype } from '../creatures/creature';
-import { spatialRandom } from '../util/prng';
 
 export const GRID_SIZE = 40;
 export const BLOCK_PX = 3;
@@ -79,4 +78,5 @@ export function renderGridToCanvas(grid: PixelGrid, ctx: CanvasRenderingContext2
   }
 }
 
-export { spatialRandom as _sr };
+/** Re-export for creature type renderers that need seeded noise per pixel */
+export { spatialRandom } from '../util/prng';

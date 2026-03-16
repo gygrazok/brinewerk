@@ -33,12 +33,14 @@ export interface UpgradeAnchor {
   upgradeType: UpgradeType | null;
 }
 
+export type ResourceBundle = { plankton: number; minerite: number; lux: number };
+
 export interface GameState {
   saveVersion: number;
   seabedSeed: number;
   creatures: Creature[];
   pool: SeabedPool;
-  resources: { plankton: number; minerite: number; lux: number };
+  resources: ResourceBundle;
   upgradeAnchors: UpgradeAnchor[];
   shore: Creature[];
   lastSaveTimestamp: number;

@@ -4,8 +4,11 @@
 export const TIDE_INTERVAL_MIN = 180; // 3 min
 export const TIDE_INTERVAL_MAX = 300; // 5 min
 
-/** Base production: Stellarid ~1 plankton/s with average genes */
-export const BASE_PRODUCTION_MULTIPLIER = 1.0;
+/** Production formula: base = TYPE_MUL * (SIZE_BASE + size * SIZE_SCALE) * (ARMS_BASE + arms * ARMS_SCALE) */
+export const PROD_SIZE_BASE = 0.5;
+export const PROD_SIZE_SCALE = 0.5;
+export const PROD_ARMS_BASE = 0.8;
+export const PROD_ARMS_SCALE = 0.4;
 
 /** Shore pickup costs */
 export const PICKUP_BASE_COST = 30;
@@ -25,7 +28,7 @@ export const UPGRADE_ALGAE_COLONY_COST = 200;
 export const UPGRADE_ALGAE_COLONY_BONUS = 0.25; // +25% production
 
 /** Pool expansion costs by slot count tier */
-export function getExpansionCost(currentSlotCount: number): { plankton: number; minerite: number; lux: number } {
+export function getExpansionCost(currentSlotCount: number): import('./game-state').ResourceBundle {
   if (currentSlotCount < 4) return { plankton: 50, minerite: 0, lux: 0 };
   if (currentSlotCount < 9) return { plankton: 150, minerite: 0, lux: 0 };
   if (currentSlotCount < 16) return { plankton: 500, minerite: 50, lux: 0 };

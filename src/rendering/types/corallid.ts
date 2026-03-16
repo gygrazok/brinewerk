@@ -1,6 +1,6 @@
 import type { Genotype } from '../../creatures/creature';
 import { getPalette } from '../palette';
-import { type PixelGrid, setPixel, fillCircle, _sr } from '../pixel-grid';
+import { type PixelGrid, setPixel, fillCircle, spatialRandom } from '../pixel-grid';
 
 export function renderCorallid(genes: Genotype, time: number, seed: number): PixelGrid {
   const grid: PixelGrid = {};
@@ -42,7 +42,7 @@ export function renderCorallid(genes: Genotype, time: number, seed: number): Pix
         const edge = Math.abs(s) >= w || t === len - 1;
         let c = edge ? pal.outline : pal.body;
         if (!edge && pattern >= 1 && t % 3 === 0) c = pal.accent;
-        if (!edge && pattern >= 2 && _sr(bx, by, seed) > 0.7) c = pal2.body;
+        if (!edge && pattern >= 2 && spatialRandom(bx, by, seed) > 0.7) c = pal2.body;
         setPixel(grid, ppx, ppy, c);
       }
 
@@ -55,7 +55,7 @@ export function renderCorallid(genes: Genotype, time: number, seed: number): Pix
   const topY = cy + baseY - baseH;
   for (let i = 0; i < branches; i++) {
     const angle = -Math.PI / 2 + (i - (branches - 1) / 2) * (1.2 / branches);
-    const len = Math.round(size * (0.6 + _sr(i, 1, seed) * 0.4));
+    const len = Math.round(size * (0.6 + spatialRandom(i, 1, seed) * 0.4));
     drawBranch(cx, topY, angle, len, 0);
 
     for (let j = 0; j < Math.round(density * 3); j++) {

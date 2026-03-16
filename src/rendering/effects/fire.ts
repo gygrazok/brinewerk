@@ -1,20 +1,12 @@
 import { type PixelGrid, GRID_SIZE, setPixel } from '../pixel-grid';
-import { rgbHex } from './util';
+import { rgbHex, findTopPixels } from './util';
 
 /**
  * Pixel-level fire strands rising from creature body (POC style).
  * Finds top pixels per column and generates animated strands going upward.
  */
 export function applyFireEffect(grid: PixelGrid, time: number): void {
-  // Find top pixel (minimum y) for each x column
-  const topPixels = new Map<number, number>();
-  for (const key in grid) {
-    const [x, y] = key.split(',').map(Number);
-    const cur = topPixels.get(x);
-    if (cur === undefined || y < cur) {
-      topPixels.set(x, y);
-    }
-  }
+  const topPixels = findTopPixels(grid);
 
   // Generate fire strands from each top pixel
   for (const [x, y] of topPixels) {

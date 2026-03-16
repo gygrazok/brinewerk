@@ -18,6 +18,11 @@ interface TwinkleCtx { twinkles: Twinkle[]; lastSpawnTime: number; }
 /** Per-creature twinkle state */
 const twinkleState = new Map<string, TwinkleCtx>();
 
+/** Remove state for a creature that no longer exists */
+export function cleanupFrostState(creatureId: string): void {
+  twinkleState.delete(creatureId);
+}
+
 /**
  * Pixel-level frost twinkles: small "+" shapes that appear and fade
  * around the creature body edges.

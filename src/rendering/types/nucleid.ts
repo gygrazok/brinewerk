@@ -1,6 +1,6 @@
 import type { Genotype } from '../../creatures/creature';
 import { getPalette } from '../palette';
-import { type PixelGrid, setPixel, fillCircle, addEyes, _sr } from '../pixel-grid';
+import { type PixelGrid, setPixel, fillCircle, addEyes, spatialRandom } from '../pixel-grid';
 
 export function renderNucleid(genes: Genotype, time: number, seed: number): PixelGrid {
   const grid: PixelGrid = {};
@@ -32,7 +32,7 @@ export function renderNucleid(genes: Genotype, time: number, seed: number): Pixe
 
         if (ad <= Math.abs(polyR) + 0.5) {
           const edge = ad > Math.abs(polyR) - 1.2;
-          let c = edge ? pal.outline : (pattern >= 2 && _sr(dx, dy, seed) > 0.8 ? c2 : c1);
+          let c = edge ? pal.outline : (pattern >= 2 && spatialRandom(dx, dy, seed) > 0.8 ? c2 : c1);
           if (!edge && pattern >= 1 && (Math.abs(dx) + Math.abs(dy)) % 4 === 0) c = pal.accent;
           setPixel(grid, cx + dx, cy + dy, c);
         }

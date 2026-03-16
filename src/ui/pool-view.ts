@@ -13,8 +13,10 @@ import {
 import {
   createSeabedBackground,
   updateSeabedBackground,
+  destroySeabedBackground,
   type SeabedBackground,
 } from '../rendering/seabed-bg';
+import { cleanupEffectState } from '../rendering/effects/index';
 import { getRenderSettings } from '../rendering/render-settings';
 import { UPGRADE_ANCHORS } from '../systems/seabed-layout';
 
@@ -28,7 +30,6 @@ const HIT_RADIUS = 50;
 const ANCHOR_RADIUS = 16;
 
 
-let ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2.0;
 const DRAG_THRESHOLD = 4;
 
@@ -74,6 +75,9 @@ export interface PoolView {
   _app: Application;
   _worldW: number;
   _worldH: number;
+  _zoomMin: number;
+  /** Cleanup function — removes all event listeners and destroys resources */
+  _cleanup: (() => void) | null;
 }
 
 // --- Cost tooltip ---
@@ -187,6 +191,8 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
     _app: app,
     _worldW: pool.worldWidth,
     _worldH: pool.worldHeight,
+    _zoomMin: 0.5,
+    _cleanup: null,
   };
 
   let isPanning = false;
@@ -202,15 +208,14 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
   const updateMinZoom = () => {
     const screenW = app.screen.width;
     const screenH = app.screen.height;
-    ZOOM_MIN = Math.max(screenW / pool.worldWidth, screenH / pool.worldHeight);
-    if (poolView.zoom < ZOOM_MIN) {
-      poolView.zoom = ZOOM_MIN;
+    poolView._zoomMin = Math.max(screenW / pool.worldWidth, screenH / pool.worldHeight);
+    if (poolView.zoom < poolView._zoomMin) {
+      poolView.zoom = poolView._zoomMin;
       viewport.scale.set(poolView.zoom);
       clampViewport(poolView);
     }
   };
   updateMinZoom();
-  app.renderer.on('resize', updateMinZoom);
 
   // --- Zoom ---
   canvas.addEventListener('wheel', (e) => {
@@ -218,7 +223,7 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
     hideTooltip();
     const delta = e.deltaY > 0 ? -0.1 : 0.1;
     const oldZoom = poolView.zoom;
-    poolView.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, poolView.zoom + delta));
+    poolView.zoom = Math.max(poolView._zoomMin, Math.min(ZOOM_MAX, poolView.zoom + delta));
 
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left;
@@ -345,9 +350,57 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
   syncUpgradeAnchors(poolView);
 
   centerViewport(poolView, app);
-  app.renderer.on('resize', () => centerViewport(poolView, app));
+  const onResize = () => centerViewport(poolView, app);
+  app.renderer.on('resize', updateMinZoom);
+  app.renderer.on('resize', onResize);
+
+  // Store cleanup function to remove all external listeners
+  poolView._cleanup = () => {
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+    app.renderer.off('resize', updateMinZoom);
+    app.renderer.off('resize', onResize);
+  };
 
   return poolView;
+}
+
+/** Destroy a pool view, removing all event listeners and freeing resources */
+export function destroyPoolView(poolView: PoolView): void {
+  // Remove external event listeners
+  poolView._cleanup?.();
+  poolView._cleanup = null;
+
+  // Destroy creature visuals (and clean up effect state)
+  for (const [id, visual] of poolView.visuals) {
+    cleanupEffectState(id);
+    destroyCreatureVisual(visual);
+  }
+  poolView.visuals.clear();
+
+  // Destroy slot graphics
+  for (const gfx of poolView.slotGraphics.values()) gfx.destroy();
+  poolView.slotGraphics.clear();
+
+  // Destroy anchor graphics
+  for (const gfx of poolView._anchorGraphics.values()) gfx.destroy();
+  poolView._anchorGraphics.clear();
+
+  // Destroy glow graphics
+  for (const gfx of poolView._slotGlowGraphics.values()) gfx.destroy();
+  poolView._slotGlowGraphics.clear();
+
+  // Destroy seabed background (textures + containers)
+  if (poolView._seabedBg) {
+    destroySeabedBackground(poolView._seabedBg);
+    poolView._seabedBg = null;
+  }
+
+  // Remove tooltip if present
+  hideTooltip();
+
+  // Destroy viewport and all remaining children
+  poolView.viewport.destroy({ children: true });
 }
 
 function centerViewport(poolView: PoolView, _app: Application): void {

@@ -53,15 +53,13 @@ void main(void) {
 // Shared filter cache — one Filter per rare effect type
 const rareFilterCache = new Map<RareEffect, Filter>();
 
-export function getRareFilter(rare: RareEffect): Filter | null {
-  let filter = rareFilterCache.get(rare);
-  if (filter) return filter;
-
+/** Create a new Filter instance for a rare effect (not cached — caller owns lifecycle) */
+export function createRareFilter(rare: RareEffect): Filter | null {
   const fragment = RARE_FRAG[rare as keyof typeof RARE_FRAG];
-  if (!fragment) return null; // unknown rare type — render as normal creature
+  if (!fragment) return null;
 
   try {
-    filter = new Filter({
+    return new Filter({
       glProgram: new GlProgram({ vertex: defaultVertex, fragment }),
       padding: 12,
       resources: {
@@ -74,8 +72,18 @@ export function getRareFilter(rare: RareEffect): Filter | null {
     console.warn(`[shader] failed to compile filter for rare="${rare}":`, e);
     return null;
   }
+}
 
-  rareFilterCache.set(rare, filter);
+/**
+ * Get a shared/cached Filter for a rare effect (singleton per effect type).
+ * Do NOT use for ephemeral views (panels, previews) — use createRareFilter instead.
+ */
+export function getRareFilter(rare: RareEffect): Filter | null {
+  const cached = rareFilterCache.get(rare);
+  if (cached) return cached;
+
+  const filter = createRareFilter(rare);
+  if (filter) rareFilterCache.set(rare, filter);
   return filter;
 }
 
@@ -121,4 +129,12 @@ export function updateShaderTime(time: number): void {
   for (const filter of rareFilterCache.values()) {
     filter.resources.rareUniforms.uniforms.uTime = time;
   }
+}
+
+/** Destroy all cached filters and free GPU resources */
+export function destroyRareFilterCache(): void {
+  for (const filter of rareFilterCache.values()) {
+    filter.destroy();
+  }
+  rareFilterCache.clear();
 }

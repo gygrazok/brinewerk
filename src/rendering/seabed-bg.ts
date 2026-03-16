@@ -1,6 +1,7 @@
 import { Container, Sprite, Texture, Graphics } from 'pixi.js';
 import { getRenderSettings } from './render-settings';
 import { GRID_SIZE } from './pixel-grid';
+import { SeededRng, seededNoise } from '../util/prng';
 
 /**
  * Uniform pixel density across all pixel-art elements.
@@ -71,30 +72,6 @@ function getRockiness(x: number, w: number): number {
   if (t < 0.3) return Math.max(0, 1 - t / 0.3);
   if (t > 0.7) return Math.max(0, (t - 0.7) / 0.3);
   return 0;
-}
-
-// --- Seeded PRNG (mulberry32) ---
-
-class SeededRng {
-  private state: number;
-  constructor(seed: number) {
-    this.state = seed | 0;
-  }
-  /** Returns a float in [0, 1) */
-  next(): number {
-    this.state = (this.state + 0x6D2B79F5) | 0;
-    let t = Math.imul(this.state ^ (this.state >>> 15), 1 | this.state);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  }
-  /** Integer in [min, max] inclusive */
-  int(min: number, max: number): number {
-    return min + Math.floor(this.next() * (max - min + 1));
-  }
-  /** Float in [min, max) */
-  float(min: number, max: number): number {
-    return min + this.next() * (max - min);
-  }
 }
 
 /**
@@ -300,11 +277,6 @@ function paintGround(
   const fg = Math.round(sg + (rg - sg) * rk);
   const fb = Math.round(sb + (rb - sb) * rk);
   ctx.fillStyle = `rgb(${fr},${fg},${fb})`;
-}
-
-function seededNoise(n: number): number {
-  const s = Math.sin(n * 127.1 + 311.7) * 43758.5453;
-  return s - Math.floor(s);
 }
 
 // --- Pixel-art decorations ---
@@ -956,6 +928,28 @@ export function createSeabedBackground(worldW: number, worldH: number, seabedSee
   container.addChild(ambientParticles.gfx);
 
   return { container, sandSprite, decoContainer, ambientParticles, lightRays, swayingDecos, time: 0 };
+}
+
+/** Destroy all textures and children in a seabed background */
+export function destroySeabedBackground(bg: SeabedBackground): void {
+  // Destroy sand texture
+  bg.sandSprite.texture.destroy(true);
+  bg.sandSprite.destroy();
+
+  // Destroy each decoration sprite and its texture
+  for (const child of bg.decoContainer.children) {
+    if (child instanceof Sprite) {
+      child.texture.destroy(true);
+    }
+    child.destroy();
+  }
+  bg.decoContainer.destroy();
+
+  // Destroy light rays and ambient particles
+  bg.lightRays.container.destroy({ children: true });
+  bg.ambientParticles.gfx.destroy();
+
+  bg.container.destroy();
 }
 
 export function updateSeabedBackground(bg: SeabedBackground, dt: number): void {

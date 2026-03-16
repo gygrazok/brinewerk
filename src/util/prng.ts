@@ -9,8 +9,37 @@ export function mulberry32(seed: number): () => number {
   };
 }
 
+/** Stateful seeded PRNG with convenience methods (mulberry32-based) */
+export class SeededRng {
+  private state: number;
+  constructor(seed: number) {
+    this.state = seed | 0;
+  }
+  /** Returns a float in [0, 1) */
+  next(): number {
+    this.state = (this.state + 0x6D2B79F5) | 0;
+    let t = Math.imul(this.state ^ (this.state >>> 15), 1 | this.state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  /** Integer in [min, max] inclusive */
+  int(min: number, max: number): number {
+    return min + Math.floor(this.next() * (max - min + 1));
+  }
+  /** Float in [min, max) */
+  float(min: number, max: number): number {
+    return min + this.next() * (max - min);
+  }
+}
+
 /** Spatial hash noise — deterministic value for (x, y, seed) */
 export function spatialRandom(x: number, y: number, seed: number): number {
   const n = Math.sin(x * 127.1 + y * 311.7 + seed) * 43758.5453;
   return n - Math.floor(n);
+}
+
+/** 1D deterministic noise — hash a single number to [0, 1) */
+export function seededNoise(n: number): number {
+  const s = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return s - Math.floor(s);
 }
