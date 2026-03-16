@@ -81,10 +81,10 @@ export function initDebugMenu(
         forceTide(state);
         break;
       case 'reset-grid': {
-        // Reset pool to single slot, remove creatures from pool
+        // Reset pool to default seabed layout, remove creatures from slots
         const def = createDefaultState();
         state.pool = def.pool;
-        state.upgradeNodes = [];
+        state.upgradeAnchors = [];
         // Remove placed creatures (keep shore)
         state.creatures = state.creatures.filter((c) =>
           state.shore.some((s) => s.id === c.id)

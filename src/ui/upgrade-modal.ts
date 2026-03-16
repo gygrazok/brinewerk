@@ -108,8 +108,7 @@ function ensureModal(): { overlay: HTMLDivElement; modal: HTMLDivElement } {
 
 export function showUpgradeModal(
   state: GameState,
-  nodeR: number,
-  nodeC: number,
+  anchorId: string,
   onInstall: (type: UpgradeType) => void,
 ): void {
   const { overlay, modal } = ensureModal();
@@ -127,7 +126,7 @@ export function showUpgradeModal(
 
   for (const type of upgrades) {
     const def = UPGRADE_DEFS[type];
-    const canAfford = canInstallUpgrade(state, nodeR, nodeC, type);
+    const canAfford = canInstallUpgrade(state, anchorId, type);
     const disabledClass = canAfford ? '' : 'disabled';
 
     let costStr = '';

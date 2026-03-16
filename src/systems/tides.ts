@@ -70,7 +70,7 @@ export function forceTide(state: GameState): void {
 
 /** Force a tide (for initial game start) */
 export function forceInitialTide(state: GameState): void {
-  const hasPoolCreatures = allSlots(state.pool).some(([, , s]) => s.creatureId !== null);
+  const hasPoolCreatures = allSlots(state.pool).some(s => s.creatureId !== null);
 
   if (hasPoolCreatures) return; // already playing
 

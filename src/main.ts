@@ -11,11 +11,13 @@ import { installUpgrade } from './economy/upgrades';
 import { showUpgradeModal } from './ui/upgrade-modal';
 import { initDebugMenu } from './ui/debug-menu';
 import { injectTheme } from './ui/theme';
+import { loadRenderSettings } from './rendering/render-settings';
 
 const app = new Application();
 
 async function init() {
-  // Inject centralized theme/layout CSS before anything renders
+  // Load render settings before anything renders
+  loadRenderSettings();
   injectTheme();
 
   const gameContainer = document.getElementById('game')!;
@@ -45,10 +47,10 @@ async function init() {
   // Handle slot clicks
   let heldCreature: import('./creatures/creature').Creature | null = null;
 
-  poolView.onSlotClick = (row, col) => {
+  poolView.onSlotClick = (slotId: string) => {
     // Place held creature
     if (heldCreature) {
-      if (placeCreature(state, heldCreature, row, col)) {
+      if (placeCreature(state, heldCreature, slotId)) {
         heldCreature = null;
         syncPoolVisuals(poolView, state);
         renderShore(state);
@@ -57,9 +59,9 @@ async function init() {
       return;
     }
 
-    const creature = getCreatureAt(state, row, col);
+    const creature = getCreatureAt(state, slotId);
     if (creature) {
-      const bonus = calculateAdjacencyBonus(state, row, col);
+      const bonus = calculateAdjacencyBonus(state, slotId);
       showCreaturePanel(creature, bonus);
     } else {
       hideCreaturePanel();
@@ -67,34 +69,33 @@ async function init() {
   };
 
   // Handle creature drag & drop between slots
-  poolView.onCreatureDrop = (fromR, fromC, toR, toC) => {
-    const creature = removeCreature(state, fromR, fromC);
-    if (creature && placeCreature(state, creature, toR, toC)) {
+  poolView.onCreatureDrop = (fromSlotId: string, toSlotId: string) => {
+    const creature = removeCreature(state, fromSlotId);
+    if (creature && placeCreature(state, creature, toSlotId)) {
       syncPoolVisuals(poolView, state);
       updateHud(state);
     } else if (creature) {
       // Rollback: put creature back
-      placeCreature(state, creature, fromR, fromC);
+      placeCreature(state, creature, fromSlotId);
     }
   };
 
-  // Handle expansion clicks
-  poolView.onExpansionClick = (row, col) => {
-    if (expandPool(state, row, col)) {
+  // Handle expansion clicks (unlock locked slots)
+  poolView.onExpansionClick = (slotId: string) => {
+    if (expandPool(state, slotId)) {
       syncPoolVisuals(poolView, state);
       updateHud(state);
-      renderShore(state); // update shore cards (grid may no longer be full)
+      renderShore(state);
     }
   };
 
-  // Handle upgrade node clicks
-  poolView.onUpgradeNodeClick = (row, col) => {
-    // Check if node already has an upgrade
-    const existing = state.upgradeNodes.find((n) => n.row === row && n.col === col);
-    if (existing?.upgradeType) return; // already upgraded
+  // Handle upgrade anchor clicks
+  poolView.onUpgradeNodeClick = (anchorId: string) => {
+    const existing = state.upgradeAnchors.find(a => a.id === anchorId);
+    if (existing?.upgradeType) return;
 
-    showUpgradeModal(state, row, col, (type) => {
-      if (installUpgrade(state, row, col, type)) {
+    showUpgradeModal(state, anchorId, (type) => {
+      if (installUpgrade(state, anchorId, type)) {
         syncPoolVisuals(poolView, state);
         updateHud(state);
       }
@@ -103,9 +104,9 @@ async function init() {
 
   // Shore: pick up creature → auto-place or hold
   setOnPickUp((creature) => {
-    const emptySlot = findEmptySlot(state);
-    if (emptySlot) {
-      placeCreature(state, creature, emptySlot[0], emptySlot[1]);
+    const emptySlotId = findEmptySlot(state);
+    if (emptySlotId) {
+      placeCreature(state, creature, emptySlotId);
       syncPoolVisuals(poolView, state);
       updateHud(state);
     } else {

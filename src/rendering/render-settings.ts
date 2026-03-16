@@ -1,0 +1,75 @@
+const STORAGE_KEY = 'brinewerk_render';
+
+export interface RenderSettings {
+  sandBackground: boolean;
+  decorations: boolean;
+  ambientParticles: boolean;
+  lightRays: boolean;
+  creatureGlow: boolean;
+  rareShaders: boolean;
+  rarePixelFx: boolean;
+  slotGlow: boolean;
+}
+
+const DEFAULTS: RenderSettings = {
+  sandBackground: true,
+  decorations: true,
+  ambientParticles: true,
+  lightRays: true,
+  creatureGlow: true,
+  rareShaders: true,
+  rarePixelFx: true,
+  slotGlow: true,
+};
+
+export type RenderPreset = 'high' | 'medium' | 'low';
+
+const PRESETS: Record<RenderPreset, Partial<RenderSettings>> = {
+  high: {},
+  medium: { lightRays: false, ambientParticles: false },
+  low: {
+    lightRays: false,
+    ambientParticles: false,
+    decorations: false,
+    creatureGlow: false,
+    rareShaders: false,
+    rarePixelFx: false,
+    slotGlow: false,
+  },
+};
+
+let settings: RenderSettings = { ...DEFAULTS };
+
+export function getRenderSettings(): Readonly<RenderSettings> {
+  return settings;
+}
+
+export function setRenderSetting<K extends keyof RenderSettings>(key: K, value: boolean): void {
+  settings[key] = value;
+  saveRenderSettings();
+}
+
+export function applyPreset(preset: RenderPreset): void {
+  settings = { ...DEFAULTS, ...PRESETS[preset] };
+  saveRenderSettings();
+}
+
+export function loadRenderSettings(): void {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<RenderSettings>;
+      settings = { ...DEFAULTS, ...parsed };
+    }
+  } catch {
+    // corrupt data — use defaults
+  }
+}
+
+function saveRenderSettings(): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+    // localStorage full or unavailable
+  }
+}

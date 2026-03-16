@@ -1,33 +1,44 @@
 import type { Creature } from '../creatures/creature';
-import type { CoordKey } from '../systems/coords';
-import { toKey } from '../systems/coords';
+import { SEABED_SLOTS } from '../systems/seabed-layout';
 
 const SAVE_KEY = 'brinewerk_save';
-const CURRENT_SAVE_VERSION = 2;
+const CURRENT_SAVE_VERSION = 3;
 
-export interface PoolSlot {
+// --- Seabed pool (v3+) ---
+
+export type SlotTheme = 'rock' | 'coral' | 'shell' | 'anemone' | 'vent';
+
+export interface SeabedSlot {
+  id: string;
+  x: number;
+  y: number;
   creatureId: string | null;
+  unlocked: boolean;
+  theme: SlotTheme;
+  tier: number;
 }
 
-export interface SparsePool {
-  slots: Record<CoordKey, PoolSlot>;
+export interface SeabedPool {
+  slots: Record<string, SeabedSlot>;
+  worldWidth: number;
+  worldHeight: number;
 }
 
 export type UpgradeType = 'algae_colony';
 
-export interface UpgradeNode {
+export interface UpgradeAnchor {
   id: string;
-  row: number; // top-left of the 2x2 block
-  col: number;
+  x: number;
+  y: number;
   upgradeType: UpgradeType | null;
 }
 
 export interface GameState {
   saveVersion: number;
   creatures: Creature[];
-  pool: SparsePool;
+  pool: SeabedPool;
   resources: { plankton: number; minerite: number; lux: number };
-  upgradeNodes: UpgradeNode[];
+  upgradeAnchors: UpgradeAnchor[];
   shore: Creature[];
   lastSaveTimestamp: number;
   lastTideTimestamp: number;
@@ -35,15 +46,17 @@ export interface GameState {
 }
 
 export function createDefaultState(): GameState {
-  const pool: SparsePool = { slots: {} };
-  pool.slots[toKey(0, 0)] = { creatureId: null };
+  const pool: SeabedPool = { slots: {}, worldWidth: 1920, worldHeight: 1080 };
+  for (const def of SEABED_SLOTS) {
+    pool.slots[def.id] = { ...def, creatureId: null };
+  }
 
   return {
     saveVersion: CURRENT_SAVE_VERSION,
     creatures: [],
     pool,
     resources: { plankton: 0, minerite: 0, lux: 0 },
-    upgradeNodes: [],
+    upgradeAnchors: [],
     shore: [],
     lastSaveTimestamp: Date.now(),
     lastTideTimestamp: Date.now(),
@@ -79,39 +92,72 @@ export function clearSave(): void {
 function migrateState(data: Record<string, unknown>): GameState {
   const version = (data.saveVersion as number) ?? 1;
 
+  // V1 → V2: dense pool[][] → SparsePool (intermediate step)
   if (version < 2) {
-    // V1 → V2: dense pool[][] → SparsePool, structures → upgradeNodes
     const oldPool = data.pool as { creatureId: string | null }[][] | undefined;
-    const newPool: SparsePool = { slots: {} };
+    const sparseSlots: Record<string, { creatureId: string | null }> = {};
 
     if (Array.isArray(oldPool)) {
       for (let r = 0; r < oldPool.length; r++) {
         for (let c = 0; c < oldPool[r].length; c++) {
           const slot = oldPool[r][c];
-          // Skip slots occupied by structures (struct:xxx)
-          if (slot.creatureId && slot.creatureId.startsWith('struct:')) {
-            newPool.slots[toKey(r, c)] = { creatureId: null };
-          } else {
-            newPool.slots[toKey(r, c)] = { creatureId: slot.creatureId };
-          }
+          const cid = slot.creatureId && slot.creatureId.startsWith('struct:') ? null : slot.creatureId;
+          sparseSlots[`${r},${c}`] = { creatureId: cid };
         }
       }
     } else {
-      // Fallback: single slot
-      newPool.slots[toKey(0, 0)] = { creatureId: null };
+      sparseSlots['0,0'] = { creatureId: null };
     }
 
-    // Refund structure costs as plankton
-    const oldStructures = data.structures as { id: string; type: string; row: number; col: number }[] | undefined;
+    // Refund structure costs
+    const oldStructures = data.structures as { length: number } | undefined;
     const resources = data.resources as { plankton: number; minerite: number; lux: number };
     if (oldStructures && oldStructures.length > 0) {
-      resources.plankton += oldStructures.length * 500; // refund ALGAE_COLONY_COST
+      resources.plankton += oldStructures.length * 500;
+    }
+
+    data.pool = { slots: sparseSlots };
+    data.upgradeNodes = [];
+    data.saveVersion = 2;
+    delete data.structures;
+  }
+
+  // V2 → V3: SparsePool (grid) → SeabedPool (scattered slots)
+  if ((data.saveVersion as number) < 3) {
+    const oldPool = data.pool as { slots: Record<string, { creatureId: string | null }> };
+    const oldCreatureIds: string[] = [];
+
+    // Collect creature IDs from old grid slots
+    for (const slot of Object.values(oldPool.slots)) {
+      if (slot.creatureId) oldCreatureIds.push(slot.creatureId);
+    }
+
+    // Build new SeabedPool from layout, mapping old creatures to first N slots
+    const newPool: SeabedPool = { slots: {}, worldWidth: 1920, worldHeight: 1080 };
+    let creatureIdx = 0;
+    for (const def of SEABED_SLOTS) {
+      const cid = creatureIdx < oldCreatureIds.length ? oldCreatureIds[creatureIdx] : null;
+      // Unlock enough slots for existing creatures, plus starter slots
+      const needsUnlock = cid !== null || def.tier === 0;
+      newPool.slots[def.id] = {
+        ...def,
+        creatureId: cid,
+        unlocked: needsUnlock || def.unlocked,
+      };
+      if (cid !== null) creatureIdx++;
+    }
+
+    // Refund old upgrade nodes as plankton
+    const oldNodes = data.upgradeNodes as unknown[] | undefined;
+    if (oldNodes && oldNodes.length > 0) {
+      const resources = data.resources as { plankton: number };
+      resources.plankton += oldNodes.length * 200;
     }
 
     data.pool = newPool;
-    data.upgradeNodes = [];
+    data.upgradeAnchors = [];
+    delete data.upgradeNodes;
     data.saveVersion = CURRENT_SAVE_VERSION;
-    delete data.structures;
   }
 
   return data as unknown as GameState;

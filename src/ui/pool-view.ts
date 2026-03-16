@@ -1,49 +1,49 @@
-import { Container, Graphics, Sprite, Text, TextStyle } from 'pixi.js';
+import { Container, Graphics, Sprite } from 'pixi.js';
 import type { Application } from 'pixi.js';
-import type { GameState } from '../core/game-state';
+import type { GameState, SeabedSlot } from '../core/game-state';
 import { getCreatureAt } from '../systems/pool';
 import { getExpansionCost } from '../core/balance';
-import {
-  allSlots,
-  slotCount,
-  getSlot,
-  getGridBounds,
-  getExpansionCandidates,
-  getUpgradeNodePositions,
-  toKey,
-  type CoordKey,
-} from '../systems/coords';
+import { allSlots, slotCount, worldToSlot } from '../systems/coords';
 import {
   createCreatureVisual,
   updateCreatureVisual,
   destroyCreatureVisual,
   type CreatureVisual,
 } from '../rendering/creature-renderer';
+import {
+  createSeabedBackground,
+  updateSeabedBackground,
+  type SeabedBackground,
+} from '../rendering/seabed-bg';
+import { getRenderSettings } from '../rendering/render-settings';
+import { UPGRADE_ANCHORS } from '../systems/seabed-layout';
 
-const SLOT_SIZE = 80; // px per slot
-const SLOT_PAD = 6;
+const SLOT_SIZE = 80;
 const CREATURE_DISPLAY = 64;
 const SLOT_BG = 0x0d2228;
 const SLOT_BORDER = 0x1a3a3f;
 const SLOT_HOVER = 0x3aada8;
+const SLOT_LOCKED_ALPHA = 0.3;
+const HIT_RADIUS = 50;
+const ANCHOR_RADIUS = 16;
 
-const EXPAND_BTN_SIZE = 40;
-const EXPAND_BG = 0x0a1a20;
-const EXPAND_BORDER = 0x1a3a3f;
-const EXPAND_HOVER_BORDER = 0x3aada8;
 
-const NODE_SIZE = 24;
-const NODE_EMPTY_COLOR = 0x1a3a3f;
-const NODE_ACTIVE_COLOR = 0x4aad4a;
-
-const ZOOM_MIN = 0.5;
+let ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2.0;
 const DRAG_THRESHOLD = 4;
 
+// Theme-specific slot border colors
+const THEME_COLORS: Record<string, number> = {
+  rock:    0x3a5a60,
+  coral:   0x8b3366,
+  shell:   0xaa9060,
+  anemone: 0x5a8a3a,
+  vent:    0x8a5a2a,
+};
+
 interface DragState {
   creatureId: string;
-  sourceRow: number;
-  sourceCol: number;
+  sourceSlotId: string;
   ghost: Sprite;
   startX: number;
   startY: number;
@@ -54,32 +54,29 @@ export interface PoolView {
   viewport: Container;
   gridContainer: Container;
   visuals: Map<string, CreatureVisual>;
-  slotGraphics: Map<CoordKey, Graphics>;
-  expandBtns: Map<CoordKey, Container>;
-  upgradeNodeGraphics: Map<CoordKey, Container>;
-  selectedSlot: [number, number] | null;
-  onSlotClick: ((row: number, col: number) => void) | null;
-  onExpansionClick: ((row: number, col: number) => void) | null;
-  onUpgradeNodeClick: ((row: number, col: number) => void) | null;
-  onCreatureDrop: ((fromR: number, fromC: number, toR: number, toC: number) => void) | null;
+  slotGraphics: Map<string, Graphics>;
+  onSlotClick: ((slotId: string) => void) | null;
+  onExpansionClick: ((slotId: string) => void) | null;
+  onUpgradeNodeClick: ((anchorId: string) => void) | null;
+  onCreatureDrop: ((fromSlotId: string, toSlotId: string) => void) | null;
   zoom: number;
-  /** Internal: true if user dragged (to suppress click after pan/drag) */
   _dragged: boolean;
-  /** Internal: latest state ref for tooltip cost display */
   _stateRef: GameState | null;
-  /** Internal: canvas ref for tooltip positioning */
   _canvas: HTMLCanvasElement | null;
-  /** Internal: last known grid bounds for shift detection */
-  _lastMinR: number;
-  _lastMinC: number;
-  /** Internal: creature drag state */
   _dragState: DragState | null;
-  /** Internal: z-order layers inside gridContainer */
   _slotLayer: Container;
   _creatureLayer: Container;
+  _seabedBg: SeabedBackground | null;
+  _anchorLayer: Container;
+  _anchorGraphics: Map<string, Graphics>;
+  _slotGlowLayer: Container;
+  _slotGlowGraphics: Map<string, Graphics>;
+  _app: Application;
+  _worldW: number;
+  _worldH: number;
 }
 
-// --- Cost tooltip (HTML overlay, module-level singleton) ---
+// --- Cost tooltip ---
 let tooltip: HTMLDivElement | null = null;
 
 function ensureTooltip(): HTMLDivElement {
@@ -111,21 +108,57 @@ function hideTooltip() {
   if (tooltip) tooltip.style.opacity = '0';
 }
 
-/** Convert grid row/col to pixel position relative to grid origin */
-function slotPixelX(col: number, minC: number): number {
-  return (col - minC) * (SLOT_SIZE + SLOT_PAD);
+/** Convert screen coordinates to world space via viewport transform */
+function screenToWorld(pv: PoolView, sx: number, sy: number): [number, number] {
+  const wx = (sx - pv.viewport.x) / pv.zoom;
+  const wy = (sy - pv.viewport.y) / pv.zoom;
+  return [wx, wy];
 }
 
-function slotPixelY(row: number, minR: number): number {
-  return (row - minR) * (SLOT_SIZE + SLOT_PAD);
+/** Clamp viewport so the world bounds stay within the screen */
+function clampViewport(pv: PoolView): void {
+  const screenW = pv._app.screen.width;
+  const screenH = pv._app.screen.height;
+  const worldW = pv._worldW * pv.zoom;
+  const worldH = pv._worldH * pv.zoom;
+
+  // If the world is smaller than the screen at this zoom, center it
+  if (worldW <= screenW) {
+    pv.viewport.x = (screenW - worldW) / 2;
+  } else {
+    // Don't let left edge go past screen left, or right edge past screen right
+    const minX = screenW - worldW;
+    const maxX = 0;
+    pv.viewport.x = Math.max(minX, Math.min(maxX, pv.viewport.x));
+  }
+
+  if (worldH <= screenH) {
+    pv.viewport.y = (screenH - worldH) / 2;
+  } else {
+    const minY = screenH - worldH;
+    const maxY = 0;
+    pv.viewport.y = Math.max(minY, Math.min(maxY, pv.viewport.y));
+  }
 }
 
 export function createPoolView(app: Application, _state: GameState): PoolView {
   const viewport = new Container();
   const gridContainer = new Container();
-  const slotLayer = new Container();      // behind: slot bgs, expand btns, upgrade nodes
-  const creatureLayer = new Container();   // front: creature sprites
+
+  // Create seabed background as the bottom-most layer
+  const pool = _state.pool;
+  const seabedBg = createSeabedBackground(pool.worldWidth, pool.worldHeight);
+  gridContainer.addChild(seabedBg.container);
+
+  // Slot glow layer (behind slots)
+  const slotGlowLayer = new Container();
+  gridContainer.addChild(slotGlowLayer);
+
+  const slotLayer = new Container();
+  const anchorLayer = new Container();
+  const creatureLayer = new Container();
   gridContainer.addChild(slotLayer);
+  gridContainer.addChild(anchorLayer);
   gridContainer.addChild(creatureLayer);
   viewport.addChild(gridContainer);
   app.stage.addChild(viewport);
@@ -135,9 +168,6 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
     gridContainer,
     visuals: new Map(),
     slotGraphics: new Map(),
-    expandBtns: new Map(),
-    upgradeNodeGraphics: new Map(),
-    selectedSlot: null,
     onSlotClick: null,
     onExpansionClick: null,
     onUpgradeNodeClick: null,
@@ -146,14 +176,19 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
     _dragged: false,
     _stateRef: null,
     _canvas: null,
-    _lastMinR: 0,
-    _lastMinC: 0,
     _dragState: null,
     _slotLayer: slotLayer,
     _creatureLayer: creatureLayer,
+    _seabedBg: seabedBg,
+    _anchorLayer: anchorLayer,
+    _anchorGraphics: new Map(),
+    _slotGlowLayer: slotGlowLayer,
+    _slotGlowGraphics: new Map(),
+    _app: app,
+    _worldW: pool.worldWidth,
+    _worldH: pool.worldHeight,
   };
 
-  // --- Zoom & Pan & Creature Drag ---
   let isPanning = false;
   let panStartX = 0;
   let panStartY = 0;
@@ -163,24 +198,21 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
   const canvas = app.canvas as HTMLCanvasElement;
   poolView._canvas = canvas;
 
-  /** Convert screen coordinates (relative to canvas) to grid row/col */
-  function screenToGrid(sx: number, sy: number): [number, number] | null {
-    // Screen → grid container local coordinates
-    const lx = (sx - viewport.x) / poolView.zoom;
-    const ly = (sy - viewport.y) / poolView.zoom;
-    const minR = poolView._lastMinR;
-    const minC = poolView._lastMinC;
-    const col = Math.floor(lx / (SLOT_SIZE + SLOT_PAD)) + minC;
-    const row = Math.floor(ly / (SLOT_SIZE + SLOT_PAD)) + minR;
-    // Check that point is within slot area (not in padding)
-    const slotLocalX = lx - (col - minC) * (SLOT_SIZE + SLOT_PAD);
-    const slotLocalY = ly - (row - minR) * (SLOT_SIZE + SLOT_PAD);
-    if (slotLocalX < 0 || slotLocalX >= SLOT_SIZE || slotLocalY < 0 || slotLocalY >= SLOT_SIZE) {
-      return null;
+  // Compute minimum zoom so world always covers the screen
+  const updateMinZoom = () => {
+    const screenW = app.screen.width;
+    const screenH = app.screen.height;
+    ZOOM_MIN = Math.max(screenW / pool.worldWidth, screenH / pool.worldHeight);
+    if (poolView.zoom < ZOOM_MIN) {
+      poolView.zoom = ZOOM_MIN;
+      viewport.scale.set(poolView.zoom);
+      clampViewport(poolView);
     }
-    return [row, col];
-  }
+  };
+  updateMinZoom();
+  app.renderer.on('resize', updateMinZoom);
 
+  // --- Zoom ---
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
     hideTooltip();
@@ -188,7 +220,6 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
     const oldZoom = poolView.zoom;
     poolView.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, poolView.zoom + delta));
 
-    // Zoom toward mouse pointer
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
@@ -197,35 +228,32 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
     viewport.x = mx - (mx - viewport.x) * scale;
     viewport.y = my - (my - viewport.y) * scale;
     viewport.scale.set(poolView.zoom);
+    clampViewport(poolView);
   }, { passive: false });
 
+  // --- Pointerdown: start creature drag or pan ---
   canvas.addEventListener('pointerdown', (e) => {
     poolView._dragged = false;
     const rect = canvas.getBoundingClientRect();
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
 
-    // Check if pointer is on an occupied slot → start creature drag candidate
-    const gridPos = screenToGrid(sx, sy);
-    if (gridPos && poolView._stateRef) {
-      const [row, col] = gridPos;
-      const slot = getSlot(poolView._stateRef.pool, row, col);
-      if (slot?.creatureId) {
+    if (poolView._stateRef) {
+      const [wx, wy] = screenToWorld(poolView, sx, sy);
+      const slot = worldToSlot(poolView._stateRef.pool, wx, wy, HIT_RADIUS);
+      if (slot?.unlocked && slot.creatureId) {
         poolView._dragState = {
           creatureId: slot.creatureId,
-          sourceRow: row,
-          sourceCol: col,
-          ghost: new Sprite(),  // placeholder, created on threshold
+          sourceSlotId: slot.id,
+          ghost: new Sprite(),
           startX: e.clientX,
           startY: e.clientY,
           active: false,
         };
-        // Don't start pan
         return;
       }
     }
 
-    // Otherwise: start pan
     isPanning = true;
     panStartX = e.clientX;
     panStartY = e.clientY;
@@ -236,7 +264,6 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
   const onPointerMove = (e: PointerEvent) => {
     const ds = poolView._dragState;
 
-    // --- Creature drag ---
     if (ds) {
       const dx = e.clientX - ds.startX;
       const dy = e.clientY - ds.startY;
@@ -246,27 +273,21 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
           ds.active = true;
           poolView._dragged = true;
 
-          // Create ghost sprite from the creature's visual
           const visual = poolView.visuals.get(ds.creatureId);
           if (visual) {
-            // Use a new sprite sharing the same texture
             const ghost = new Sprite(visual.texture);
             ghost.width = CREATURE_DISPLAY;
             ghost.height = CREATURE_DISPLAY;
             ghost.alpha = 0.6;
             ghost.anchor.set(0.5);
-            // Position in viewport coords (above everything)
             app.stage.addChild(ghost);
             ds.ghost = ghost;
-
-            // Dim the original
             visual.sprite.alpha = 0.3;
           }
         }
       }
 
       if (ds.active && ds.ghost.texture) {
-        // Position ghost at cursor (in screen/stage space)
         const rect = canvas.getBoundingClientRect();
         ds.ghost.x = e.clientX - rect.left;
         ds.ghost.y = e.clientY - rect.top;
@@ -274,7 +295,6 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
       return;
     }
 
-    // --- Pan ---
     if (!isPanning) return;
     const dx = e.clientX - panStartX;
     const dy = e.clientY - panStartY;
@@ -283,6 +303,7 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
     }
     viewport.x = viewStartX + dx;
     viewport.y = viewStartY + dy;
+    clampViewport(poolView);
   };
 
   const onPointerUp = (e: PointerEvent) => {
@@ -290,35 +311,24 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
 
     if (ds) {
       if (ds.active) {
-        // Attempt to drop creature on target slot
         const rect = canvas.getBoundingClientRect();
         const sx = e.clientX - rect.left;
         const sy = e.clientY - rect.top;
-        const target = screenToGrid(sx, sy);
+        const [wx, wy] = screenToWorld(poolView, sx, sy);
 
-        if (
-          target &&
-          poolView._stateRef &&
-          (target[0] !== ds.sourceRow || target[1] !== ds.sourceCol)
-        ) {
-          const [toR, toC] = target;
-          const targetSlot = getSlot(poolView._stateRef.pool, toR, toC);
-          if (targetSlot && targetSlot.creatureId === null) {
-            poolView.onCreatureDrop?.(ds.sourceRow, ds.sourceCol, toR, toC);
+        if (poolView._stateRef) {
+          const target = worldToSlot(poolView._stateRef.pool, wx, wy, HIT_RADIUS);
+          if (target && target.unlocked && target.creatureId === null && target.id !== ds.sourceSlotId) {
+            poolView.onCreatureDrop?.(ds.sourceSlotId, target.id);
           }
         }
 
-        // Cleanup ghost
         if (ds.ghost.parent) ds.ghost.destroy();
-
-        // Restore original alpha
         const visual = poolView.visuals.get(ds.creatureId);
         if (visual) visual.sprite.alpha = 1;
       } else {
-        // Didn't exceed threshold → treat as click
-        const [row, col] = [ds.sourceRow, ds.sourceCol];
-        poolView.selectedSlot = [row, col];
-        poolView.onSlotClick?.(row, col);
+        // Click on slot
+        poolView.onSlotClick?.(ds.sourceSlotId);
       }
 
       poolView._dragState = null;
@@ -331,114 +341,175 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
   window.addEventListener('pointermove', onPointerMove);
   window.addEventListener('pointerup', onPointerUp);
 
-  // Center viewport initially
-  centerViewport(poolView, app);
+  // Create upgrade anchor graphics
+  syncUpgradeAnchors(poolView);
 
-  // Re-center on resize
+  centerViewport(poolView, app);
   app.renderer.on('resize', () => centerViewport(poolView, app));
 
   return poolView;
 }
 
-function centerViewport(poolView: PoolView, app: Application): void {
-  const gridW = poolView.gridContainer.width * poolView.zoom;
-  const gridH = poolView.gridContainer.height * poolView.zoom;
-  poolView.viewport.x = Math.round((app.screen.width - gridW) / 2);
-  poolView.viewport.y = Math.round((app.screen.height - gridH) / 2);
+function centerViewport(poolView: PoolView, _app: Application): void {
+  const screenW = poolView._app.screen.width;
+  const screenH = poolView._app.screen.height;
+  const slots = allSlots(poolView._stateRef?.pool ?? { slots: {}, worldWidth: 1920, worldHeight: 1080 });
+  const unlocked = slots.filter(s => s.unlocked);
+  if (unlocked.length === 0) {
+    poolView.viewport.x = screenW / 2 - (poolView._worldW * poolView.zoom) / 2;
+    poolView.viewport.y = screenH / 2 - (poolView._worldH * poolView.zoom) / 2;
+  } else {
+    const avgX = unlocked.reduce((s, sl) => s + sl.x, 0) / unlocked.length;
+    const avgY = unlocked.reduce((s, sl) => s + sl.y, 0) / unlocked.length;
+    poolView.viewport.x = Math.round(screenW / 2 - avgX * poolView.zoom);
+    poolView.viewport.y = Math.round(screenH / 2 - avgY * poolView.zoom);
+  }
   poolView.viewport.scale.set(poolView.zoom);
+  clampViewport(poolView);
 }
 
-/** Sync creature visuals, slot backgrounds, expansion buttons, and upgrade nodes with game state */
+/** Create/update upgrade anchor point graphics */
+function syncUpgradeAnchors(poolView: PoolView): void {
+  for (const anchorDef of UPGRADE_ANCHORS) {
+    if (poolView._anchorGraphics.has(anchorDef.id)) continue;
+
+    const gfx = new Graphics();
+    drawAnchor(gfx, anchorDef.x, anchorDef.y, false);
+
+    gfx.eventMode = 'static';
+    gfx.cursor = 'pointer';
+
+    gfx.on('pointerenter', () => {
+      gfx.clear();
+      drawAnchor(gfx, anchorDef.x, anchorDef.y, true);
+    });
+    gfx.on('pointerleave', () => {
+      const installed = poolView._stateRef?.upgradeAnchors.find(a => a.id === anchorDef.id);
+      gfx.clear();
+      drawAnchor(gfx, anchorDef.x, anchorDef.y, false, !!installed?.upgradeType);
+    });
+    gfx.on('pointertap', () => {
+      if (poolView._dragged) return;
+      poolView.onUpgradeNodeClick?.(anchorDef.id);
+    });
+
+    poolView._anchorLayer.addChild(gfx);
+    poolView._anchorGraphics.set(anchorDef.id, gfx);
+  }
+}
+
+function drawAnchor(gfx: Graphics, x: number, y: number, hover: boolean, installed = false): void {
+  if (installed) {
+    // Filled diamond for installed upgrade
+    gfx.star(x, y, 4, ANCHOR_RADIUS, ANCHOR_RADIUS * 0.5);
+    gfx.fill({ color: 0x3aada8, alpha: 0.6 });
+    gfx.star(x, y, 4, ANCHOR_RADIUS, ANCHOR_RADIUS * 0.5);
+    gfx.stroke({ color: 0x7eeee4, width: 1 });
+  } else {
+    // Empty diamond for available anchor
+    gfx.star(x, y, 4, ANCHOR_RADIUS * 0.8, ANCHOR_RADIUS * 0.4);
+    gfx.fill({ color: 0x0d2228, alpha: 0.5 });
+    gfx.star(x, y, 4, ANCHOR_RADIUS * 0.8, ANCHOR_RADIUS * 0.4);
+    gfx.stroke({ color: hover ? 0x7eeee4 : 0x1a3a3f, width: hover ? 2 : 1 });
+    // Small "+" inside
+    gfx.rect(x - 3, y - 0.5, 6, 1);
+    gfx.fill({ color: hover ? 0x7eeee4 : 0x3a5a60, alpha: 0.7 });
+    gfx.rect(x - 0.5, y - 3, 1, 6);
+    gfx.fill({ color: hover ? 0x7eeee4 : 0x3a5a60, alpha: 0.7 });
+  }
+}
+
+/** Sync creature visuals and slot graphics with game state */
 export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
   poolView._stateRef = state;
-  const bounds = getGridBounds(state.pool);
-  const { minR, minC } = bounds;
-
-  // If grid origin shifted (expanded left/up), rebuild all positioned elements
-  // and compensate viewport so the grid appears stationary on screen
-  if (minR !== poolView._lastMinR || minC !== poolView._lastMinC) {
-    const dR = poolView._lastMinR - minR;
-    const dC = poolView._lastMinC - minC;
-    const pxShiftX = dC * (SLOT_SIZE + SLOT_PAD) * poolView.zoom;
-    const pxShiftY = dR * (SLOT_SIZE + SLOT_PAD) * poolView.zoom;
-    poolView.viewport.x -= pxShiftX;
-    poolView.viewport.y -= pxShiftY;
-
-    for (const [, gfx] of poolView.slotGraphics) gfx.destroy();
-    poolView.slotGraphics.clear();
-    for (const [, vis] of poolView.visuals) destroyCreatureVisual(vis);
-    poolView.visuals.clear();
-    for (const [, cont] of poolView.expandBtns) cont.destroy({ children: true });
-    poolView.expandBtns.clear();
-    for (const [, cont] of poolView.upgradeNodeGraphics) cont.destroy({ children: true });
-    poolView.upgradeNodeGraphics.clear();
-    poolView._lastMinR = minR;
-    poolView._lastMinC = minC;
-  }
 
   // --- Sync slot backgrounds ---
-  const currentSlotKeys = new Set<CoordKey>();
-  for (const [r, c] of allSlots(state.pool)) {
-    const key = toKey(r, c);
-    currentSlotKeys.add(key);
+  const allSlotsList = allSlots(state.pool);
+  const currentSlotIds = new Set<string>();
 
-    if (!poolView.slotGraphics.has(key)) {
-      const x = slotPixelX(c, minC);
-      const y = slotPixelY(r, minR);
+  for (const slot of allSlotsList) {
+    currentSlotIds.add(slot.id);
 
-      const slot = new Graphics();
-      drawSlotNormal(slot, x, y);
+    if (!poolView.slotGraphics.has(slot.id)) {
+      const gfx = new Graphics();
+      drawSlot(gfx, slot);
 
-      slot.eventMode = 'static';
-      slot.cursor = 'pointer';
+      gfx.eventMode = 'static';
+      gfx.cursor = 'pointer';
 
-      slot.on('pointerenter', () => {
-        slot.clear();
-        slot.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 4);
-        slot.fill(SLOT_BG);
-        slot.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 4);
-        slot.stroke({ color: SLOT_HOVER, width: 2 });
+      gfx.on('pointerenter', (e: any) => {
+        gfx.clear();
+        drawSlotHighlight(gfx, slot);
+        if (!slot.unlocked && poolView._stateRef && poolView._canvas) {
+          const gx = e.global?.x ?? 0;
+          const gy = e.global?.y ?? 0;
+          const rect = poolView._canvas.getBoundingClientRect();
+          showTooltip(rect.left + gx, rect.top + gy, poolView._stateRef);
+        }
       });
 
-      slot.on('pointerleave', () => {
-        drawSlotNormal(slot, x, y);
+      gfx.on('pointerleave', () => {
+        gfx.clear();
+        drawSlot(gfx, slot);
+        hideTooltip();
       });
 
-      slot.on('pointertap', () => {
+      gfx.on('pointertap', () => {
         if (poolView._dragged) return;
-        poolView.selectedSlot = [r, c];
-        poolView.onSlotClick?.(r, c);
+        if (slot.unlocked) {
+          poolView.onSlotClick?.(slot.id);
+        } else {
+          poolView.onExpansionClick?.(slot.id);
+        }
       });
 
-      poolView._slotLayer.addChild(slot);
-      poolView.slotGraphics.set(key, slot);
+      poolView._slotLayer.addChild(gfx);
+      poolView.slotGraphics.set(slot.id, gfx);
+    } else {
+      const gfx = poolView.slotGraphics.get(slot.id)!;
+      gfx.clear();
+      drawSlot(gfx, slot);
     }
   }
 
-  // Remove slots no longer in pool
-  for (const [key, gfx] of poolView.slotGraphics) {
-    if (!currentSlotKeys.has(key)) {
+  // Remove obsolete slot graphics
+  for (const [id, gfx] of poolView.slotGraphics) {
+    if (!currentSlotIds.has(id)) {
       gfx.destroy();
-      poolView.slotGraphics.delete(key);
+      poolView.slotGraphics.delete(id);
     }
   }
+
+  // --- Sync upgrade anchor visuals ---
+  for (const anchorDef of UPGRADE_ANCHORS) {
+    const gfx = poolView._anchorGraphics.get(anchorDef.id);
+    if (!gfx) continue;
+    const installed = state.upgradeAnchors.find(a => a.id === anchorDef.id);
+    gfx.clear();
+    drawAnchor(gfx, anchorDef.x, anchorDef.y, false, !!installed?.upgradeType);
+  }
+
+  // --- Sync slot glow (for occupied slots) ---
+  syncSlotGlow(poolView, state);
 
   // --- Sync creature visuals ---
-  const currentIds = new Set<string>();
+  const currentCreatureIds = new Set<string>();
 
-  for (const [r, c] of allSlots(state.pool)) {
-    const creature = getCreatureAt(state, r, c);
+  for (const slot of allSlotsList) {
+    if (!slot.unlocked || !slot.creatureId) continue;
+    const creature = getCreatureAt(state, slot.id);
     if (!creature) continue;
 
-    currentIds.add(creature.id);
+    currentCreatureIds.add(creature.id);
+
+    const cx = slot.x - CREATURE_DISPLAY / 2;
+    const cy = slot.y - CREATURE_DISPLAY / 2;
 
     if (!poolView.visuals.has(creature.id)) {
       const visual = createCreatureVisual(creature);
-      const x = slotPixelX(c, minC) + (SLOT_SIZE - CREATURE_DISPLAY) / 2;
-      const y = slotPixelY(r, minR) + (SLOT_SIZE - CREATURE_DISPLAY) / 2;
-      visual.sprite.x = x;
-      visual.sprite.y = y;
-      visual.sprite.eventMode = 'none'; // clicks pass through to slot below
+      visual.sprite.x = cx;
+      visual.sprite.y = cy;
+      visual.sprite.eventMode = 'none';
       visual.mainSprite.width = CREATURE_DISPLAY;
       visual.mainSprite.height = CREATURE_DISPLAY;
       if (visual.glowSprite) {
@@ -448,165 +519,80 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
       poolView._creatureLayer.addChild(visual.sprite);
       poolView.visuals.set(creature.id, visual);
     } else {
-      // Update position (in case grid origin shifted)
       const visual = poolView.visuals.get(creature.id)!;
-      const x = slotPixelX(c, minC) + (SLOT_SIZE - CREATURE_DISPLAY) / 2;
-      const y = slotPixelY(r, minR) + (SLOT_SIZE - CREATURE_DISPLAY) / 2;
-      visual.sprite.x = x;
-      visual.sprite.y = y;
+      visual.sprite.x = cx;
+      visual.sprite.y = cy;
     }
   }
 
   // Remove visuals for creatures no longer in pool
   for (const [id, visual] of poolView.visuals) {
-    if (!currentIds.has(id)) {
+    if (!currentCreatureIds.has(id)) {
       destroyCreatureVisual(visual);
       poolView.visuals.delete(id);
     }
   }
+}
 
-  // --- Sync expansion buttons ---
-  const candidates = getExpansionCandidates(state.pool);
-  const currentExpandKeys = new Set<CoordKey>();
+/** Sync glow graphics behind occupied slots */
+function syncSlotGlow(poolView: PoolView, state: GameState): void {
+  const settings = getRenderSettings();
+  poolView._slotGlowLayer.visible = settings.slotGlow;
 
-  for (const [r, c] of candidates) {
-    const key = toKey(r, c);
-    currentExpandKeys.add(key);
+  const allSlotsList = allSlots(state.pool);
+  const occupiedIds = new Set<string>();
 
-    if (!poolView.expandBtns.has(key)) {
-      const x = slotPixelX(c, minC) + (SLOT_SIZE - EXPAND_BTN_SIZE) / 2;
-      const y = slotPixelY(r, minR) + (SLOT_SIZE - EXPAND_BTN_SIZE) / 2;
+  for (const slot of allSlotsList) {
+    if (!slot.unlocked || !slot.creatureId) continue;
+    occupiedIds.add(slot.id);
 
-      const cont = new Container();
-      cont.x = x;
-      cont.y = y;
-
-      const bg = new Graphics();
-      drawExpandNormal(bg);
-      cont.addChild(bg);
-
-      const plus = new Graphics();
-      drawPlusCross(plus, EXPAND_CROSS_COLOR);
-      cont.addChild(plus);
-
-      cont.eventMode = 'static';
-      cont.cursor = 'pointer';
-
-      cont.on('pointerenter', (e: any) => {
-        bg.clear();
-        bg.roundRect(0, 0, EXPAND_BTN_SIZE, EXPAND_BTN_SIZE, 4);
-        bg.fill(0x0d2228);
-        bg.roundRect(0, 0, EXPAND_BTN_SIZE, EXPAND_BTN_SIZE, 4);
-        bg.stroke({ color: EXPAND_HOVER_BORDER, width: 2 });
-        plus.clear();
-        drawPlusCross(plus, EXPAND_HOVER_BORDER);
-        if (poolView._stateRef && poolView._canvas) {
-          const gx = e.global?.x ?? 0;
-          const gy = e.global?.y ?? 0;
-          const rect = poolView._canvas.getBoundingClientRect();
-          showTooltip(rect.left + gx, rect.top + gy, poolView._stateRef);
-        }
-      });
-
-      cont.on('pointerleave', () => {
-        drawExpandNormal(bg);
-        plus.clear();
-        drawPlusCross(plus, EXPAND_CROSS_COLOR);
-        hideTooltip();
-      });
-
-      cont.on('pointertap', () => {
-        if (poolView._dragged) return;
-        poolView.onExpansionClick?.(r, c);
-      });
-
-      poolView._slotLayer.addChild(cont);
-      poolView.expandBtns.set(key, cont);
-    } else {
-      // Update position
-      const cont = poolView.expandBtns.get(key)!;
-      cont.x = slotPixelX(c, minC) + (SLOT_SIZE - EXPAND_BTN_SIZE) / 2;
-      cont.y = slotPixelY(r, minR) + (SLOT_SIZE - EXPAND_BTN_SIZE) / 2;
+    if (!poolView._slotGlowGraphics.has(slot.id)) {
+      const gfx = new Graphics();
+      drawSlotGlow(gfx, slot);
+      poolView._slotGlowLayer.addChild(gfx);
+      poolView._slotGlowGraphics.set(slot.id, gfx);
     }
   }
 
-  // Remove expand buttons no longer needed
-  for (const [key, cont] of poolView.expandBtns) {
-    if (!currentExpandKeys.has(key)) {
-      cont.destroy({ children: true });
-      poolView.expandBtns.delete(key);
-    }
-  }
-
-  // --- Sync upgrade node graphics ---
-  const nodePositions = getUpgradeNodePositions(state.pool);
-  const currentNodeKeys = new Set<CoordKey>();
-
-  for (const [r, c] of nodePositions) {
-    const key = toKey(r, c);
-    currentNodeKeys.add(key);
-
-    // Position: center of the 2x2 block
-    const cx = slotPixelX(c, minC) + SLOT_SIZE + SLOT_PAD / 2;
-    const cy = slotPixelY(r, minR) + SLOT_SIZE + SLOT_PAD / 2;
-
-    const existingNode = state.upgradeNodes.find((n) => n.row === r && n.col === c);
-    const hasUpgrade = !!existingNode?.upgradeType;
-
-    if (!poolView.upgradeNodeGraphics.has(key)) {
-      const cont = new Container();
-      cont.x = cx - NODE_SIZE / 2;
-      cont.y = cy - NODE_SIZE / 2;
-
-      const diamond = new Graphics();
-      drawUpgradeNode(diamond, hasUpgrade);
-      cont.addChild(diamond);
-
-      if (hasUpgrade) {
-        const icon = new Text({
-          text: '\u{1F33F}', // herb emoji for algae
-          style: new TextStyle({ fontSize: 10, align: 'center' }),
-        });
-        icon.anchor.set(0.5);
-        icon.x = NODE_SIZE / 2;
-        icon.y = NODE_SIZE / 2;
-        cont.addChild(icon);
-      }
-
-      cont.eventMode = 'static';
-      cont.cursor = 'pointer';
-
-      cont.on('pointertap', () => {
-        if (poolView._dragged) return;
-        poolView.onUpgradeNodeClick?.(r, c);
-      });
-
-      poolView._slotLayer.addChild(cont);
-      poolView.upgradeNodeGraphics.set(key, cont);
-    } else {
-      // Update position and state
-      const cont = poolView.upgradeNodeGraphics.get(key)!;
-      cont.x = cx - NODE_SIZE / 2;
-      cont.y = cy - NODE_SIZE / 2;
-
-      // Redraw if upgrade state changed
-      const diamond = cont.children[0] as Graphics;
-      diamond.clear();
-      drawUpgradeNode(diamond, hasUpgrade);
-    }
-  }
-
-  // Remove upgrade nodes no longer valid
-  for (const [key, cont] of poolView.upgradeNodeGraphics) {
-    if (!currentNodeKeys.has(key)) {
-      cont.destroy({ children: true });
-      poolView.upgradeNodeGraphics.delete(key);
+  // Remove glow for empty slots
+  for (const [id, gfx] of poolView._slotGlowGraphics) {
+    if (!occupiedIds.has(id)) {
+      gfx.destroy();
+      poolView._slotGlowGraphics.delete(id);
     }
   }
 }
 
-/** Update all creature animations */
+function drawSlotGlow(gfx: Graphics, slot: SeabedSlot): void {
+  const themeColor = THEME_COLORS[slot.theme] ?? SLOT_BORDER;
+  const r = SLOT_SIZE * 0.8;
+  gfx.circle(slot.x, slot.y, r);
+  gfx.fill({ color: themeColor, alpha: 0.12 });
+  gfx.circle(slot.x, slot.y, r * 0.6);
+  gfx.fill({ color: themeColor, alpha: 0.08 });
+  gfx.circle(slot.x, slot.y, r * 0.35);
+  gfx.fill({ color: themeColor, alpha: 0.06 });
+}
+
+/** Update all creature animations + seabed background */
 export function updatePoolVisuals(poolView: PoolView, deltaSec: number, totalTime: number): void {
+  // Update seabed background (particles, light rays)
+  if (poolView._seabedBg) {
+    updateSeabedBackground(poolView._seabedBg, deltaSec);
+  }
+
+  // Update slot glow pulsing
+  const settings = getRenderSettings();
+  if (settings.slotGlow) {
+    let i = 0;
+    for (const gfx of poolView._slotGlowGraphics.values()) {
+      // Each slot pulses with a slight phase offset for variety
+      gfx.alpha = 0.5 + Math.sin(totalTime * 1.2 + i * 0.8) * 0.35;
+      i++;
+    }
+  }
+
+  // Update creature animations
   for (const visual of poolView.visuals.values()) {
     updateCreatureVisual(visual, deltaSec, totalTime);
   }
@@ -614,51 +600,37 @@ export function updatePoolVisuals(poolView: PoolView, deltaSec: number, totalTim
 
 // --- Drawing helpers ---
 
-function drawSlotNormal(slot: Graphics, x: number, y: number): void {
-  slot.clear();
-  slot.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 4);
-  slot.fill(SLOT_BG);
-  slot.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 4);
-  slot.stroke({ color: SLOT_BORDER, width: 1 });
-}
+function drawSlot(gfx: Graphics, slot: SeabedSlot): void {
+  const x = slot.x - SLOT_SIZE / 2;
+  const y = slot.y - SLOT_SIZE / 2;
+  const themeColor = THEME_COLORS[slot.theme] ?? SLOT_BORDER;
 
-const EXPAND_CROSS_COLOR = 0x1a3a3f;
-
-function drawPlusCross(g: Graphics, color: number): void {
-  const cx = EXPAND_BTN_SIZE / 2;
-  const cy = EXPAND_BTN_SIZE / 2;
-  const arm = 7; // half-length of each arm
-  const thick = 2;
-  // Horizontal bar
-  g.rect(cx - arm, cy - thick / 2, arm * 2, thick);
-  g.fill(color);
-  // Vertical bar
-  g.rect(cx - thick / 2, cy - arm, thick, arm * 2);
-  g.fill(color);
-}
-
-function drawExpandNormal(bg: Graphics): void {
-  bg.clear();
-  bg.roundRect(0, 0, EXPAND_BTN_SIZE, EXPAND_BTN_SIZE, 4);
-  bg.fill(EXPAND_BG);
-  bg.roundRect(0, 0, EXPAND_BTN_SIZE, EXPAND_BTN_SIZE, 4);
-  bg.stroke({ color: EXPAND_BORDER, width: 1 });
-}
-
-function drawUpgradeNode(diamond: Graphics, active: boolean): void {
-  const half = NODE_SIZE / 2;
-  // Draw diamond shape
-  diamond.moveTo(half, 0);
-  diamond.lineTo(NODE_SIZE, half);
-  diamond.lineTo(half, NODE_SIZE);
-  diamond.lineTo(0, half);
-  diamond.closePath();
-
-  if (active) {
-    diamond.fill({ color: NODE_ACTIVE_COLOR, alpha: 0.3 });
-    diamond.stroke({ color: NODE_ACTIVE_COLOR, width: 2 });
+  if (slot.unlocked) {
+    gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
+    gfx.fill({ color: SLOT_BG, alpha: 0.7 });
+    gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
+    gfx.stroke({ color: themeColor, width: 1, alpha: 0.6 });
   } else {
-    diamond.fill({ color: NODE_EMPTY_COLOR, alpha: 0.15 });
-    diamond.stroke({ color: NODE_EMPTY_COLOR, width: 1 });
+    gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
+    gfx.fill({ color: SLOT_BG, alpha: SLOT_LOCKED_ALPHA });
+    gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
+    gfx.stroke({ color: SLOT_BORDER, width: 1, alpha: SLOT_LOCKED_ALPHA });
+    // Lock icon "+"
+    const cx = slot.x;
+    const cy = slot.y;
+    gfx.rect(cx - 6, cy - 1, 12, 2);
+    gfx.fill({ color: SLOT_BORDER, alpha: 0.5 });
+    gfx.rect(cx - 1, cy - 6, 2, 12);
+    gfx.fill({ color: SLOT_BORDER, alpha: 0.5 });
   }
+}
+
+function drawSlotHighlight(gfx: Graphics, slot: SeabedSlot): void {
+  const x = slot.x - SLOT_SIZE / 2;
+  const y = slot.y - SLOT_SIZE / 2;
+
+  gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
+  gfx.fill(slot.unlocked ? { color: SLOT_BG, alpha: 0.8 } : { color: SLOT_BG, alpha: 0.5 });
+  gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
+  gfx.stroke({ color: SLOT_HOVER, width: 2 });
 }
