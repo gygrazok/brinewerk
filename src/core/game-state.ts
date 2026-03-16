@@ -2,7 +2,7 @@ import type { Creature } from '../creatures/creature';
 import { SEABED_SLOTS } from '../systems/seabed-layout';
 
 const SAVE_KEY = 'brinewerk_save';
-const CURRENT_SAVE_VERSION = 3;
+const CURRENT_SAVE_VERSION = 4;
 
 // --- Seabed pool (v3+) ---
 
@@ -35,6 +35,7 @@ export interface UpgradeAnchor {
 
 export interface GameState {
   saveVersion: number;
+  seabedSeed: number;
   creatures: Creature[];
   pool: SeabedPool;
   resources: { plankton: number; minerite: number; lux: number };
@@ -53,6 +54,7 @@ export function createDefaultState(): GameState {
 
   return {
     saveVersion: CURRENT_SAVE_VERSION,
+    seabedSeed: Math.floor(Math.random() * 2_147_483_647),
     creatures: [],
     pool,
     resources: { plankton: 0, minerite: 0, lux: 0 },
@@ -157,6 +159,12 @@ function migrateState(data: Record<string, unknown>): GameState {
     data.pool = newPool;
     data.upgradeAnchors = [];
     delete data.upgradeNodes;
+    data.saveVersion = 3;
+  }
+
+  // V3 → V4: add seabedSeed for procedural decoration generation
+  if ((data.saveVersion as number) < 4) {
+    data.seabedSeed = Math.floor(Math.random() * 2_147_483_647);
     data.saveVersion = CURRENT_SAVE_VERSION;
   }
 

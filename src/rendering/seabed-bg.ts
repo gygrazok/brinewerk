@@ -73,11 +73,55 @@ function getRockiness(x: number, w: number): number {
   return 0;
 }
 
+// --- Seeded PRNG (mulberry32) ---
+
+class SeededRng {
+  private state: number;
+  constructor(seed: number) {
+    this.state = seed | 0;
+  }
+  /** Returns a float in [0, 1) */
+  next(): number {
+    this.state = (this.state + 0x6D2B79F5) | 0;
+    let t = Math.imul(this.state ^ (this.state >>> 15), 1 | this.state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  /** Integer in [min, max] inclusive */
+  int(min: number, max: number): number {
+    return min + Math.floor(this.next() * (max - min + 1));
+  }
+  /** Float in [min, max) */
+  float(min: number, max: number): number {
+    return min + this.next() * (max - min);
+  }
+}
+
 /**
- * Terrain profiles: two layers.
+ * Terrain wave phase offsets — derived from the seabed seed so each
+ * playthrough has a unique terrain silhouette.  Set once per background
+ * creation via `initTerrainPhases()`.
+ */
+let tp = { p1a: 0, p1b: 1.5, p2a: 2.0, p2b: 0.7, p3a: 3.5, p3b: 1.2 };
+
+function initTerrainPhases(seed: number): void {
+  const rng = new SeededRng(seed);
+  tp = {
+    p1a: rng.float(0, Math.PI * 2),
+    p1b: rng.float(0, Math.PI * 2),
+    p2a: rng.float(0, Math.PI * 2),
+    p2b: rng.float(0, Math.PI * 2),
+    p3a: rng.float(0, Math.PI * 2),
+    p3b: rng.float(0, Math.PI * 2),
+  };
+}
+
+/**
+ * Terrain profiles: three layers.
  * Layer 1 (upper): rocky cliff at edges, sandy shelf in center.
- * Layer 2 (lower): deeper ledge with different rock color, ~15% below layer 1.
- * Both have gentle (not jagged) undulation.
+ * Layer 2 (middle): deeper ledge with different rock color.
+ * Layer 3 (deepest): bottom shelf.
+ * All have gentle seed-based undulation.
  */
 function getLayer1Profile(x: number, w: number, h: number): number {
   const t = x / w;
@@ -87,8 +131,7 @@ function getLayer1Profile(x: number, w: number, h: number): number {
 
   // Upper layer: 0.55h at corners, 0.80h at center
   const baseY = 0.80 - plateau * 0.25;
-  // Gentle smooth undulation only (no per-pixel noise)
-  const wave = Math.sin(x * 0.04) * 0.012 + Math.sin(x * 0.09 + 1.5) * 0.006;
+  const wave = Math.sin(x * 0.04 + tp.p1a) * 0.012 + Math.sin(x * 0.09 + tp.p1b) * 0.006;
   return Math.floor(h * (baseY + wave));
 }
 
@@ -100,7 +143,7 @@ function getLayer2Profile(x: number, w: number, h: number): number {
 
   // Middle layer: 0.72h at corners, 0.90h at center
   const baseY = 0.90 - plateau * 0.18;
-  const wave = Math.sin(x * 0.05 + 2.0) * 0.008 + Math.sin(x * 0.12 + 0.7) * 0.005;
+  const wave = Math.sin(x * 0.05 + tp.p2a) * 0.008 + Math.sin(x * 0.12 + tp.p2b) * 0.005;
   return Math.floor(h * (baseY + wave));
 }
 
@@ -112,12 +155,13 @@ function getLayer3Profile(x: number, w: number, h: number): number {
 
   // Deepest layer: 0.85h at corners, 0.96h at center
   const baseY = 0.96 - plateau * 0.11;
-  const wave = Math.sin(x * 0.06 + 3.5) * 0.006 + Math.sin(x * 0.14 + 1.2) * 0.004;
+  const wave = Math.sin(x * 0.06 + tp.p3a) * 0.006 + Math.sin(x * 0.14 + tp.p3b) * 0.004;
   return Math.floor(h * (baseY + wave));
 }
 
-/** Create an offscreen sand texture with three-layer terrain */
-export function createSandTexture(worldW: number, worldH: number): Texture {
+/** Create an offscreen sand texture with three-layer terrain.
+ *  Terrain phases must be initialised via `initTerrainPhases(seed)` before calling. */
+function createSandTexture(worldW: number, worldH: number): Texture {
   const canvas = document.createElement('canvas');
   const w = Math.ceil(worldW / WORLD_PX);
   const h = Math.ceil(worldH / WORLD_PX);
@@ -273,188 +317,143 @@ interface DecorationDef {
   seed: number;
 }
 
-/**
- * Decoration positions for 1920×1080 seabed.
- * Grid sizes are in grid units; display size = size × 1.6 world px.
- * Sizes here are ~1.875× larger than before to compensate for smaller pixel density.
- */
-const DECORATIONS: DecorationDef[] = [
-  // =====================================================================
-  // ROCKS — accent boulders sitting on the terrain (not the ground itself,
-  // which is painted in the background texture)
-  // =====================================================================
-  // Left cliff accent rocks (on top of the rocky cliff)
-  { x: 80,   y: 660,  type: 'rock',    size: 34, seed: 200 },
-  { x: 200,  y: 720,  type: 'rock',    size: 28, seed: 201 },
-  { x: 320,  y: 780,  type: 'rock',    size: 24, seed: 202 },
-  { x: 50,   y: 780,  type: 'rock',    size: 30, seed: 203 },
-  // Right cliff accent rocks
-  { x: 1840, y: 660,  type: 'rock',    size: 34, seed: 210 },
-  { x: 1700, y: 720,  type: 'rock',    size: 28, seed: 211 },
-  { x: 1580, y: 780,  type: 'rock',    size: 24, seed: 212 },
-  { x: 1870, y: 780,  type: 'rock',    size: 30, seed: 213 },
-  // Mid-floor scattered boulders
-  { x: 700,  y: 920,  type: 'rock',    size: 20, seed: 1 },
-  { x: 1200, y: 940,  type: 'rock',    size: 22, seed: 4 },
-  { x: 960,  y: 960,  type: 'rock',    size: 18, seed: 5 },
+// --- Decoration placement rules per layer/zone ---
 
-  // =====================================================================
-  // PEBBLE CLUSTERS — on the sandy floor
-  // =====================================================================
-  { x: 500,  y: 960,  type: 'pebbles', size: 14, seed: 40 },
-  { x: 800,  y: 980,  type: 'pebbles', size: 12, seed: 42 },
-  { x: 1100, y: 960,  type: 'pebbles', size: 14, seed: 45 },
-  { x: 1400, y: 970,  type: 'pebbles', size: 12, seed: 46 },
-  { x: 600,  y: 1000, type: 'pebbles', size: 10, seed: 230 },
-  { x: 1300, y: 1000, type: 'pebbles', size: 10, seed: 231 },
+interface PlacementRule {
+  type: DecorationDef['type'];
+  count: number;          // how many to spawn in this zone
+  sizeMin: number;        // grid units
+  sizeMax: number;
+  yOffsetMin: number;     // offset below the terrain profile line (world px)
+  yOffsetMax: number;
+}
 
-  // =====================================================================
-  // SHELLS — on the sandy floor
-  // =====================================================================
-  { x: 680,  y: 960,  type: 'shell',   size: 12, seed: 30 },
-  { x: 1050, y: 980,  type: 'shell',   size: 10, seed: 32 },
-  { x: 1350, y: 950,  type: 'shell',   size: 12, seed: 33 },
-  { x: 860,  y: 1000, type: 'shell',   size: 10, seed: 35 },
-
-  // =====================================================================
-  // CORALS — on cliff edges (terrain line) and rocky ledges
-  // Left cliff: terrain ~y600-700, right cliff similar
-  // =====================================================================
-  // Left cliff corals
-  { x: 120,  y: 640,  type: 'coral',   size: 24, seed: 60 },
-  { x: 250,  y: 700,  type: 'coral',   size: 20, seed: 61 },
-  { x: 60,   y: 700,  type: 'coral',   size: 18, seed: 63 },
-  { x: 180,  y: 760,  type: 'coral',   size: 16, seed: 64 },
-  { x: 350,  y: 800,  type: 'coral',   size: 22, seed: 62 },
-  { x: 420,  y: 840,  type: 'coral',   size: 14, seed: 240 },
-  // Right cliff corals
-  { x: 1800, y: 640,  type: 'coral',   size: 22, seed: 65 },
-  { x: 1680, y: 700,  type: 'coral',   size: 24, seed: 66 },
-  { x: 1870, y: 700,  type: 'coral',   size: 18, seed: 68 },
-  { x: 1760, y: 760,  type: 'coral',   size: 16, seed: 69 },
-  { x: 1560, y: 800,  type: 'coral',   size: 20, seed: 67 },
-  { x: 1500, y: 840,  type: 'coral',   size: 14, seed: 241 },
-  // Sandy floor corals (sparse, smaller)
-  { x: 700,  y: 920,  type: 'coral',   size: 16, seed: 70 },
-  { x: 1200, y: 930,  type: 'coral',   size: 18, seed: 71 },
-
-  // =====================================================================
-  // ALGAE — rooted on cliff edges, large at corners (foreground)
-  // =====================================================================
-  // Left cliff algae (large, rooted at terrain line)
-  { x: 40,   y: 640,  type: 'algae',   size: 56, seed: 80 },
-  { x: 150,  y: 680,  type: 'algae',   size: 60, seed: 81 },
-  { x: 280,  y: 740,  type: 'algae',   size: 50, seed: 82 },
-  { x: 380,  y: 800,  type: 'algae',   size: 46, seed: 83 },
-  { x: 90,   y: 720,  type: 'algae',   size: 54, seed: 84 },
-  { x: 450,  y: 860,  type: 'algae',   size: 40, seed: 85 },
-  // Right cliff algae (large, rooted at terrain line)
-  { x: 1880, y: 640,  type: 'algae',   size: 56, seed: 86 },
-  { x: 1750, y: 680,  type: 'algae',   size: 60, seed: 87 },
-  { x: 1620, y: 740,  type: 'algae',   size: 50, seed: 88 },
-  { x: 1530, y: 800,  type: 'algae',   size: 46, seed: 89 },
-  { x: 1830, y: 720,  type: 'algae',   size: 54, seed: 90 },
-  { x: 1460, y: 860,  type: 'algae',   size: 40, seed: 91 },
-  // Sandy floor algae (smaller, sparser)
-  { x: 600,  y: 920,  type: 'algae',   size: 30, seed: 92 },
-  { x: 1000, y: 930,  type: 'algae',   size: 28, seed: 93 },
-  { x: 1300, y: 920,  type: 'algae',   size: 26, seed: 94 },
-
-  // =====================================================================
-  // SPONGES — on layer 1 cliff faces
-  // =====================================================================
-  { x: 160,  y: 700,  type: 'sponge',  size: 18, seed: 100 },
-  { x: 300,  y: 760,  type: 'sponge',  size: 16, seed: 101 },
-  { x: 70,   y: 760,  type: 'sponge',  size: 20, seed: 102 },
-  { x: 1760, y: 700,  type: 'sponge',  size: 18, seed: 103 },
-  { x: 1620, y: 760,  type: 'sponge',  size: 16, seed: 104 },
-  { x: 1860, y: 760,  type: 'sponge',  size: 20, seed: 105 },
-  { x: 850,  y: 940,  type: 'sponge',  size: 12, seed: 109 },
-
-  // =====================================================================
-  // LAYER 2 DECORATIONS — on the lower ledge
-  // Layer 2 terrain: ~y780 at edges, ~y1000 at center
-  // =====================================================================
-
-  // Layer 2 rocks (accent boulders on the lower ledge)
-  { x: 100,  y: 800,  type: 'rock',    size: 26, seed: 300 },
-  { x: 250,  y: 840,  type: 'rock',    size: 22, seed: 301 },
-  { x: 1820, y: 800,  type: 'rock',    size: 26, seed: 302 },
-  { x: 1660, y: 840,  type: 'rock',    size: 22, seed: 303 },
-  { x: 600,  y: 980,  type: 'rock',    size: 18, seed: 304 },
-  { x: 1300, y: 1000, type: 'rock',    size: 20, seed: 305 },
-
-  // Layer 2 corals (on lower ledge edge, slightly different y)
-  { x: 80,   y: 800,  type: 'coral',   size: 20, seed: 310 },
-  { x: 200,  y: 830,  type: 'coral',   size: 18, seed: 311 },
-  { x: 340,  y: 860,  type: 'coral',   size: 16, seed: 312 },
-  { x: 1840, y: 800,  type: 'coral',   size: 20, seed: 313 },
-  { x: 1720, y: 830,  type: 'coral',   size: 18, seed: 314 },
-  { x: 1580, y: 860,  type: 'coral',   size: 16, seed: 315 },
-  { x: 560,  y: 980,  type: 'coral',   size: 14, seed: 316 },
-  { x: 1100, y: 1000, type: 'coral',   size: 16, seed: 317 },
-
-  // Layer 2 algae (rooted on lower ledge, big at corners)
-  { x: 50,   y: 800,  type: 'algae',   size: 50, seed: 320 },
-  { x: 180,  y: 840,  type: 'algae',   size: 46, seed: 321 },
-  { x: 300,  y: 870,  type: 'algae',   size: 42, seed: 322 },
-  { x: 1870, y: 800,  type: 'algae',   size: 50, seed: 323 },
-  { x: 1740, y: 840,  type: 'algae',   size: 46, seed: 324 },
-  { x: 1600, y: 870,  type: 'algae',   size: 42, seed: 325 },
-  { x: 480,  y: 960,  type: 'algae',   size: 28, seed: 326 },
-  { x: 1400, y: 980,  type: 'algae',   size: 26, seed: 327 },
-
-  // Layer 2 sponges
-  { x: 140,  y: 830,  type: 'sponge',  size: 16, seed: 330 },
-  { x: 370,  y: 880,  type: 'sponge',  size: 14, seed: 331 },
-  { x: 1780, y: 830,  type: 'sponge',  size: 16, seed: 332 },
-  { x: 1550, y: 880,  type: 'sponge',  size: 14, seed: 333 },
-  { x: 750,  y: 1000, type: 'sponge',  size: 12, seed: 334 },
-
-  // Layer 2 pebbles (on the lower sandy zone)
-  { x: 500,  y: 1010, type: 'pebbles', size: 12, seed: 340 },
-  { x: 900,  y: 1020, type: 'pebbles', size: 10, seed: 341 },
-  { x: 1250, y: 1010, type: 'pebbles', size: 12, seed: 342 },
-
-  // Layer 2 shells
-  { x: 650,  y: 1010, type: 'shell',   size: 10, seed: 350 },
-  { x: 1150, y: 1020, type: 'shell',   size: 10, seed: 351 },
-
-  // =====================================================================
-  // LAYER 3 DECORATIONS — deepest ledge
-  // Layer 3 terrain: ~y920 at edges, ~y1040 at center
-  // =====================================================================
-
-  // Layer 3 rocks
-  { x: 120,  y: 930,  type: 'rock',    size: 24, seed: 400 },
-  { x: 280,  y: 950,  type: 'rock',    size: 20, seed: 401 },
-  { x: 1800, y: 930,  type: 'rock',    size: 24, seed: 402 },
-  { x: 1640, y: 950,  type: 'rock',    size: 20, seed: 403 },
-  { x: 700,  y: 1050, type: 'rock',    size: 16, seed: 404 },
-  { x: 1200, y: 1050, type: 'rock',    size: 18, seed: 405 },
-
-  // Layer 3 corals (deep, encrusted)
-  { x: 100,  y: 930,  type: 'coral',   size: 18, seed: 410 },
-  { x: 240,  y: 960,  type: 'coral',   size: 16, seed: 411 },
-  { x: 1820, y: 930,  type: 'coral',   size: 18, seed: 412 },
-  { x: 1680, y: 960,  type: 'coral',   size: 16, seed: 413 },
-  { x: 800,  y: 1050, type: 'coral',   size: 12, seed: 414 },
-
-  // Layer 3 algae (deep, smaller)
-  { x: 60,   y: 940,  type: 'algae',   size: 42, seed: 420 },
-  { x: 200,  y: 960,  type: 'algae',   size: 38, seed: 421 },
-  { x: 350,  y: 980,  type: 'algae',   size: 34, seed: 422 },
-  { x: 1860, y: 940,  type: 'algae',   size: 42, seed: 423 },
-  { x: 1720, y: 960,  type: 'algae',   size: 38, seed: 424 },
-  { x: 1560, y: 980,  type: 'algae',   size: 34, seed: 425 },
-  { x: 550,  y: 1050, type: 'algae',   size: 24, seed: 426 },
-  { x: 1350, y: 1050, type: 'algae',   size: 22, seed: 427 },
-
-  // Layer 3 sponges
-  { x: 160,  y: 950,  type: 'sponge',  size: 14, seed: 430 },
-  { x: 1760, y: 950,  type: 'sponge',  size: 14, seed: 431 },
-  { x: 950,  y: 1060, type: 'sponge',  size: 10, seed: 432 },
+/** Cliff-side rules (rocky edges, x < 500 or x > 1420) */
+const CLIFF_RULES_L1: PlacementRule[] = [
+  { type: 'rock',   count: 4, sizeMin: 24, sizeMax: 34, yOffsetMin: 0,  yOffsetMax: 40 },
+  { type: 'coral',  count: 5, sizeMin: 14, sizeMax: 24, yOffsetMin: -10, yOffsetMax: 50 },
+  { type: 'algae',  count: 6, sizeMin: 40, sizeMax: 60, yOffsetMin: -10, yOffsetMax: 60 },
+  { type: 'sponge', count: 3, sizeMin: 16, sizeMax: 20, yOffsetMin: 10, yOffsetMax: 50 },
 ];
+
+const CLIFF_RULES_L2: PlacementRule[] = [
+  { type: 'rock',   count: 3, sizeMin: 20, sizeMax: 26, yOffsetMin: 0,  yOffsetMax: 30 },
+  { type: 'coral',  count: 3, sizeMin: 14, sizeMax: 20, yOffsetMin: -5, yOffsetMax: 40 },
+  { type: 'algae',  count: 4, sizeMin: 36, sizeMax: 50, yOffsetMin: -10, yOffsetMax: 50 },
+  { type: 'sponge', count: 2, sizeMin: 14, sizeMax: 16, yOffsetMin: 10, yOffsetMax: 40 },
+];
+
+const CLIFF_RULES_L3: PlacementRule[] = [
+  { type: 'rock',   count: 2, sizeMin: 18, sizeMax: 24, yOffsetMin: 0,  yOffsetMax: 20 },
+  { type: 'coral',  count: 2, sizeMin: 12, sizeMax: 18, yOffsetMin: -5, yOffsetMax: 30 },
+  { type: 'algae',  count: 3, sizeMin: 30, sizeMax: 42, yOffsetMin: -10, yOffsetMax: 40 },
+  { type: 'sponge', count: 1, sizeMin: 12, sizeMax: 14, yOffsetMin: 5,  yOffsetMax: 25 },
+];
+
+/** Center/floor rules (sandy zone, x 500–1420) */
+const FLOOR_RULES_L1: PlacementRule[] = [
+  { type: 'rock',    count: 3, sizeMin: 18, sizeMax: 22, yOffsetMin: -10, yOffsetMax: 20 },
+  { type: 'pebbles', count: 5, sizeMin: 10, sizeMax: 14, yOffsetMin: 0,  yOffsetMax: 30 },
+  { type: 'shell',   count: 4, sizeMin: 10, sizeMax: 12, yOffsetMin: 0,  yOffsetMax: 30 },
+  { type: 'coral',   count: 2, sizeMin: 14, sizeMax: 18, yOffsetMin: -10, yOffsetMax: 15 },
+  { type: 'algae',   count: 3, sizeMin: 24, sizeMax: 30, yOffsetMin: -10, yOffsetMax: 15 },
+  { type: 'sponge',  count: 1, sizeMin: 10, sizeMax: 12, yOffsetMin: 0,  yOffsetMax: 15 },
+];
+
+const FLOOR_RULES_L2: PlacementRule[] = [
+  { type: 'rock',    count: 2, sizeMin: 16, sizeMax: 20, yOffsetMin: -5, yOffsetMax: 15 },
+  { type: 'pebbles', count: 3, sizeMin: 10, sizeMax: 12, yOffsetMin: 0,  yOffsetMax: 20 },
+  { type: 'shell',   count: 2, sizeMin: 10, sizeMax: 10, yOffsetMin: 0,  yOffsetMax: 20 },
+  { type: 'coral',   count: 2, sizeMin: 12, sizeMax: 16, yOffsetMin: -5, yOffsetMax: 10 },
+  { type: 'algae',   count: 2, sizeMin: 22, sizeMax: 28, yOffsetMin: -5, yOffsetMax: 10 },
+  { type: 'sponge',  count: 1, sizeMin: 10, sizeMax: 12, yOffsetMin: 0,  yOffsetMax: 10 },
+];
+
+const FLOOR_RULES_L3: PlacementRule[] = [
+  { type: 'rock',    count: 2, sizeMin: 14, sizeMax: 18, yOffsetMin: -5, yOffsetMax: 10 },
+  { type: 'coral',   count: 1, sizeMin: 10, sizeMax: 14, yOffsetMin: -5, yOffsetMax: 8 },
+  { type: 'algae',   count: 2, sizeMin: 18, sizeMax: 24, yOffsetMin: -5, yOffsetMax: 8 },
+  { type: 'sponge',  count: 1, sizeMin: 8,  sizeMax: 10, yOffsetMin: 0,  yOffsetMax: 8 },
+];
+
+/**
+ * Procedurally generate decoration list from a seed.
+ * Uses terrain profiles to place decorations at correct y positions.
+ * Mirrors structure left↔right for natural cliff symmetry.
+ */
+function generateDecorations(seed: number, worldW: number, worldH: number): DecorationDef[] {
+  const rng = new SeededRng(seed);
+  const decos: DecorationDef[] = [];
+  let nextSeed = 0;
+
+  // Helper: get terrain y (world px) at a given world x
+  const gridW = Math.ceil(worldW / WORLD_PX);
+  const gridH = Math.ceil(worldH / WORLD_PX);
+  const profileY1 = (wx: number) => getLayer1Profile(wx / WORLD_PX, gridW, gridH) * WORLD_PX;
+  const profileY2 = (wx: number) => getLayer2Profile(wx / WORLD_PX, gridW, gridH) * WORLD_PX;
+  const profileY3 = (wx: number) => getLayer3Profile(wx / WORLD_PX, gridW, gridH) * WORLD_PX;
+
+  const profiles = [profileY1, profileY2, profileY3];
+
+  // Minimum distance between decorations (world px) to avoid clumping
+  const MIN_DIST = 50;
+
+  function tooClose(x: number, y: number): boolean {
+    for (const d of decos) {
+      const dx = d.x - x;
+      const dy = d.y - y;
+      if (dx * dx + dy * dy < MIN_DIST * MIN_DIST) return true;
+    }
+    return false;
+  }
+
+  function placeInZone(
+    rules: PlacementRule[],
+    xMin: number,
+    xMax: number,
+    profileFn: (wx: number) => number,
+  ) {
+    for (const rule of rules) {
+      let placed = 0;
+      let attempts = 0;
+      while (placed < rule.count && attempts < rule.count * 6) {
+        attempts++;
+        const x = Math.floor(rng.float(xMin, xMax));
+        const terrainY = profileFn(x);
+        const yOff = rng.float(rule.yOffsetMin, rule.yOffsetMax);
+        const y = Math.floor(terrainY + yOff);
+
+        // Skip if out of bounds or too close to another decoration
+        if (y < 0 || y > worldH) continue;
+        if (tooClose(x, y)) continue;
+
+        const size = rng.int(rule.sizeMin, rule.sizeMax);
+        decos.push({ x, y, type: rule.type, size, seed: nextSeed++ });
+        placed++;
+      }
+    }
+  }
+
+  // -- Layer 1 --
+  // Left cliff (x 30–470)
+  placeInZone(CLIFF_RULES_L1, 30, 470, profiles[0]);
+  // Right cliff (mirrored, x 1450–1890)
+  placeInZone(CLIFF_RULES_L1, 1450, 1890, profiles[0]);
+  // Center floor
+  placeInZone(FLOOR_RULES_L1, 500, 1420, profiles[0]);
+
+  // -- Layer 2 --
+  placeInZone(CLIFF_RULES_L2, 40, 400, profiles[1]);
+  placeInZone(CLIFF_RULES_L2, 1520, 1880, profiles[1]);
+  placeInZone(FLOOR_RULES_L2, 450, 1470, profiles[1]);
+
+  // -- Layer 3 --
+  placeInZone(CLIFF_RULES_L3, 50, 380, profiles[2]);
+  placeInZone(CLIFF_RULES_L3, 1540, 1870, profiles[2]);
+  placeInZone(FLOOR_RULES_L3, 500, 1420, profiles[2]);
+
+  return decos;
+}
 
 function renderDecoration(def: DecorationDef): HTMLCanvasElement {
   const canvasPx = def.size * RENDER_PX;
@@ -890,7 +889,11 @@ export interface SeabedBackground {
   time: number;
 }
 
-export function createSeabedBackground(worldW: number, worldH: number): SeabedBackground {
+export function createSeabedBackground(worldW: number, worldH: number, seabedSeed: number): SeabedBackground {
+  // Derive terrain wave phases from seed — affects profiles used by both
+  // the sand texture and decoration placement
+  initTerrainPhases(seabedSeed);
+
   const container = new Container();
   const settings = getRenderSettings();
 
@@ -902,12 +905,13 @@ export function createSeabedBackground(worldW: number, worldH: number): SeabedBa
   sandSprite.visible = settings.sandBackground;
   container.addChild(sandSprite);
 
-  // Decorations layer
+  // Decorations layer — procedurally generated from seed
+  const decorations = generateDecorations(seabedSeed, worldW, worldH);
   const decoContainer = new Container();
   decoContainer.visible = settings.decorations;
   const swayingDecos: SwayingDeco[] = [];
 
-  for (const def of DECORATIONS) {
+  for (const def of decorations) {
     const canvas = renderDecoration(def);
     const tex = Texture.from({ resource: canvas, scaleMode: 'nearest' });
     const sprite = new Sprite(tex);

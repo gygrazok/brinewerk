@@ -147,7 +147,7 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
 
   // Create seabed background as the bottom-most layer
   const pool = _state.pool;
-  const seabedBg = createSeabedBackground(pool.worldWidth, pool.worldHeight);
+  const seabedBg = createSeabedBackground(pool.worldWidth, pool.worldHeight, _state.seabedSeed);
   gridContainer.addChild(seabedBg.container);
 
   // Slot glow layer (behind slots)
