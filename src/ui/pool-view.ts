@@ -57,6 +57,9 @@ export interface PoolView {
   _stateRef: GameState | null;
   /** Internal: canvas ref for tooltip positioning */
   _canvas: HTMLCanvasElement | null;
+  /** Internal: last known grid bounds for shift detection */
+  _lastMinR: number;
+  _lastMinC: number;
 }
 
 // --- Cost tooltip (HTML overlay, module-level singleton) ---
@@ -121,6 +124,8 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
     _dragged: false,
     _stateRef: null,
     _canvas: null,
+    _lastMinR: 0,
+    _lastMinC: 0,
   };
 
   // --- Zoom & Pan ---
@@ -201,6 +206,28 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
   const bounds = getGridBounds(state.pool);
   const { minR, minC } = bounds;
 
+  // If grid origin shifted (expanded left/up), rebuild all positioned elements
+  // and compensate viewport so the grid appears stationary on screen
+  if (minR !== poolView._lastMinR || minC !== poolView._lastMinC) {
+    const dR = poolView._lastMinR - minR;
+    const dC = poolView._lastMinC - minC;
+    const pxShiftX = dC * (SLOT_SIZE + SLOT_PAD) * poolView.zoom;
+    const pxShiftY = dR * (SLOT_SIZE + SLOT_PAD) * poolView.zoom;
+    poolView.viewport.x -= pxShiftX;
+    poolView.viewport.y -= pxShiftY;
+
+    for (const [, gfx] of poolView.slotGraphics) gfx.destroy();
+    poolView.slotGraphics.clear();
+    for (const [, vis] of poolView.visuals) destroyCreatureVisual(vis);
+    poolView.visuals.clear();
+    for (const [, cont] of poolView.expandBtns) cont.destroy({ children: true });
+    poolView.expandBtns.clear();
+    for (const [, cont] of poolView.upgradeNodeGraphics) cont.destroy({ children: true });
+    poolView.upgradeNodeGraphics.clear();
+    poolView._lastMinR = minR;
+    poolView._lastMinC = minC;
+  }
+
   // --- Sync slot backgrounds ---
   const currentSlotKeys = new Set<CoordKey>();
   for (const [r, c] of allSlots(state.pool)) {
@@ -263,6 +290,7 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
       const y = slotPixelY(r, minR) + (SLOT_SIZE - CREATURE_DISPLAY) / 2;
       visual.sprite.x = x;
       visual.sprite.y = y;
+      visual.sprite.eventMode = 'none'; // clicks pass through to slot below
       visual.mainSprite.width = CREATURE_DISPLAY;
       visual.mainSprite.height = CREATURE_DISPLAY;
       if (visual.glowSprite) {
