@@ -3,7 +3,7 @@ import { initGameLoop, getState, getClock, onTide } from './core/game-loop';
 import { initRenderer } from './rendering/renderer';
 import { createPoolView, syncPoolVisuals, updatePoolVisuals } from './ui/pool-view';
 import { showCreaturePanel, hideCreaturePanel } from './ui/creature-panel';
-import { getCreatureAt, calculateAdjacencyBonus, placeCreature, findEmptySlot, expandPool } from './systems/pool';
+import { getCreatureAt, calculateAdjacencyBonus, placeCreature, removeCreature, findEmptySlot, expandPool } from './systems/pool';
 import { forceInitialTide } from './systems/tides';
 import { renderShore, setOnPickUp } from './ui/tide-shore';
 import { updateHud } from './ui/hud';
@@ -58,6 +58,18 @@ async function init() {
       showCreaturePanel(creature, bonus);
     } else {
       hideCreaturePanel();
+    }
+  };
+
+  // Handle creature drag & drop between slots
+  poolView.onCreatureDrop = (fromR, fromC, toR, toC) => {
+    const creature = removeCreature(state, fromR, fromC);
+    if (creature && placeCreature(state, creature, toR, toC)) {
+      syncPoolVisuals(poolView, state);
+      updateHud(state);
+    } else if (creature) {
+      // Rollback: put creature back
+      placeCreature(state, creature, fromR, fromC);
     }
   };
 

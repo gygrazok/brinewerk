@@ -1,4 +1,4 @@
-import { Container, Graphics, Text, TextStyle } from 'pixi.js';
+import { Container, Graphics, Sprite, Text, TextStyle } from 'pixi.js';
 import type { Application } from 'pixi.js';
 import type { GameState } from '../core/game-state';
 import { getCreatureAt } from '../systems/pool';
@@ -6,6 +6,7 @@ import { getExpansionCost } from '../core/balance';
 import {
   allSlots,
   slotCount,
+  getSlot,
   getGridBounds,
   getExpansionCandidates,
   getUpgradeNodePositions,
@@ -39,6 +40,16 @@ const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2.0;
 const DRAG_THRESHOLD = 4;
 
+interface DragState {
+  creatureId: string;
+  sourceRow: number;
+  sourceCol: number;
+  ghost: Sprite;
+  startX: number;
+  startY: number;
+  active: boolean;
+}
+
 export interface PoolView {
   viewport: Container;
   gridContainer: Container;
@@ -50,8 +61,9 @@ export interface PoolView {
   onSlotClick: ((row: number, col: number) => void) | null;
   onExpansionClick: ((row: number, col: number) => void) | null;
   onUpgradeNodeClick: ((row: number, col: number) => void) | null;
+  onCreatureDrop: ((fromR: number, fromC: number, toR: number, toC: number) => void) | null;
   zoom: number;
-  /** Internal: true if user dragged (to suppress click after pan) */
+  /** Internal: true if user dragged (to suppress click after pan/drag) */
   _dragged: boolean;
   /** Internal: latest state ref for tooltip cost display */
   _stateRef: GameState | null;
@@ -60,6 +72,11 @@ export interface PoolView {
   /** Internal: last known grid bounds for shift detection */
   _lastMinR: number;
   _lastMinC: number;
+  /** Internal: creature drag state */
+  _dragState: DragState | null;
+  /** Internal: z-order layers inside gridContainer */
+  _slotLayer: Container;
+  _creatureLayer: Container;
 }
 
 // --- Cost tooltip (HTML overlay, module-level singleton) ---
@@ -106,6 +123,10 @@ function slotPixelY(row: number, minR: number): number {
 export function createPoolView(app: Application, _state: GameState): PoolView {
   const viewport = new Container();
   const gridContainer = new Container();
+  const slotLayer = new Container();      // behind: slot bgs, expand btns, upgrade nodes
+  const creatureLayer = new Container();   // front: creature sprites
+  gridContainer.addChild(slotLayer);
+  gridContainer.addChild(creatureLayer);
   viewport.addChild(gridContainer);
   app.stage.addChild(viewport);
 
@@ -120,23 +141,45 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
     onSlotClick: null,
     onExpansionClick: null,
     onUpgradeNodeClick: null,
+    onCreatureDrop: null,
     zoom: 1.0,
     _dragged: false,
     _stateRef: null,
     _canvas: null,
     _lastMinR: 0,
     _lastMinC: 0,
+    _dragState: null,
+    _slotLayer: slotLayer,
+    _creatureLayer: creatureLayer,
   };
 
-  // --- Zoom & Pan ---
-  let isDragging = false;
-  let dragStartX = 0;
-  let dragStartY = 0;
+  // --- Zoom & Pan & Creature Drag ---
+  let isPanning = false;
+  let panStartX = 0;
+  let panStartY = 0;
   let viewStartX = 0;
   let viewStartY = 0;
 
   const canvas = app.canvas as HTMLCanvasElement;
   poolView._canvas = canvas;
+
+  /** Convert screen coordinates (relative to canvas) to grid row/col */
+  function screenToGrid(sx: number, sy: number): [number, number] | null {
+    // Screen → grid container local coordinates
+    const lx = (sx - viewport.x) / poolView.zoom;
+    const ly = (sy - viewport.y) / poolView.zoom;
+    const minR = poolView._lastMinR;
+    const minC = poolView._lastMinC;
+    const col = Math.floor(lx / (SLOT_SIZE + SLOT_PAD)) + minC;
+    const row = Math.floor(ly / (SLOT_SIZE + SLOT_PAD)) + minR;
+    // Check that point is within slot area (not in padding)
+    const slotLocalX = lx - (col - minC) * (SLOT_SIZE + SLOT_PAD);
+    const slotLocalY = ly - (row - minR) * (SLOT_SIZE + SLOT_PAD);
+    if (slotLocalX < 0 || slotLocalX >= SLOT_SIZE || slotLocalY < 0 || slotLocalY >= SLOT_SIZE) {
+      return null;
+    }
+    return [row, col];
+  }
 
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
@@ -157,18 +200,84 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
   }, { passive: false });
 
   canvas.addEventListener('pointerdown', (e) => {
-    isDragging = true;
     poolView._dragged = false;
-    dragStartX = e.clientX;
-    dragStartY = e.clientY;
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+
+    // Check if pointer is on an occupied slot → start creature drag candidate
+    const gridPos = screenToGrid(sx, sy);
+    if (gridPos && poolView._stateRef) {
+      const [row, col] = gridPos;
+      const slot = getSlot(poolView._stateRef.pool, row, col);
+      if (slot?.creatureId) {
+        poolView._dragState = {
+          creatureId: slot.creatureId,
+          sourceRow: row,
+          sourceCol: col,
+          ghost: new Sprite(),  // placeholder, created on threshold
+          startX: e.clientX,
+          startY: e.clientY,
+          active: false,
+        };
+        // Don't start pan
+        return;
+      }
+    }
+
+    // Otherwise: start pan
+    isPanning = true;
+    panStartX = e.clientX;
+    panStartY = e.clientY;
     viewStartX = viewport.x;
     viewStartY = viewport.y;
   });
 
   const onPointerMove = (e: PointerEvent) => {
-    if (!isDragging) return;
-    const dx = e.clientX - dragStartX;
-    const dy = e.clientY - dragStartY;
+    const ds = poolView._dragState;
+
+    // --- Creature drag ---
+    if (ds) {
+      const dx = e.clientX - ds.startX;
+      const dy = e.clientY - ds.startY;
+
+      if (!ds.active) {
+        if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
+          ds.active = true;
+          poolView._dragged = true;
+
+          // Create ghost sprite from the creature's visual
+          const visual = poolView.visuals.get(ds.creatureId);
+          if (visual) {
+            // Use a new sprite sharing the same texture
+            const ghost = new Sprite(visual.texture);
+            ghost.width = CREATURE_DISPLAY;
+            ghost.height = CREATURE_DISPLAY;
+            ghost.alpha = 0.6;
+            ghost.anchor.set(0.5);
+            // Position in viewport coords (above everything)
+            app.stage.addChild(ghost);
+            ds.ghost = ghost;
+
+            // Dim the original
+            visual.sprite.alpha = 0.3;
+          }
+        }
+      }
+
+      if (ds.active && ds.ghost.texture) {
+        // Position ghost at cursor (in screen/stage space)
+        const rect = canvas.getBoundingClientRect();
+        ds.ghost.x = e.clientX - rect.left;
+        ds.ghost.y = e.clientY - rect.top;
+      }
+      return;
+    }
+
+    // --- Pan ---
+    if (!isPanning) return;
+    const dx = e.clientX - panStartX;
+    const dy = e.clientY - panStartY;
     if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
       poolView._dragged = true;
     }
@@ -176,8 +285,47 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
     viewport.y = viewStartY + dy;
   };
 
-  const onPointerUp = () => {
-    isDragging = false;
+  const onPointerUp = (e: PointerEvent) => {
+    const ds = poolView._dragState;
+
+    if (ds) {
+      if (ds.active) {
+        // Attempt to drop creature on target slot
+        const rect = canvas.getBoundingClientRect();
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
+        const target = screenToGrid(sx, sy);
+
+        if (
+          target &&
+          poolView._stateRef &&
+          (target[0] !== ds.sourceRow || target[1] !== ds.sourceCol)
+        ) {
+          const [toR, toC] = target;
+          const targetSlot = getSlot(poolView._stateRef.pool, toR, toC);
+          if (targetSlot && targetSlot.creatureId === null) {
+            poolView.onCreatureDrop?.(ds.sourceRow, ds.sourceCol, toR, toC);
+          }
+        }
+
+        // Cleanup ghost
+        if (ds.ghost.parent) ds.ghost.destroy();
+
+        // Restore original alpha
+        const visual = poolView.visuals.get(ds.creatureId);
+        if (visual) visual.sprite.alpha = 1;
+      } else {
+        // Didn't exceed threshold → treat as click
+        const [row, col] = [ds.sourceRow, ds.sourceCol];
+        poolView.selectedSlot = [row, col];
+        poolView.onSlotClick?.(row, col);
+      }
+
+      poolView._dragState = null;
+      return;
+    }
+
+    isPanning = false;
   };
 
   window.addEventListener('pointermove', onPointerMove);
@@ -262,7 +410,7 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
         poolView.onSlotClick?.(r, c);
       });
 
-      poolView.gridContainer.addChild(slot);
+      poolView._slotLayer.addChild(slot);
       poolView.slotGraphics.set(key, slot);
     }
   }
@@ -297,7 +445,7 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
         visual.glowSprite.width = CREATURE_DISPLAY;
         visual.glowSprite.height = CREATURE_DISPLAY;
       }
-      poolView.gridContainer.addChild(visual.sprite);
+      poolView._creatureLayer.addChild(visual.sprite);
       poolView.visuals.set(creature.id, visual);
     } else {
       // Update position (in case grid origin shifted)
@@ -372,7 +520,7 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
         poolView.onExpansionClick?.(r, c);
       });
 
-      poolView.gridContainer.addChild(cont);
+      poolView._slotLayer.addChild(cont);
       poolView.expandBtns.set(key, cont);
     } else {
       // Update position
@@ -433,7 +581,7 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
         poolView.onUpgradeNodeClick?.(r, c);
       });
 
-      poolView.gridContainer.addChild(cont);
+      poolView._slotLayer.addChild(cont);
       poolView.upgradeNodeGraphics.set(key, cont);
     } else {
       // Update position and state
