@@ -277,12 +277,19 @@ export async function showCreaturePanel(creature: Creature, adjacencyBonus: numb
     previewVisual.glowSprite.width = PREVIEW_SIZE;
     previewVisual.glowSprite.height = PREVIEW_SIZE;
   }
-  // Rotating creatures: pivot at center so rotation looks natural in preview
-  if (creature.rare === 'rotating') {
+  // Special pivot setup for movement-based rare effects
+  const needsCenterPivot = creature.rare === 'rotating' || creature.rare === 'pulse' || creature.rare === 'tiny';
+  if (needsCenterPivot) {
     const half = PREVIEW_SIZE / 2;
     previewVisual.sprite.pivot.set(half, half);
     previewVisual.sprite.x = half;
     previewVisual.sprite.y = half;
+  } else if (creature.rare === 'upside-down') {
+    const half = PREVIEW_SIZE / 2;
+    previewVisual.sprite.pivot.set(half, 0);
+    previewVisual.sprite.scale.y = -1;
+    previewVisual.sprite.x = half;
+    previewVisual.sprite.y = PREVIEW_SIZE;
   } else {
     previewVisual.sprite.x = 0;
     previewVisual.sprite.y = 0;

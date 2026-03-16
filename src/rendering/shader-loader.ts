@@ -10,6 +10,10 @@ import shinyFrag from './shaders/shiny.glsl';
 import nebulaFrag from './shaders/nebula.glsl';
 import toxicFrag from './shaders/toxic.glsl';
 import phantomFrag from './shaders/phantom.glsl';
+import waveFrag from './shaders/wave.glsl';
+import rainbowFrag from './shaders/rainbow.glsl';
+import hologramFrag from './shaders/hologram.glsl';
+import negativeFrag from './shaders/negative.glsl';
 import outlineFrag from './shaders/outline.glsl';
 import glowFrag from './shaders/glow.glsl';
 
@@ -22,6 +26,10 @@ const RARE_FRAG: Partial<Record<RareEffect, string>> = {
   nebula: nebulaFrag,
   toxic: toxicFrag,
   phantom: phantomFrag,
+  wave: waveFrag,
+  rainbow: rainbowFrag,
+  hologram: hologramFrag,
+  negative: negativeFrag,
 };
 
 // Default vertex shader for PixiJS v8 filters

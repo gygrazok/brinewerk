@@ -3,6 +3,8 @@ import type { PixelGrid } from '../pixel-grid';
 import { applyFireEffect } from './fire';
 import { applyToxicEffect } from './toxic';
 import { applyFrostEffect } from './frost';
+import { applyElectricEffect } from './electric';
+import { applyShadowEffect } from './shadow';
 import { cleanupFrostState } from './frost';
 import { cleanupToxicState } from './toxic';
 
@@ -12,6 +14,8 @@ const PIXEL_EFFECTS: Partial<Record<RareEffect, PixelEffect>> = {
   fire: (grid, time) => applyFireEffect(grid, time),
   toxic: (grid, time, id) => applyToxicEffect(grid, time, id),
   frost: (grid, time, id) => applyFrostEffect(grid, time, id),
+  electric: (grid, time) => applyElectricEffect(grid, time),
+  shadow: (grid, time) => applyShadowEffect(grid, time),
 };
 
 /** Get the pixel-level effect for a rare type (if any). */

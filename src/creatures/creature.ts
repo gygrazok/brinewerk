@@ -30,7 +30,16 @@ export type RareEffect =
   | 'nebula'
   | 'toxic'
   | 'phantom'
-  | 'rotating';
+  | 'rotating'
+  | 'upside-down'
+  | 'wave'
+  | 'rainbow'
+  | 'hologram'
+  | 'negative'
+  | 'electric'
+  | 'shadow'
+  | 'pulse'
+  | 'tiny';
 
 export interface RareInfo {
   id: string;
@@ -43,7 +52,7 @@ export interface RareInfo {
 }
 
 export const RARE_EFFECTS: RareInfo[] = [
-  { id: 'none', label: '', icon: '', chance: 0.55, color: '#8ba0a8' },
+  { id: 'none', label: '', icon: '', chance: 0.15, color: '#8ba0a8' },
   { id: 'metallic', label: 'Metallic', icon: '\u2699', chance: 0.08, color: '#c0c8d0' },
   { id: 'glitch', label: 'Glitch', icon: '\u25A6', chance: 0.05, color: '#00ff88' },
   { id: 'fire', label: 'On Fire', icon: '\uD83D\uDD25', chance: 0.05, color: '#ff6020' },
@@ -53,6 +62,15 @@ export const RARE_EFFECTS: RareInfo[] = [
   { id: 'toxic', label: 'Toxic', icon: '\u2623', chance: 0.04, color: '#80ff40' },
   { id: 'phantom', label: 'Phantom', icon: '\uD83D\uDC7B', chance: 0.04, color: '#a080c0' },
   { id: 'rotating', label: 'Rotating', icon: '\uD83C\uDF00', chance: 0.05, color: '#60c0e0', types: [CreatureType.Stellarid, CreatureType.Nucleid] },
+  { id: 'upside-down', label: 'Upside Down', icon: '\uD83D\uDD03', chance: 0.05, color: '#e0a060', types: [CreatureType.Blobid, CreatureType.Corallid] },
+  { id: 'wave', label: 'Wave', icon: '\u223F', chance: 0.05, color: '#40c0ff' },
+  { id: 'rainbow', label: 'Rainbow', icon: '\uD83C\uDF08', chance: 0.04, color: '#ff80c0' },
+  { id: 'hologram', label: 'Hologram', icon: '\u25C7', chance: 0.04, color: '#60a0ff' },
+  { id: 'negative', label: 'Negative', icon: '\u25D1', chance: 0.04, color: '#e0e0e0' },
+  { id: 'electric', label: 'Electric', icon: '\u26A1', chance: 0.04, color: '#80d0ff' },
+  { id: 'shadow', label: 'Shadow', icon: '\u2592', chance: 0.04, color: '#404060' },
+  { id: 'pulse', label: 'Pulse', icon: '\u2665', chance: 0.04, color: '#ff6080' },
+  { id: 'tiny', label: 'Tiny', icon: '\u2022', chance: 0.04, color: '#a0e060' },
 ];
 
 export function rollRare(rng: () => number, creatureType?: CreatureType): RareEffect | null {

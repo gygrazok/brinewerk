@@ -169,14 +169,34 @@ export function updateCreatureVisual(visual: CreatureVisual, _deltaSec: number, 
   // Rotating rare effect — layered cosine waves for organic accelerate/decelerate/reverse
   if (visual.creature.rare === 'rotating') {
     const s = visual.creature.seed;
-    // Two waves with seed-derived periods in 3–10s range
-    const p1 = 3 + (s % 1000) / 1000 * 7;       // 3–10s
-    const p2 = 3 + ((s * 7) % 1000) / 1000 * 7;  // 3–10s (different)
+    const p1 = 3 + (s % 1000) / 1000 * 7;
+    const p2 = 3 + ((s * 7) % 1000) / 1000 * 7;
     const angle =
       Math.cos(time * (2 * Math.PI) / p1) * 1.8 +
       Math.cos(time * (2 * Math.PI) / p2) * 1.2;
-    // Rotate the container (which has pivot set at center by pool-view / creature-panel)
     visual.sprite.rotation = angle;
+  }
+
+  // Pulse rare effect — heartbeat-like scale throb
+  if (visual.creature.rare === 'pulse') {
+    // Quick expand (systole) + slow relax (diastole) — asymmetric like a real heartbeat
+    const beat = Math.abs(Math.sin(time * 2.5));
+    const sharp = beat * beat; // sharpen the curve
+    const scale = 1 + sharp * 0.15; // 1.0 → 1.15
+    visual.sprite.scale.set(scale, scale);
+  }
+
+  // Tiny rare effect — half size, Lissajous bounce inside the cell
+  if (visual.creature.rare === 'tiny') {
+    const s = visual.creature.seed;
+    visual.sprite.scale.set(0.5, 0.5);
+    // Derive base pivot and bounce range from actual sprite size (works for both pool and preview)
+    const baseP = visual.mainSprite.width / 2;
+    const range = baseP * 0.375; // ~12px at 64, ~37px at 200
+    const dx = Math.sin(time * 1.4 + s) * range;
+    const dy = Math.sin(time * 1.9 + s * 0.7) * range;
+    visual.sprite.pivot.x = baseP - dx;
+    visual.sprite.pivot.y = baseP - dy;
   }
 }
 

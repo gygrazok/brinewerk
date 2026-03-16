@@ -2,6 +2,8 @@ import type { GameState } from '../core/game-state';
 import { createDefaultState, clearSave } from '../core/game-state';
 import { disableSaving } from '../core/game-loop';
 import { forceTide } from '../systems/tides';
+import { createCreature, RARE_EFFECTS, type RareEffect } from '../creatures/creature';
+import { CreatureType } from '../creatures/types';
 
 /** Inject a floating debug menu (dev only). Returns cleanup function. */
 export function initDebugMenu(
@@ -29,8 +31,14 @@ export function initDebugMenu(
         cursor: pointer; text-align: left;
       }
       #debug-menu button:hover { border-color: #3aada8; color: #7eeee4; }
-      #debug-menu .debug-row { display: flex; gap: 4px; flex-wrap: wrap; }
+      #debug-menu .debug-row { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
       #debug-menu .debug-section { margin-top: 4px; color: #1a3a3f; font-size: 7px; }
+      #debug-menu select {
+        background: #0d2228; border: 1px solid #1a3a3f; border-radius: 3px;
+        color: #3aada8; font-family: inherit; font-size: 7px; padding: 3px 4px;
+        cursor: pointer; flex: 1; min-width: 0;
+      }
+      #debug-menu select:hover { border-color: #3aada8; }
     </style>
     <details open>
       <summary>DEBUG</summary>
@@ -47,6 +55,23 @@ export function initDebugMenu(
       <div class="debug-row">
         <button data-action="force-tide">Force Tide</button>
       </div>
+      <div class="debug-section">Spawn</div>
+      <div class="debug-row">
+        <select id="dbg-type">
+          <option value="">Random</option>
+          <option value="stellarid">Stellarid</option>
+          <option value="blobid">Blobid</option>
+          <option value="corallid">Corallid</option>
+          <option value="nucleid">Nucleid</option>
+        </select>
+        <select id="dbg-rare">
+          <option value="">Random</option>
+          <option value="none">None</option>
+        </select>
+      </div>
+      <div class="debug-row">
+        <button data-action="spawn">Spawn → Shore</button>
+      </div>
       <div class="debug-section">Grid</div>
       <div class="debug-row">
         <button data-action="reset-grid">Reset Grid</button>
@@ -56,6 +81,16 @@ export function initDebugMenu(
   `;
 
   document.body.appendChild(panel);
+
+  // Populate rare dropdown dynamically from RARE_EFFECTS registry
+  const rareSelect = panel.querySelector('#dbg-rare') as HTMLSelectElement;
+  for (const eff of RARE_EFFECTS) {
+    if (eff.id === 'none') continue; // already added as static option
+    const opt = document.createElement('option');
+    opt.value = eff.id;
+    opt.textContent = `${eff.icon} ${eff.label}`;
+    rareSelect.appendChild(opt);
+  }
 
   panel.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
@@ -80,6 +115,20 @@ export function initDebugMenu(
       case 'force-tide':
         forceTide(state);
         break;
+      case 'spawn': {
+        const typeSelect = panel.querySelector('#dbg-type') as HTMLSelectElement;
+        const typeVal = typeSelect.value;
+        const rareVal = rareSelect.value;
+        const type = typeVal ? (typeVal as CreatureType) : undefined;
+        const rare: RareEffect | null | undefined =
+          rareVal === '' ? undefined :        // random
+          rareVal === 'none' ? null :         // force no rare
+          (rareVal as RareEffect);            // specific rare
+        const creature = createCreature(type, undefined, rare);
+        state.creatures.push(creature);
+        state.shore.push(creature);
+        break;
+      }
       case 'reset-grid': {
         // Reset pool to default seabed layout, remove creatures from slots
         const def = createDefaultState();

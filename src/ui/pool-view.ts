@@ -454,12 +454,19 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
         visual.glowSprite.width = CREATURE_DISPLAY;
         visual.glowSprite.height = CREATURE_DISPLAY;
       }
-      // Rotating creatures: pivot at center so rotation looks natural
-      if (creature.rare === 'rotating') {
+      // Special pivot setup for movement-based rare effects
+      const needsCenterPivot = creature.rare === 'rotating' || creature.rare === 'pulse' || creature.rare === 'tiny';
+      if (needsCenterPivot) {
         const half = CREATURE_DISPLAY / 2;
         visual.sprite.pivot.set(half, half);
         visual.sprite.x = cx + half;
         visual.sprite.y = cy + half;
+      } else if (creature.rare === 'upside-down') {
+        const half = CREATURE_DISPLAY / 2;
+        visual.sprite.pivot.set(half, 0);
+        visual.sprite.scale.y = -1;
+        visual.sprite.x = cx + half;
+        visual.sprite.y = cy + CREATURE_DISPLAY;
       } else {
         visual.sprite.x = cx;
         visual.sprite.y = cy;
@@ -468,10 +475,15 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
       poolView.visuals.set(creature.id, visual);
     } else {
       const visual = poolView.visuals.get(creature.id)!;
-      if (creature.rare === 'rotating') {
+      const needsCenterPivot = creature.rare === 'rotating' || creature.rare === 'pulse' || creature.rare === 'tiny';
+      if (needsCenterPivot) {
         const half = CREATURE_DISPLAY / 2;
         visual.sprite.x = cx + half;
         visual.sprite.y = cy + half;
+      } else if (creature.rare === 'upside-down') {
+        const half = CREATURE_DISPLAY / 2;
+        visual.sprite.x = cx + half;
+        visual.sprite.y = cy + CREATURE_DISPLAY;
       } else {
         visual.sprite.x = cx;
         visual.sprite.y = cy;
