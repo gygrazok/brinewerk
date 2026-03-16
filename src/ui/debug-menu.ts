@@ -1,5 +1,6 @@
 import type { GameState } from '../core/game-state';
 import { createDefaultState, clearSave } from '../core/game-state';
+import { disableSaving } from '../core/game-loop';
 import { forceTide } from '../systems/tides';
 
 /** Inject a floating debug menu (dev only). Returns cleanup function. */
@@ -91,6 +92,7 @@ export function initDebugMenu(
         break;
       }
       case 'reset-all':
+        disableSaving();
         clearSave();
         onReset();
         return;

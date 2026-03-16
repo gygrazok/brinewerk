@@ -9,6 +9,7 @@ const AUTO_SAVE_INTERVAL = 30; // seconds
 let state: GameState;
 let clock: Clock;
 let saveTimer = 0;
+let savingEnabled = true;
 const onTideCallbacks: (() => void)[] = [];
 
 export function onTide(cb: () => void): void {
@@ -57,5 +58,12 @@ export function initGameLoop(ticker: Ticker): void {
   });
 
   // Save on page unload
-  window.addEventListener('beforeunload', () => saveState(state));
+  window.addEventListener('beforeunload', () => {
+    if (savingEnabled) saveState(state);
+  });
+}
+
+/** Disable auto-save (call before clearSave + reload to prevent beforeunload from re-saving) */
+export function disableSaving(): void {
+  savingEnabled = false;
 }
