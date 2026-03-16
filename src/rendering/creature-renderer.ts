@@ -66,7 +66,8 @@ export function createCreatureVisual(creature: Creature): CreatureVisual {
   // Rare effect filter on main sprite
   const mainFilters: Filter[] = [];
   if (creature.rare) {
-    mainFilters.push(getRareFilter(creature.rare));
+    const rf = getRareFilter(creature.rare);
+    if (rf) mainFilters.push(rf);
   }
   if (mainFilters.length > 0) {
     mainSprite.filters = mainFilters;

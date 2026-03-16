@@ -27,7 +27,7 @@ export type RareEffect =
   | 'fire'
   | 'frost'
   | 'shiny'
-  | 'starry'
+  | 'nebula'
   | 'toxic'
   | 'phantom';
 
@@ -46,7 +46,7 @@ export const RARE_EFFECTS: RareInfo[] = [
   { id: 'fire', label: 'On Fire', icon: '\uD83D\uDD25', chance: 0.05, color: '#ff6020' },
   { id: 'frost', label: 'Frost', icon: '\u2744', chance: 0.05, color: '#80d0ff' },
   { id: 'shiny', label: 'Shiny', icon: '\u2728', chance: 0.05, color: '#ffe040' },
-  { id: 'starry', label: 'Starry', icon: '\u2605', chance: 0.04, color: '#c0a0ff' },
+  { id: 'nebula', label: 'Nebula', icon: '\u2605', chance: 0.04, color: '#c0a0ff' },
   { id: 'toxic', label: 'Toxic', icon: '\u2623', chance: 0.04, color: '#80ff40' },
   { id: 'phantom', label: 'Phantom', icon: '\uD83D\uDC7B', chance: 0.04, color: '#a080c0' },
 ];

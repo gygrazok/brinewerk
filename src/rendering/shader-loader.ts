@@ -7,19 +7,19 @@ import glitchFrag from './shaders/glitch.glsl';
 import fireFrag from './shaders/fire.glsl';
 import frostFrag from './shaders/frost.glsl';
 import shinyFrag from './shaders/shiny.glsl';
-import starryFrag from './shaders/starry.glsl';
+import nebulaFrag from './shaders/nebula.glsl';
 import toxicFrag from './shaders/toxic.glsl';
 import phantomFrag from './shaders/phantom.glsl';
 import outlineFrag from './shaders/outline.glsl';
 import glowFrag from './shaders/glow.glsl';
 
-const RARE_FRAG: Record<RareEffect, string> = {
+const RARE_FRAG: Partial<Record<RareEffect, string>> = {
   metallic: metallicFrag,
   glitch: glitchFrag,
   fire: fireFrag,
   frost: frostFrag,
   shiny: shinyFrag,
-  starry: starryFrag,
+  nebula: nebulaFrag,
   toxic: toxicFrag,
   phantom: phantomFrag,
 };
@@ -53,20 +53,27 @@ void main(void) {
 // Shared filter cache — one Filter per rare effect type
 const rareFilterCache = new Map<RareEffect, Filter>();
 
-export function getRareFilter(rare: RareEffect): Filter {
+export function getRareFilter(rare: RareEffect): Filter | null {
   let filter = rareFilterCache.get(rare);
   if (filter) return filter;
 
-  const fragment = RARE_FRAG[rare];
-  filter = new Filter({
-    glProgram: new GlProgram({ vertex: defaultVertex, fragment }),
-    padding: 12,
-    resources: {
-      rareUniforms: {
-        uTime: { value: 0, type: 'f32' },
+  const fragment = RARE_FRAG[rare as keyof typeof RARE_FRAG];
+  if (!fragment) return null; // unknown rare type — render as normal creature
+
+  try {
+    filter = new Filter({
+      glProgram: new GlProgram({ vertex: defaultVertex, fragment }),
+      padding: 12,
+      resources: {
+        rareUniforms: {
+          uTime: { value: 0, type: 'f32' },
+        },
       },
-    },
-  });
+    });
+  } catch (e) {
+    console.warn(`[shader] failed to compile filter for rare="${rare}":`, e);
+    return null;
+  }
 
   rareFilterCache.set(rare, filter);
   return filter;
