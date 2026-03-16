@@ -13,7 +13,7 @@ export function initDebugMenu(
   panel.innerHTML = `
     <style>
       #debug-menu {
-        position: fixed; top: 8px; right: 8px; z-index: 9999;
+        position: fixed; top: 50px; right: 8px; z-index: 50;
         background: #0a1a20ee; border: 1px solid #1a3a3f; border-radius: 6px;
         padding: 8px 10px; font-family: 'Press Start 2P', monospace; font-size: 8px;
         color: #3aada8; display: flex; flex-direction: column; gap: 6px;

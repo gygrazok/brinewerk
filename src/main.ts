@@ -10,13 +10,19 @@ import { updateHud } from './ui/hud';
 import { installUpgrade } from './economy/upgrades';
 import { showUpgradeModal } from './ui/upgrade-modal';
 import { initDebugMenu } from './ui/debug-menu';
+import { injectTheme } from './ui/theme';
 
 const app = new Application();
 
 async function init() {
+  // Inject centralized theme/layout CSS before anything renders
+  injectTheme();
+
+  const gameContainer = document.getElementById('game')!;
+
   await app.init({
     background: '#060e12',
-    resizeTo: window,
+    resizeTo: gameContainer,
     antialias: false,
     roundPixels: true,
     resolution: window.devicePixelRatio || 1,
@@ -24,8 +30,7 @@ async function init() {
     preference: 'webgl',
   });
 
-  const container = document.getElementById('game')!;
-  container.appendChild(app.canvas as HTMLCanvasElement);
+  gameContainer.appendChild(app.canvas as HTMLCanvasElement);
 
   initGameLoop(app.ticker);
   initRenderer(app);
@@ -78,6 +83,7 @@ async function init() {
     if (expandPool(state, row, col)) {
       syncPoolVisuals(poolView, state);
       updateHud(state);
+      renderShore(state); // update shore cards (grid may no longer be full)
     }
   };
 
