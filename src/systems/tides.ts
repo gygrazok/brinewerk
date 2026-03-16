@@ -9,8 +9,8 @@ import { allSlots } from './coords';
 
 const SHORE_CAPACITY = 3;
 
-/** Phase 1 creature types available from tides */
-const TIDE_TYPES = [CreatureType.Stellarid, CreatureType.Blobid];
+/** Creature types available from tides */
+const TIDE_TYPES = [CreatureType.Stellarid, CreatureType.Blobid, CreatureType.Corallid, CreatureType.Nucleid];
 
 /** Generate 1-3 random tide creatures */
 function generateTideCreatures(): Creature[] {
@@ -80,6 +80,7 @@ export function forceInitialTide(state: GameState): void {
     state.shore = [
       createCreature(CreatureType.Stellarid),
       createCreature(CreatureType.Blobid),
+      createCreature(TIDE_TYPES[Math.floor(Math.random() * TIDE_TYPES.length)]),
     ];
     state.lastTideTimestamp = Date.now();
   }

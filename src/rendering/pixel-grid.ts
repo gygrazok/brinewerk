@@ -58,13 +58,22 @@ export function addEyes(
   pal: Palette,
 ): void {
   const ec = Math.round(genes.eyes * 3);
+  const big = genes.eyes >= 0.7; // high trait → 2×2 eyes
   const pos: [number, number][] = [];
   if (ec >= 1) pos.push([cx - 2, cy - 1]);
   if (ec >= 2) pos.push([cx + 2, cy - 1]);
   if (ec >= 3) pos.push([cx, cy + 1]);
   for (const [ex, ey] of pos) {
-    setPixel(grid, ex, ey, '#ffffff');
-    setPixel(grid, ex, ey - 1, pal.outline);
+    if (big) {
+      // 2×2 eye: 3 dark pixels + 1 white highlight (top-right)
+      setPixel(grid, ex, ey, '#000000');
+      setPixel(grid, ex + 1, ey, '#000000');
+      setPixel(grid, ex, ey - 1, '#000000');
+      setPixel(grid, ex + 1, ey - 1, '#ffffff');
+    } else {
+      setPixel(grid, ex, ey, '#ffffff');
+      setPixel(grid, ex, ey - 1, pal.outline);
+    }
   }
 }
 
