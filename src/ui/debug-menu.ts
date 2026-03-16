@@ -84,7 +84,6 @@ export function initDebugMenu(
         // Reset pool to default seabed layout, remove creatures from slots
         const def = createDefaultState();
         state.pool = def.pool;
-        state.upgradeAnchors = [];
         // Remove placed creatures (keep shore)
         state.creatures = state.creatures.filter((c) =>
           state.shore.some((s) => s.id === c.id)

@@ -1,7 +1,6 @@
 import type { GameState } from '../core/game-state';
 import { calculateProduction } from '../creatures/production';
 import { calculateAdjacencyBonus } from '../systems/pool';
-import { getUpgradeBonus } from './upgrades';
 import { unlockedSlots } from '../systems/coords';
 
 /** Advance resource production for one tick */
@@ -14,8 +13,7 @@ export function tickProduction(state: GameState, deltaSec: number): void {
     if (!creature) continue;
 
     const adjacencyBonus = calculateAdjacencyBonus(state, slot.id);
-    const upgradeBonus = getUpgradeBonus(state, slot.id);
-    totalPlanktonPerSec += calculateProduction(creature, adjacencyBonus + upgradeBonus);
+    totalPlanktonPerSec += calculateProduction(creature, adjacencyBonus);
   }
 
   state.resources.plankton += totalPlanktonPerSec * deltaSec;
@@ -29,8 +27,7 @@ export function getTotalProductionRate(state: GameState): number {
     const creature = state.creatures.find(cr => cr.id === slot.creatureId);
     if (!creature) continue;
     const adjacencyBonus = calculateAdjacencyBonus(state, slot.id);
-    const upgradeBonus = getUpgradeBonus(state, slot.id);
-    total += calculateProduction(creature, adjacencyBonus + upgradeBonus);
+    total += calculateProduction(creature, adjacencyBonus);
   }
   return total;
 }

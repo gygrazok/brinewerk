@@ -19,16 +19,12 @@ import {
 } from '../rendering/seabed-bg';
 import { cleanupEffectState } from '../rendering/effects/index';
 import { getRenderSettings } from '../rendering/render-settings';
-import { UPGRADE_ANCHORS } from '../systems/seabed-layout';
-
 const SLOT_SIZE = 80;
 const CREATURE_DISPLAY = 64;
 const SLOT_BG = 0x0d2228;
 const SLOT_BORDER = 0x1a3a3f;
 const SLOT_HOVER = 0x3aada8;
 const HIT_RADIUS = 50;
-const ANCHOR_RADIUS = 16;
-
 
 const ZOOM_MAX = 2.0;
 const DRAG_THRESHOLD = 4;
@@ -58,7 +54,6 @@ export interface PoolView {
   slotGraphics: Map<string, Graphics>;
   onSlotClick: ((slotId: string) => void) | null;
   onExpansionClick: ((slotId: string) => void) | null;
-  onUpgradeNodeClick: ((anchorId: string) => void) | null;
   onCreatureDrop: ((fromSlotId: string, toSlotId: string) => void) | null;
   zoom: number;
   _dragged: boolean;
@@ -68,8 +63,6 @@ export interface PoolView {
   _slotLayer: Container;
   _creatureLayer: Container;
   _seabedBg: SeabedBackground | null;
-  _anchorLayer: Container;
-  _anchorGraphics: Map<string, Graphics>;
   _slotGlowLayer: Container;
   _slotGlowGraphics: Map<string, Graphics>;
   _app: Application;
@@ -128,10 +121,8 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
   gridContainer.addChild(slotGlowLayer);
 
   const slotLayer = new Container();
-  const anchorLayer = new Container();
   const creatureLayer = new Container();
   gridContainer.addChild(slotLayer);
-  gridContainer.addChild(anchorLayer);
   gridContainer.addChild(creatureLayer);
   viewport.addChild(gridContainer);
   app.stage.addChild(viewport);
@@ -143,7 +134,6 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
     slotGraphics: new Map(),
     onSlotClick: null,
     onExpansionClick: null,
-    onUpgradeNodeClick: null,
     onCreatureDrop: null,
     zoom: 1.0,
     _dragged: false,
@@ -153,8 +143,6 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
     _slotLayer: slotLayer,
     _creatureLayer: creatureLayer,
     _seabedBg: seabedBg,
-    _anchorLayer: anchorLayer,
-    _anchorGraphics: new Map(),
     _slotGlowLayer: slotGlowLayer,
     _slotGlowGraphics: new Map(),
     _app: app,
@@ -314,9 +302,6 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
   window.addEventListener('pointermove', onPointerMove);
   window.addEventListener('pointerup', onPointerUp);
 
-  // Create upgrade anchor graphics
-  syncUpgradeAnchors(poolView);
-
   centerViewport(poolView, app);
   const onResize = () => centerViewport(poolView, app);
   app.renderer.on('resize', updateMinZoom);
@@ -350,10 +335,6 @@ export function destroyPoolView(poolView: PoolView): void {
   for (const gfx of poolView.slotGraphics.values()) gfx.destroy();
   poolView.slotGraphics.clear();
 
-  // Destroy anchor graphics
-  for (const gfx of poolView._anchorGraphics.values()) gfx.destroy();
-  poolView._anchorGraphics.clear();
-
   // Destroy glow graphics
   for (const gfx of poolView._slotGlowGraphics.values()) gfx.destroy();
   poolView._slotGlowGraphics.clear();
@@ -384,57 +365,6 @@ function centerViewport(poolView: PoolView, _app: Application): void {
   }
   poolView.viewport.scale.set(poolView.zoom);
   clampViewport(poolView);
-}
-
-/** Create/update upgrade anchor point graphics */
-function syncUpgradeAnchors(poolView: PoolView): void {
-  for (const anchorDef of UPGRADE_ANCHORS) {
-    if (poolView._anchorGraphics.has(anchorDef.id)) continue;
-
-    const gfx = new Graphics();
-    drawAnchor(gfx, anchorDef.x, anchorDef.y, false);
-
-    gfx.eventMode = 'static';
-    gfx.cursor = 'pointer';
-
-    gfx.on('pointerenter', () => {
-      gfx.clear();
-      drawAnchor(gfx, anchorDef.x, anchorDef.y, true);
-    });
-    gfx.on('pointerleave', () => {
-      const installed = poolView._stateRef?.upgradeAnchors.find(a => a.id === anchorDef.id);
-      gfx.clear();
-      drawAnchor(gfx, anchorDef.x, anchorDef.y, false, !!installed?.upgradeType);
-    });
-    gfx.on('pointertap', () => {
-      if (poolView._dragged) return;
-      poolView.onUpgradeNodeClick?.(anchorDef.id);
-    });
-
-    poolView._anchorLayer.addChild(gfx);
-    poolView._anchorGraphics.set(anchorDef.id, gfx);
-  }
-}
-
-function drawAnchor(gfx: Graphics, x: number, y: number, hover: boolean, installed = false): void {
-  if (installed) {
-    // Filled diamond for installed upgrade
-    gfx.star(x, y, 4, ANCHOR_RADIUS, ANCHOR_RADIUS * 0.5);
-    gfx.fill({ color: 0x3aada8, alpha: 0.6 });
-    gfx.star(x, y, 4, ANCHOR_RADIUS, ANCHOR_RADIUS * 0.5);
-    gfx.stroke({ color: 0x7eeee4, width: 1 });
-  } else {
-    // Empty diamond for available anchor
-    gfx.star(x, y, 4, ANCHOR_RADIUS * 0.8, ANCHOR_RADIUS * 0.4);
-    gfx.fill({ color: 0x0d2228, alpha: 0.5 });
-    gfx.star(x, y, 4, ANCHOR_RADIUS * 0.8, ANCHOR_RADIUS * 0.4);
-    gfx.stroke({ color: hover ? 0x7eeee4 : 0x1a3a3f, width: hover ? 2 : 1 });
-    // Small "+" inside
-    gfx.rect(x - 3, y - 0.5, 6, 1);
-    gfx.fill({ color: hover ? 0x7eeee4 : 0x3a5a60, alpha: 0.7 });
-    gfx.rect(x - 0.5, y - 3, 1, 6);
-    gfx.fill({ color: hover ? 0x7eeee4 : 0x3a5a60, alpha: 0.7 });
-  }
 }
 
 /** Sync creature visuals and slot graphics with game state */
@@ -491,15 +421,6 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
       gfx.destroy();
       poolView.slotGraphics.delete(id);
     }
-  }
-
-  // --- Sync upgrade anchor visuals ---
-  for (const anchorDef of UPGRADE_ANCHORS) {
-    const gfx = poolView._anchorGraphics.get(anchorDef.id);
-    if (!gfx) continue;
-    const installed = state.upgradeAnchors.find(a => a.id === anchorDef.id);
-    gfx.clear();
-    drawAnchor(gfx, anchorDef.x, anchorDef.y, false, !!installed?.upgradeType);
   }
 
   // --- Sync slot glow (for occupied slots) ---

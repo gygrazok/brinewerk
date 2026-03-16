@@ -51,18 +51,3 @@ export const SEABED_SLOTS: SlotDef[] = [
   { id: 'slot_23', x: 580,  y: 140, unlocked: false, theme: 'rock',    tier: 4 },
   { id: 'slot_24', x: 940,  y: 940, unlocked: false, theme: 'coral',   tier: 4 },
 ];
-
-/** Upgrade anchor positions on the seabed */
-export interface UpgradeAnchorDef {
-  id: string;
-  x: number;
-  y: number;
-}
-
-export const UPGRADE_ANCHORS: UpgradeAnchorDef[] = [
-  { id: 'ua_0', x: 920,  y: 500 },  // center
-  { id: 'ua_1', x: 680,  y: 560 },  // left of center
-  { id: 'ua_2', x: 1180, y: 480 },  // right of center
-  { id: 'ua_3', x: 800,  y: 320 },  // top
-  { id: 'ua_4', x: 1060, y: 740 },  // bottom
-];

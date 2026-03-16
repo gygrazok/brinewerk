@@ -24,15 +24,6 @@ export interface SeabedPool {
   worldHeight: number;
 }
 
-export type UpgradeType = 'algae_colony';
-
-export interface UpgradeAnchor {
-  id: string;
-  x: number;
-  y: number;
-  upgradeType: UpgradeType | null;
-}
-
 export type ResourceBundle = { plankton: number; minerite: number; lux: number };
 
 export interface GameState {
@@ -41,7 +32,6 @@ export interface GameState {
   creatures: Creature[];
   pool: SeabedPool;
   resources: ResourceBundle;
-  upgradeAnchors: UpgradeAnchor[];
   shore: Creature[];
   lastSaveTimestamp: number;
   lastTideTimestamp: number;
@@ -60,7 +50,6 @@ export function createDefaultState(): GameState {
     creatures: [],
     pool,
     resources: { plankton: 0, minerite: 0, lux: 0 },
-    upgradeAnchors: [],
     shore: [],
     lastSaveTimestamp: Date.now(),
     lastTideTimestamp: Date.now(),
@@ -159,8 +148,8 @@ function migrateState(data: Record<string, unknown>): GameState {
     }
 
     data.pool = newPool;
-    data.upgradeAnchors = [];
     delete data.upgradeNodes;
+    delete data.upgradeAnchors;
     data.saveVersion = 3;
   }
 

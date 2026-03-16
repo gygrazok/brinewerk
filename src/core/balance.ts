@@ -23,9 +23,6 @@ export const BLOBID_SYMBIOSIS_SCALE = 0.10; // +10% per tentacles gene
 /** Initial game state */
 export const INITIAL_PLANKTON = 50;
 
-/** Upgrade: Algae Colony */
-export const UPGRADE_ALGAE_COLONY_COST = 200;
-export const UPGRADE_ALGAE_COLONY_BONUS = 0.25; // +25% production
 
 /**
  * Slot unlock cost by tier (position-based).

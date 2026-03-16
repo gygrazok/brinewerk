@@ -7,8 +7,6 @@ import { getCreatureAt, calculateAdjacencyBonus, placeCreature, removeCreature, 
 import { forceInitialTide } from './systems/tides';
 import { renderShore, setOnPickUp } from './ui/tide-shore';
 import { updateHud } from './ui/hud';
-import { installUpgrade } from './economy/upgrades';
-import { showUpgradeModal } from './ui/upgrade-modal';
 import { initDebugMenu } from './ui/debug-menu';
 import { injectTheme } from './ui/theme';
 import { loadRenderSettings } from './rendering/render-settings';
@@ -90,19 +88,6 @@ async function init() {
       updateHud(state);
       renderShore(state);
     }
-  };
-
-  // Handle upgrade anchor clicks
-  poolView.onUpgradeNodeClick = (anchorId: string) => {
-    const existing = state.upgradeAnchors.find(a => a.id === anchorId);
-    if (existing?.upgradeType) return;
-
-    showUpgradeModal(state, anchorId, (type) => {
-      if (installUpgrade(state, anchorId, type)) {
-        syncPoolVisuals(poolView, state);
-        updateHud(state);
-      }
-    });
   };
 
   // Shore: pick up creature → auto-place or hold
