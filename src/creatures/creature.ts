@@ -40,7 +40,13 @@ export type RareEffect =
   | 'shadow'
   | 'pulse'
   | 'tiny'
-  | 'holy';
+  | 'holy'
+  | 'xray'
+  | 'thermal'
+  | 'crt'
+  | 'caustic'
+  | 'stained'
+  | 'liquify';
 
 export interface RareInfo {
   id: string;
@@ -53,7 +59,7 @@ export interface RareInfo {
 }
 
 export const RARE_EFFECTS: RareInfo[] = [
-  { id: 'none', label: '', icon: '', chance: 0.11, color: '#8ba0a8' },
+  { id: 'none', label: '', icon: '', chance: 0.0, color: '#8ba0a8' },
   { id: 'metallic', label: 'Metallic', icon: '\u2699', chance: 0.08, color: '#c0c8d0' },
   { id: 'glitch', label: 'Glitch', icon: '\u25A6', chance: 0.05, color: '#00ff88' },
   { id: 'fire', label: 'On Fire', icon: '\uD83D\uDD25', chance: 0.05, color: '#ff6020' },
@@ -73,6 +79,12 @@ export const RARE_EFFECTS: RareInfo[] = [
   { id: 'pulse', label: 'Pulse', icon: '\u2665', chance: 0.04, color: '#ff6080' },
   { id: 'tiny', label: 'Tiny', icon: '\u2022', chance: 0.04, color: '#a0e060' },
   { id: 'holy', label: 'Holy', icon: '\u2742', chance: 0.04, color: '#fff8e0' },
+  { id: 'xray', label: 'X-Ray', icon: '\u2622', chance: 0.04, color: '#a0c0e0' },
+  { id: 'thermal', label: 'Thermal', icon: '\uD83C\uDF21', chance: 0.04, color: '#ff6040' },
+  { id: 'crt', label: 'CRT', icon: '\u25AA', chance: 0.03, color: '#90a060' },
+  { id: 'caustic', label: 'Caustic', icon: '\u224B', chance: 0.03, color: '#70c8e0' },
+  { id: 'stained', label: 'Stained Glass', icon: '\u2B21', chance: 0.03, color: '#c06080' },
+  { id: 'liquify', label: 'Liquify', icon: '\uD83D\uDCA7', chance: 0.03, color: '#80b0d0' },
 ];
 
 export function rollRare(rng: () => number, creatureType?: CreatureType): RareEffect | null {

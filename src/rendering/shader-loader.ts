@@ -15,6 +15,12 @@ import rainbowFrag from './shaders/rainbow.glsl';
 import hologramFrag from './shaders/hologram.glsl';
 import negativeFrag from './shaders/negative.glsl';
 import holyFrag from './shaders/holy.glsl';
+import xrayFrag from './shaders/xray.glsl';
+import thermalFrag from './shaders/thermal.glsl';
+import crtFrag from './shaders/crt.glsl';
+import causticFrag from './shaders/caustic.glsl';
+import stainedFrag from './shaders/stained.glsl';
+import liquifyFrag from './shaders/liquify.glsl';
 import outlineFrag from './shaders/outline.glsl';
 import glowFrag from './shaders/glow.glsl';
 
@@ -32,6 +38,12 @@ const RARE_FRAG: Partial<Record<RareEffect, string>> = {
   hologram: hologramFrag,
   negative: negativeFrag,
   holy: holyFrag,
+  xray: xrayFrag,
+  thermal: thermalFrag,
+  crt: crtFrag,
+  caustic: causticFrag,
+  stained: stainedFrag,
+  liquify: liquifyFrag,
 };
 
 // Default vertex shader for PixiJS v8 filters
@@ -60,11 +72,12 @@ void main(void) {
 }
 `;
 
-// Vertex shader for holy effect — passes UV center to fragment
-const holyVertex = `
+// Vertex shader for spatial effects — passes UV extent so fragments can
+// normalize coordinates to 0-1 regardless of zoom / filter padding.
+const spatialVertex = `
 attribute vec2 aPosition;
 varying vec2 vTextureCoord;
-varying vec2 vUvCenter;
+varying vec2 vUvExtent;
 
 uniform vec4 uInputSize;
 uniform vec4 uOutputFrame;
@@ -84,7 +97,7 @@ vec2 filterTextureCoord(void) {
 void main(void) {
   gl_Position = filterVertexPosition();
   vTextureCoord = filterTextureCoord();
-  vUvCenter = (uOutputFrame.zw * uInputSize.zw) * 0.5;
+  vUvExtent = uOutputFrame.zw * uInputSize.zw;
 }
 `;
 
@@ -97,7 +110,9 @@ export function createRareFilter(rare: RareEffect): Filter | null {
   if (!fragment) return null;
 
   try {
-    const vertex = rare === 'holy' ? holyVertex : defaultVertex;
+    // Shaders with spatial patterns need stable UV coords via spatialVertex
+    const spatialEffects: RareEffect[] = ['holy', 'stained', 'caustic', 'liquify'];
+    const vertex = spatialEffects.includes(rare) ? spatialVertex : defaultVertex;
     return new Filter({
       glProgram: new GlProgram({ vertex, fragment }),
       padding: rare === 'holy' ? 20 : 12,

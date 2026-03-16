@@ -1,5 +1,5 @@
 varying vec2 vTextureCoord;
-varying vec2 vUvCenter;
+varying vec2 vUvExtent;
 uniform sampler2D uTexture;
 uniform float uTime;
 
@@ -7,13 +7,11 @@ void main() {
   vec2 uv = vTextureCoord;
   vec4 base = texture2D(uTexture, uv);
 
-  // Center computed from vertex shader (accounts for padding/zoom)
-  vec2 center = vUvCenter;
-  vec2 dir = uv - center;
-
-  // Normalize distance relative to UV extent so rays stay consistent
-  float refSize = max(center.x, center.y);
-  float dist = length(dir) / refSize;
+  // Normalize UV to 0-1 using extent from vertex shader
+  vec2 nUv = uv / vUvExtent;
+  vec2 center = vec2(0.5, 0.5);
+  vec2 dir = nUv - center;
+  float dist = length(dir) * 2.0; // 0 at center, ~1 at edges
   float angle = atan(dir.y, dir.x);
 
   // --- Light rays behind the creature (only on transparent pixels) ---
@@ -29,25 +27,25 @@ void main() {
   vec3 rayColor = vec3(1.0, 0.95, 0.8) * rayIntensity;
 
   // --- White aura glow around creature edges ---
-  // Texel size relative to UV extent
-  float texel = refSize / 50.0;
+  // Texel size: 1 pixel in UV space
+  vec2 texel = vUvExtent / 50.0;
   float neighborAlpha = 0.0;
-  neighborAlpha += texture2D(uTexture, uv + vec2(texel, 0.0)).a;
-  neighborAlpha += texture2D(uTexture, uv - vec2(texel, 0.0)).a;
-  neighborAlpha += texture2D(uTexture, uv + vec2(0.0, texel)).a;
-  neighborAlpha += texture2D(uTexture, uv - vec2(0.0, texel)).a;
-  neighborAlpha += texture2D(uTexture, uv + vec2(texel, texel)).a;
-  neighborAlpha += texture2D(uTexture, uv - vec2(texel, texel)).a;
-  neighborAlpha += texture2D(uTexture, uv + vec2(texel, -texel)).a;
-  neighborAlpha += texture2D(uTexture, uv - vec2(texel, -texel)).a;
+  neighborAlpha += texture2D(uTexture, uv + vec2(texel.x, 0.0)).a;
+  neighborAlpha += texture2D(uTexture, uv - vec2(texel.x, 0.0)).a;
+  neighborAlpha += texture2D(uTexture, uv + vec2(0.0, texel.y)).a;
+  neighborAlpha += texture2D(uTexture, uv - vec2(0.0, texel.y)).a;
+  neighborAlpha += texture2D(uTexture, uv + texel).a;
+  neighborAlpha += texture2D(uTexture, uv - texel).a;
+  neighborAlpha += texture2D(uTexture, uv + vec2(texel.x, -texel.y)).a;
+  neighborAlpha += texture2D(uTexture, uv - vec2(texel.x, -texel.y)).a;
 
   // Second ring for wider glow
-  float t2 = texel * 2.0;
+  vec2 t2 = texel * 2.0;
   float outerAlpha = 0.0;
-  outerAlpha += texture2D(uTexture, uv + vec2(t2, 0.0)).a;
-  outerAlpha += texture2D(uTexture, uv - vec2(t2, 0.0)).a;
-  outerAlpha += texture2D(uTexture, uv + vec2(0.0, t2)).a;
-  outerAlpha += texture2D(uTexture, uv - vec2(0.0, t2)).a;
+  outerAlpha += texture2D(uTexture, uv + vec2(t2.x, 0.0)).a;
+  outerAlpha += texture2D(uTexture, uv - vec2(t2.x, 0.0)).a;
+  outerAlpha += texture2D(uTexture, uv + vec2(0.0, t2.y)).a;
+  outerAlpha += texture2D(uTexture, uv - vec2(0.0, t2.y)).a;
 
   // Aura: visible on transparent pixels near opaque ones
   float nearEdge = step(0.01, neighborAlpha / 8.0) * (1.0 - base.a);
