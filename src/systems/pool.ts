@@ -1,8 +1,8 @@
 import type { GameState } from '../core/game-state';
 import type { Creature } from '../creatures/creature';
 import { CreatureType } from '../creatures/types';
-import { getSlotById, unlockedSlots, getNearbySlots, slotCount } from './coords';
-import { getExpansionCost, BLOBID_SYMBIOSIS_BASE, BLOBID_SYMBIOSIS_SCALE } from '../core/balance';
+import { getSlotById, unlockedSlots, getNearbySlots } from './coords';
+import { getSlotUnlockCost, BLOBID_SYMBIOSIS_BASE, BLOBID_SYMBIOSIS_SCALE } from '../core/balance';
 
 /** Adjacency radius for proximity-based bonuses (px in world space) */
 const ADJACENCY_RADIUS = 120;
@@ -83,7 +83,7 @@ export function expandPool(state: GameState, slotId: string): boolean {
   const slot = getSlotById(state.pool, slotId);
   if (!slot || slot.unlocked) return false;
 
-  const cost = getExpansionCost(slotCount(state.pool));
+  const cost = getSlotUnlockCost(slot.tier);
   if (state.resources.plankton < cost.plankton) return false;
   if (state.resources.minerite < cost.minerite) return false;
   if (state.resources.lux < cost.lux) return false;

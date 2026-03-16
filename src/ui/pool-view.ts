@@ -1,9 +1,10 @@
-import { Container, Graphics, Sprite } from 'pixi.js';
+import { Container, Graphics, Sprite, Text, TextStyle } from 'pixi.js';
 import type { Application } from 'pixi.js';
 import type { GameState, SeabedSlot } from '../core/game-state';
+import type { ResourceBundle } from '../core/game-state';
 import { getCreatureAt } from '../systems/pool';
-import { getExpansionCost } from '../core/balance';
-import { allSlots, slotCount, worldToSlot } from '../systems/coords';
+import { getSlotUnlockCost } from '../core/balance';
+import { allSlots, worldToSlot } from '../systems/coords';
 import {
   createCreatureVisual,
   updateCreatureVisual,
@@ -25,7 +26,6 @@ const CREATURE_DISPLAY = 64;
 const SLOT_BG = 0x0d2228;
 const SLOT_BORDER = 0x1a3a3f;
 const SLOT_HOVER = 0x3aada8;
-const SLOT_LOCKED_ALPHA = 0.3;
 const HIT_RADIUS = 50;
 const ANCHOR_RADIUS = 16;
 
@@ -80,37 +80,6 @@ export interface PoolView {
   _cleanup: (() => void) | null;
 }
 
-// --- Cost tooltip ---
-let tooltip: HTMLDivElement | null = null;
-
-function ensureTooltip(): HTMLDivElement {
-  if (!tooltip) {
-    tooltip = document.createElement('div');
-    tooltip.style.cssText =
-      'position:fixed;pointer-events:none;opacity:0;transition:opacity .15s;' +
-      'background:#0a1a20;border:1px solid #1a3a3f;border-radius:4px;padding:4px 8px;' +
-      'font-family:"Press Start 2P",monospace;font-size:9px;color:#3aada8;white-space:nowrap;z-index:100;';
-    document.body.appendChild(tooltip);
-  }
-  return tooltip;
-}
-
-function showTooltip(screenX: number, screenY: number, state: GameState) {
-  const tip = ensureTooltip();
-  const cost = getExpansionCost(slotCount(state.pool));
-  const parts: string[] = [];
-  if (cost.plankton > 0) parts.push(`${cost.plankton}\u{1F7E2}`);
-  if (cost.minerite > 0) parts.push(`${cost.minerite}\u{1F535}`);
-  if (cost.lux > 0) parts.push(`${cost.lux}\u2728`);
-  tip.textContent = parts.join(' + ');
-  tip.style.left = `${screenX + 12}px`;
-  tip.style.top = `${screenY - 8}px`;
-  tip.style.opacity = '1';
-}
-
-function hideTooltip() {
-  if (tooltip) tooltip.style.opacity = '0';
-}
 
 /** Convert screen coordinates to world space via viewport transform */
 function screenToWorld(pv: PoolView, sx: number, sy: number): [number, number] {
@@ -220,7 +189,6 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
   // --- Zoom ---
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
-    hideTooltip();
     const delta = e.deltaY > 0 ? -0.1 : 0.1;
     const oldZoom = poolView.zoom;
     poolView.zoom = Math.max(poolView._zoomMin, Math.min(ZOOM_MAX, poolView.zoom + delta));
@@ -396,9 +364,6 @@ export function destroyPoolView(poolView: PoolView): void {
     poolView._seabedBg = null;
   }
 
-  // Remove tooltip if present
-  hideTooltip();
-
   // Destroy viewport and all remaining children
   poolView.viewport.destroy({ children: true });
 }
@@ -486,25 +451,19 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
     if (!poolView.slotGraphics.has(slot.id)) {
       const gfx = new Graphics();
       drawSlot(gfx, slot);
+      ensureSlotCostText(gfx, slot);
 
       gfx.eventMode = 'static';
       gfx.cursor = 'pointer';
 
-      gfx.on('pointerenter', (e: any) => {
+      gfx.on('pointerenter', () => {
         gfx.clear();
         drawSlotHighlight(gfx, slot);
-        if (!slot.unlocked && poolView._stateRef && poolView._canvas) {
-          const gx = e.global?.x ?? 0;
-          const gy = e.global?.y ?? 0;
-          const rect = poolView._canvas.getBoundingClientRect();
-          showTooltip(rect.left + gx, rect.top + gy, poolView._stateRef);
-        }
       });
 
       gfx.on('pointerleave', () => {
         gfx.clear();
         drawSlot(gfx, slot);
-        hideTooltip();
       });
 
       gfx.on('pointertap', () => {
@@ -522,6 +481,7 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
       const gfx = poolView.slotGraphics.get(slot.id)!;
       gfx.clear();
       drawSlot(gfx, slot);
+      ensureSlotCostText(gfx, slot);
     }
   }
 
@@ -653,6 +613,50 @@ export function updatePoolVisuals(poolView: PoolView, deltaSec: number, totalTim
 
 // --- Drawing helpers ---
 
+/** Shared text style for cost labels on locked slots */
+const COST_STYLE = new TextStyle({
+  fontFamily: '"Press Start 2P", monospace',
+  fontSize: 7,
+  fill: '#5a8a8f',
+  align: 'center',
+});
+
+/** Format a ResourceBundle as multi-line cost string for slot display */
+function formatSlotCost(cost: ResourceBundle): string {
+  const lines: string[] = [];
+  if (cost.plankton > 0) lines.push(`${cost.plankton} \u{1F7E2}`);
+  if (cost.minerite > 0) lines.push(`${cost.minerite} \u{1F535}`);
+  if (cost.lux > 0) lines.push(`${cost.lux} \u2728`);
+  return lines.join('\n');
+}
+
+/** Draw a pixel-art padlock icon centred at (cx, cy) */
+function drawLockIcon(gfx: Graphics, cx: number, cy: number): void {
+  const c = 0x5a8a8f; // brighter teal — visible against dark slot bg
+  const a = 0.85;
+  const px = 2; // pixel size
+
+  // Shackle (arch)
+  gfx.rect(cx - 1 * px, cy - 7 * px, 2 * px, px); // top bar
+  gfx.fill({ color: c, alpha: a });
+  gfx.rect(cx - 3 * px, cy - 6 * px, px, 3 * px); // left arm
+  gfx.fill({ color: c, alpha: a });
+  gfx.rect(cx + 2 * px, cy - 6 * px, px, 3 * px); // right arm
+  gfx.fill({ color: c, alpha: a });
+
+  // Lock body
+  const bx = cx - 4 * px;
+  const by = cy - 3 * px;
+  const bw = 8 * px;
+  const bh = 6 * px;
+  gfx.roundRect(bx, by, bw, bh, 2);
+  gfx.fill({ color: c, alpha: a });
+
+  // Keyhole
+  gfx.rect(cx - 0.5 * px, cy - 1 * px, px, 2 * px);
+  gfx.fill({ color: SLOT_BG, alpha: 0.9 });
+}
+
 function drawSlot(gfx: Graphics, slot: SeabedSlot): void {
   const x = slot.x - SLOT_SIZE / 2;
   const y = slot.y - SLOT_SIZE / 2;
@@ -662,20 +666,38 @@ function drawSlot(gfx: Graphics, slot: SeabedSlot): void {
     gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
     gfx.fill({ color: SLOT_BG, alpha: 0.7 });
     gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
-    gfx.stroke({ color: themeColor, width: 1, alpha: 0.6 });
+    gfx.stroke({ color: themeColor, width: 2, alpha: 0.6 });
   } else {
     gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
-    gfx.fill({ color: SLOT_BG, alpha: SLOT_LOCKED_ALPHA });
+    gfx.fill({ color: SLOT_BG, alpha: 0.45 });
     gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
-    gfx.stroke({ color: SLOT_BORDER, width: 1, alpha: SLOT_LOCKED_ALPHA });
-    // Lock icon "+"
-    const cx = slot.x;
-    const cy = slot.y;
-    gfx.rect(cx - 6, cy - 1, 12, 2);
-    gfx.fill({ color: SLOT_BORDER, alpha: 0.5 });
-    gfx.rect(cx - 1, cy - 6, 2, 12);
-    gfx.fill({ color: SLOT_BORDER, alpha: 0.5 });
+    gfx.stroke({ color: SLOT_BORDER, width: 2, alpha: 0.55 });
+    // Padlock shifted up to leave room for cost text
+    drawLockIcon(gfx, slot.x, slot.y - 14);
   }
+}
+
+/** Create (or update) the cost Text child on a locked slot Graphics */
+function ensureSlotCostText(gfx: Graphics, slot: SeabedSlot): void {
+  // Remove any previous cost text children
+  for (let i = gfx.children.length - 1; i >= 0; i--) {
+    const child = gfx.children[i];
+    if (child instanceof Text) {
+      child.destroy();
+    }
+  }
+
+  if (slot.unlocked) return;
+
+  const cost = getSlotUnlockCost(slot.tier);
+  const label = formatSlotCost(cost);
+  if (!label) return;
+
+  const text = new Text({ text: label, style: COST_STYLE });
+  text.anchor.set(0.5, 0);
+  text.x = slot.x;
+  text.y = slot.y + 6; // below padlock
+  gfx.addChild(text);
 }
 
 function drawSlotHighlight(gfx: Graphics, slot: SeabedSlot): void {
@@ -686,4 +708,9 @@ function drawSlotHighlight(gfx: Graphics, slot: SeabedSlot): void {
   gfx.fill(slot.unlocked ? { color: SLOT_BG, alpha: 0.8 } : { color: SLOT_BG, alpha: 0.5 });
   gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
   gfx.stroke({ color: SLOT_HOVER, width: 2 });
+
+  // Keep padlock visible on hover for locked slots
+  if (!slot.unlocked) {
+    drawLockIcon(gfx, slot.x, slot.y - 14);
+  }
 }

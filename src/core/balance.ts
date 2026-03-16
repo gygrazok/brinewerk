@@ -27,11 +27,18 @@ export const INITIAL_PLANKTON = 50;
 export const UPGRADE_ALGAE_COLONY_COST = 200;
 export const UPGRADE_ALGAE_COLONY_BONUS = 0.25; // +25% production
 
-/** Pool expansion costs by slot count tier */
-export function getExpansionCost(currentSlotCount: number): import('./game-state').ResourceBundle {
-  if (currentSlotCount < 4) return { plankton: 50, minerite: 0, lux: 0 };
-  if (currentSlotCount < 9) return { plankton: 150, minerite: 0, lux: 0 };
-  if (currentSlotCount < 16) return { plankton: 500, minerite: 50, lux: 0 };
-  if (currentSlotCount < 25) return { plankton: 2000, minerite: 200, lux: 0 };
-  return { plankton: 5000, minerite: 500, lux: 50 };
+/**
+ * Slot unlock cost by tier (position-based).
+ * Inner slots (tier 1) are cheap; outer slots (tier 4) require all 3 resources.
+ * Tier 0 slots are free (starter, unlocked by default).
+ */
+export function getSlotUnlockCost(tier: number): import('./game-state').ResourceBundle {
+  switch (tier) {
+    case 0:  return { plankton: 0,    minerite: 0,   lux: 0 };
+    case 1:  return { plankton: 100,  minerite: 0,   lux: 0 };
+    case 2:  return { plankton: 400,  minerite: 40,  lux: 0 };
+    case 3:  return { plankton: 1200, minerite: 150, lux: 20 };
+    case 4:  return { plankton: 3500, minerite: 400, lux: 80 };
+    default: return { plankton: 5000, minerite: 500, lux: 100 };
+  }
 }
