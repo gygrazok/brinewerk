@@ -2,8 +2,10 @@ import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import type { Application } from 'pixi.js';
 import type { GameState } from '../core/game-state';
 import { getCreatureAt } from '../systems/pool';
+import { getExpansionCost } from '../core/balance';
 import {
   allSlots,
+  slotCount,
   getGridBounds,
   getExpansionCandidates,
   getUpgradeNodePositions,
@@ -51,6 +53,42 @@ export interface PoolView {
   zoom: number;
   /** Internal: true if user dragged (to suppress click after pan) */
   _dragged: boolean;
+  /** Internal: latest state ref for tooltip cost display */
+  _stateRef: GameState | null;
+  /** Internal: canvas ref for tooltip positioning */
+  _canvas: HTMLCanvasElement | null;
+}
+
+// --- Cost tooltip (HTML overlay, module-level singleton) ---
+let tooltip: HTMLDivElement | null = null;
+
+function ensureTooltip(): HTMLDivElement {
+  if (!tooltip) {
+    tooltip = document.createElement('div');
+    tooltip.style.cssText =
+      'position:fixed;pointer-events:none;opacity:0;transition:opacity .15s;' +
+      'background:#0a1a20;border:1px solid #1a3a3f;border-radius:4px;padding:4px 8px;' +
+      'font-family:"Press Start 2P",monospace;font-size:9px;color:#3aada8;white-space:nowrap;z-index:100;';
+    document.body.appendChild(tooltip);
+  }
+  return tooltip;
+}
+
+function showTooltip(screenX: number, screenY: number, state: GameState) {
+  const tip = ensureTooltip();
+  const cost = getExpansionCost(slotCount(state.pool));
+  const parts: string[] = [];
+  if (cost.plankton > 0) parts.push(`${cost.plankton}\u{1F7E2}`);
+  if (cost.minerite > 0) parts.push(`${cost.minerite}\u{1F535}`);
+  if (cost.lux > 0) parts.push(`${cost.lux}\u2728`);
+  tip.textContent = parts.join(' + ');
+  tip.style.left = `${screenX + 12}px`;
+  tip.style.top = `${screenY - 8}px`;
+  tip.style.opacity = '1';
+}
+
+function hideTooltip() {
+  if (tooltip) tooltip.style.opacity = '0';
 }
 
 /** Convert grid row/col to pixel position relative to grid origin */
@@ -81,6 +119,8 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
     onUpgradeNodeClick: null,
     zoom: 1.0,
     _dragged: false,
+    _stateRef: null,
+    _canvas: null,
   };
 
   // --- Zoom & Pan ---
@@ -91,9 +131,11 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
   let viewStartY = 0;
 
   const canvas = app.canvas as HTMLCanvasElement;
+  poolView._canvas = canvas;
 
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
+    hideTooltip();
     const delta = e.deltaY > 0 ? -0.1 : 0.1;
     const oldZoom = poolView.zoom;
     poolView.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, poolView.zoom + delta));
@@ -155,6 +197,7 @@ function centerViewport(poolView: PoolView, app: Application): void {
 
 /** Sync creature visuals, slot backgrounds, expansion buttons, and upgrade nodes with game state */
 export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
+  poolView._stateRef = state;
   const bounds = getGridBounds(state.pool);
   const { minR, minC } = bounds;
 
@@ -273,7 +316,7 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
       cont.eventMode = 'static';
       cont.cursor = 'pointer';
 
-      cont.on('pointerenter', () => {
+      cont.on('pointerenter', (e: any) => {
         bg.clear();
         bg.roundRect(0, 0, EXPAND_BTN_SIZE, EXPAND_BTN_SIZE, 4);
         bg.fill(0x0d2228);
@@ -281,12 +324,19 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
         bg.stroke({ color: EXPAND_HOVER_BORDER, width: 2 });
         plus.clear();
         drawPlusCross(plus, EXPAND_HOVER_BORDER);
+        if (poolView._stateRef && poolView._canvas) {
+          const gx = e.global?.x ?? 0;
+          const gy = e.global?.y ?? 0;
+          const rect = poolView._canvas.getBoundingClientRect();
+          showTooltip(rect.left + gx, rect.top + gy, poolView._stateRef);
+        }
       });
 
       cont.on('pointerleave', () => {
         drawExpandNormal(bg);
         plus.clear();
         drawPlusCross(plus, EXPAND_CROSS_COLOR);
+        hideTooltip();
       });
 
       cont.on('pointertap', () => {
