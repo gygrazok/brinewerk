@@ -57,6 +57,17 @@ export function pickUpCreature(state: GameState, shoreIndex: number): Creature |
   return creature;
 }
 
+/** Force a tide immediately (debug / manual trigger) */
+export function forceTide(state: GameState): void {
+  const count = 1 + Math.floor(Math.random() * 3);
+  state.shore = [];
+  for (let i = 0; i < Math.min(count, SHORE_CAPACITY); i++) {
+    const type = TIDE_TYPES[Math.floor(Math.random() * TIDE_TYPES.length)];
+    state.shore.push(createCreature(type));
+  }
+  state.lastTideTimestamp = Date.now();
+}
+
 /** Force a tide (for initial game start) */
 export function forceInitialTide(state: GameState): void {
   const hasPoolCreatures = allSlots(state.pool).some(([, , s]) => s.creatureId !== null);

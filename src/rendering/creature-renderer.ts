@@ -7,6 +7,7 @@ import { renderCorallid } from './types/corallid';
 import { renderNucleid } from './types/nucleid';
 import { type PixelGrid, CANVAS_PX, BLOCK_PX, GRID_SIZE, renderGridToCanvas } from './pixel-grid';
 import { getRareFilter } from './shader-loader';
+import { getPixelEffect } from './effects';
 import { getPalette } from './palette';
 
 type TypeRenderer = (genes: Creature['genes'], time: number, seed: number) => PixelGrid;
@@ -124,6 +125,13 @@ export function updateCreatureVisual(visual: CreatureVisual, _deltaSec: number, 
   // Re-render pixel grid with current time
   const renderer = TYPE_RENDERERS[visual.creature.type];
   const grid = renderer(visual.creature.genes, time, visual.creature.seed);
+
+  // Apply pixel-level rare effect (if any)
+  if (visual.creature.rare) {
+    const fx = getPixelEffect(visual.creature.rare);
+    if (fx) fx(grid, time, visual.creature.id);
+  }
+
   renderGridToCanvas(grid, visual.ctx);
 
   // Tell PixiJS the texture source has changed

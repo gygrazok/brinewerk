@@ -1,5 +1,6 @@
 import type { GameState } from '../core/game-state';
 import { createDefaultState, clearSave } from '../core/game-state';
+import { forceTide } from '../systems/tides';
 
 /** Inject a floating debug menu (dev only). Returns cleanup function. */
 export function initDebugMenu(
@@ -41,6 +42,10 @@ export function initDebugMenu(
       <div class="debug-row">
         <button data-action="max-resources">Max All</button>
       </div>
+      <div class="debug-section">Tide</div>
+      <div class="debug-row">
+        <button data-action="force-tide">Force Tide</button>
+      </div>
       <div class="debug-section">Grid</div>
       <div class="debug-row">
         <button data-action="reset-grid">Reset Grid</button>
@@ -70,6 +75,9 @@ export function initDebugMenu(
         state.resources.plankton += 999999;
         state.resources.minerite += 99999;
         state.resources.lux += 9999;
+        break;
+      case 'force-tide':
+        forceTide(state);
         break;
       case 'reset-grid': {
         // Reset pool to single slot, remove creatures from pool
