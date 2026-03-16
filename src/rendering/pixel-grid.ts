@@ -1,8 +1,8 @@
 import type { Palette } from './palette';
 import type { Genotype } from '../creatures/creature';
 
-export const GRID_SIZE = 40;
-export const BLOCK_PX = 3;
+export const GRID_SIZE = 50;
+export const BLOCK_PX = 2;
 export const CANVAS_PX = GRID_SIZE * BLOCK_PX;
 
 export type PixelGrid = Record<string, string>;

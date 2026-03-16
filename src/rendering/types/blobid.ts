@@ -6,8 +6,8 @@ export function renderBlobid(genes: Genotype, time: number, seed: number): Pixel
   const grid: PixelGrid = {};
   const pal = getPalette(genes.palette1);
   const pal2 = getPalette(genes.palette2);
-  const cx = 20, cy = 12;
-  const size = 8 + Math.floor(genes.size * 10);
+  const cx = 25, cy = 15;
+  const size = 10 + Math.floor(genes.size * 13);
   const fatness = 0.3 + genes.fatness * 0.7;
   const bodyR = Math.round(size * 0.45 * fatness + 3);
   const hw = bodyR, hh = Math.round(bodyR * 1.3);

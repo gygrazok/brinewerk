@@ -447,8 +447,6 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
 
     if (!poolView.visuals.has(creature.id)) {
       const visual = createCreatureVisual(creature);
-      visual.sprite.x = cx;
-      visual.sprite.y = cy;
       visual.sprite.eventMode = 'none';
       visual.mainSprite.width = CREATURE_DISPLAY;
       visual.mainSprite.height = CREATURE_DISPLAY;
@@ -456,12 +454,28 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
         visual.glowSprite.width = CREATURE_DISPLAY;
         visual.glowSprite.height = CREATURE_DISPLAY;
       }
+      // Rotating creatures: pivot at center so rotation looks natural
+      if (creature.rare === 'rotating') {
+        const half = CREATURE_DISPLAY / 2;
+        visual.sprite.pivot.set(half, half);
+        visual.sprite.x = cx + half;
+        visual.sprite.y = cy + half;
+      } else {
+        visual.sprite.x = cx;
+        visual.sprite.y = cy;
+      }
       poolView._creatureLayer.addChild(visual.sprite);
       poolView.visuals.set(creature.id, visual);
     } else {
       const visual = poolView.visuals.get(creature.id)!;
-      visual.sprite.x = cx;
-      visual.sprite.y = cy;
+      if (creature.rare === 'rotating') {
+        const half = CREATURE_DISPLAY / 2;
+        visual.sprite.x = cx + half;
+        visual.sprite.y = cy + half;
+      } else {
+        visual.sprite.x = cx;
+        visual.sprite.y = cy;
+      }
     }
   }
 

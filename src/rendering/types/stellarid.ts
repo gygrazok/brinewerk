@@ -6,9 +6,9 @@ export function renderStellarid(genes: Genotype, time: number, seed: number): Pi
   const grid: PixelGrid = {};
   const pal = getPalette(genes.palette1);
   const pal2 = getPalette(genes.palette2);
-  const cx = 20, cy = 20;
+  const cx = 25, cy = 25;
   const armCount = 3 + Math.floor(genes.arms * 6);
-  const size = 8 + Math.floor(genes.size * 10);
+  const size = 10 + Math.floor(genes.size * 13);
   const fatness = 0.3 + genes.fatness * 0.7;
   const bodyR = Math.round(size * 0.35 * fatness + 2);
   const spikes = Math.round(genes.spikes * 3);

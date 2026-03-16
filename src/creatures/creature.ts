@@ -29,7 +29,8 @@ export type RareEffect =
   | 'shiny'
   | 'nebula'
   | 'toxic'
-  | 'phantom';
+  | 'phantom'
+  | 'rotating';
 
 export interface RareInfo {
   id: string;
@@ -37,10 +38,12 @@ export interface RareInfo {
   icon: string;
   chance: number;
   color: string;
+  /** If set, this effect can only appear on these creature types */
+  types?: CreatureType[];
 }
 
 export const RARE_EFFECTS: RareInfo[] = [
-  { id: 'none', label: '', icon: '', chance: 0.60, color: '#8ba0a8' },
+  { id: 'none', label: '', icon: '', chance: 0.55, color: '#8ba0a8' },
   { id: 'metallic', label: 'Metallic', icon: '\u2699', chance: 0.08, color: '#c0c8d0' },
   { id: 'glitch', label: 'Glitch', icon: '\u25A6', chance: 0.05, color: '#00ff88' },
   { id: 'fire', label: 'On Fire', icon: '\uD83D\uDD25', chance: 0.05, color: '#ff6020' },
@@ -49,12 +52,20 @@ export const RARE_EFFECTS: RareInfo[] = [
   { id: 'nebula', label: 'Nebula', icon: '\u2605', chance: 0.04, color: '#c0a0ff' },
   { id: 'toxic', label: 'Toxic', icon: '\u2623', chance: 0.04, color: '#80ff40' },
   { id: 'phantom', label: 'Phantom', icon: '\uD83D\uDC7B', chance: 0.04, color: '#a080c0' },
+  { id: 'rotating', label: 'Rotating', icon: '\uD83C\uDF00', chance: 0.05, color: '#60c0e0', types: [CreatureType.Stellarid, CreatureType.Nucleid] },
 ];
 
-export function rollRare(rng: () => number): RareEffect | null {
+export function rollRare(rng: () => number, creatureType?: CreatureType): RareEffect | null {
+  // Build filtered list: keep effects that have no type restriction or match the creature type
+  const eligible = RARE_EFFECTS.filter((e) => !e.types || !creatureType || e.types.includes(creatureType));
+  // Redistribute excluded chances to 'none'
+  const excluded = RARE_EFFECTS.filter((e) => e.types && creatureType && !e.types.includes(creatureType));
+  const extraNone = excluded.reduce((s, e) => s + e.chance, 0);
+
   let r = rng(), cum = 0;
-  for (const e of RARE_EFFECTS) {
-    cum += e.chance;
+  for (const e of eligible) {
+    const ch = e.id === 'none' ? e.chance + extraNone : e.chance;
+    cum += ch;
     if (r < cum) return e.id === 'none' ? null : (e.id as RareEffect);
   }
   return null;
@@ -87,7 +98,7 @@ export function createCreature(
 
   const rng = mulberry32(seed);
   const genes = randomGenotype(rng);
-  const rare = forceRare !== undefined ? forceRare : rollRare(rng);
+  const rare = forceRare !== undefined ? forceRare : rollRare(rng, type);
   const nameRng = mulberry32(seed + 999);
   const name = generateName(type, nameRng);
   const id = `c_${Date.now()}_${_nextId++}`;

@@ -165,6 +165,19 @@ export function updateCreatureVisual(visual: CreatureVisual, _deltaSec: number, 
     const pulse = Math.sin(time * 2.0) * 0.06 + 1.0;
     visual.glowSprite.alpha = baseAlpha * pulse;
   }
+
+  // Rotating rare effect — layered cosine waves for organic accelerate/decelerate/reverse
+  if (visual.creature.rare === 'rotating') {
+    const s = visual.creature.seed;
+    // Two waves with seed-derived periods in 3–10s range
+    const p1 = 3 + (s % 1000) / 1000 * 7;       // 3–10s
+    const p2 = 3 + ((s * 7) % 1000) / 1000 * 7;  // 3–10s (different)
+    const angle =
+      Math.cos(time * (2 * Math.PI) / p1) * 1.8 +
+      Math.cos(time * (2 * Math.PI) / p2) * 1.2;
+    // Rotate the container (which has pivot set at center by pool-view / creature-panel)
+    visual.sprite.rotation = angle;
+  }
 }
 
 /** Destroy a creature visual and free resources */

@@ -277,8 +277,16 @@ export async function showCreaturePanel(creature: Creature, adjacencyBonus: numb
     previewVisual.glowSprite.width = PREVIEW_SIZE;
     previewVisual.glowSprite.height = PREVIEW_SIZE;
   }
-  previewVisual.sprite.x = 0;
-  previewVisual.sprite.y = 0;
+  // Rotating creatures: pivot at center so rotation looks natural in preview
+  if (creature.rare === 'rotating') {
+    const half = PREVIEW_SIZE / 2;
+    previewVisual.sprite.pivot.set(half, half);
+    previewVisual.sprite.x = half;
+    previewVisual.sprite.y = half;
+  } else {
+    previewVisual.sprite.x = 0;
+    previewVisual.sprite.y = 0;
+  }
   app.stage.addChild(previewVisual.sprite);
 
   // Animate the preview creature via the preview app's ticker

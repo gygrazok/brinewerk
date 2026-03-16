@@ -6,8 +6,8 @@ export function renderCorallid(genes: Genotype, time: number, seed: number): Pix
   const grid: PixelGrid = {};
   const pal = getPalette(genes.palette1);
   const pal2 = getPalette(genes.palette2);
-  const cx = 20, cy = 20;
-  const size = 10 + Math.floor(genes.size * 10);
+  const cx = 25, cy = 25;
+  const size = 12 + Math.floor(genes.size * 13);
   const branches = 2 + Math.round(genes.branches * 4);
   const density = 0.3 + genes.density * 0.7;
   const pattern = Math.round(genes.pattern * 4);

@@ -6,10 +6,10 @@ export function renderNucleid(genes: Genotype, time: number, seed: number): Pixe
   const grid: PixelGrid = {};
   const pal = getPalette(genes.palette1);
   const pal2 = getPalette(genes.palette2);
-  const cx = 20, cy = 20;
+  const cx = 25, cy = 25;
   const facets = 3 + Math.floor(genes.facets * 6);
   const rings = 1 + Math.floor(genes.rings * 3);
-  const size = 8 + Math.floor(genes.size * 10);
+  const size = 10 + Math.floor(genes.size * 13);
   const pattern = Math.round(genes.pattern * 4);
   const spikes = Math.round(genes.spikes * 3);
   const wobble = genes.wobble * 3;
@@ -70,6 +70,19 @@ export function renderNucleid(genes: Genotype, time: number, seed: number): Pixe
 
   // Center
   fillCircle(grid, cx, cy, 2, pattern >= 4 ? pal2.accent : pal.accent, pal.outline);
+
+  // Subtle 1px halo so dark palettes don't vanish against the seabed
+  const haloColor = pal.hi;
+  const occupied = new Set(Object.keys(grid));
+  const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  for (const key of occupied) {
+    const [px, py] = key.split(',').map(Number);
+    for (const [ddx, ddy] of dirs) {
+      const nk = `${px + ddx},${py + ddy}`;
+      if (!occupied.has(nk)) setPixel(grid, px + ddx, py + ddy, haloColor);
+    }
+  }
+
   addEyes(grid, cx, cy, genes, pal);
   return grid;
 }
