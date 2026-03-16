@@ -17,7 +17,9 @@ async function init() {
     background: '#060e12',
     resizeTo: window,
     antialias: false,
-    resolution: 1,
+    roundPixels: true,
+    resolution: window.devicePixelRatio || 1,
+    autoDensity: true,
     preference: 'webgl',
   });
 

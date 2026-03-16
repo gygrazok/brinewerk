@@ -186,7 +186,9 @@ async function ensurePreviewApp(container: HTMLElement): Promise<Application> {
     height: PREVIEW_SIZE,
     background: '#060e12',
     antialias: false,
-    resolution: 1,
+    roundPixels: true,
+    resolution: window.devicePixelRatio || 1,
+    autoDensity: true,
     preference: 'webgl',
   });
 

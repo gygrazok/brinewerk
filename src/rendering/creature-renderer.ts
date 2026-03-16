@@ -52,8 +52,9 @@ export function createCreatureVisual(creature: Creature): CreatureVisual {
   const grid = renderer(creature.genes, 0, creature.seed);
   renderGridToCanvas(grid, ctx);
 
-  // Create texture from canvas
+  // Create texture from canvas (nearest-neighbor for pixel art)
   const texture = Texture.from(canvas);
+  texture.source.scaleMode = 'nearest';
   const displaySize = GRID_SIZE * BLOCK_PX; // 120
 
   // Main sprite

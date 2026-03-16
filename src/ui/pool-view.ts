@@ -266,18 +266,8 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
       drawExpandNormal(bg);
       cont.addChild(bg);
 
-      const plus = new Text({
-        text: '+',
-        style: new TextStyle({
-          fontFamily: 'Press Start 2P',
-          fontSize: 14,
-          fill: '#1a3a3f',
-          align: 'center',
-        }),
-      });
-      plus.anchor.set(0.5);
-      plus.x = EXPAND_BTN_SIZE / 2;
-      plus.y = EXPAND_BTN_SIZE / 2;
+      const plus = new Graphics();
+      drawPlusCross(plus, EXPAND_CROSS_COLOR);
       cont.addChild(plus);
 
       cont.eventMode = 'static';
@@ -289,12 +279,14 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
         bg.fill(0x0d2228);
         bg.roundRect(0, 0, EXPAND_BTN_SIZE, EXPAND_BTN_SIZE, 4);
         bg.stroke({ color: EXPAND_HOVER_BORDER, width: 2 });
-        plus.style.fill = '#3aada8';
+        plus.clear();
+        drawPlusCross(plus, EXPAND_HOVER_BORDER);
       });
 
       cont.on('pointerleave', () => {
         drawExpandNormal(bg);
-        plus.style.fill = '#1a3a3f';
+        plus.clear();
+        drawPlusCross(plus, EXPAND_CROSS_COLOR);
       });
 
       cont.on('pointertap', () => {
@@ -402,6 +394,21 @@ function drawSlotNormal(slot: Graphics, x: number, y: number): void {
   slot.fill(SLOT_BG);
   slot.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 4);
   slot.stroke({ color: SLOT_BORDER, width: 1 });
+}
+
+const EXPAND_CROSS_COLOR = 0x1a3a3f;
+
+function drawPlusCross(g: Graphics, color: number): void {
+  const cx = EXPAND_BTN_SIZE / 2;
+  const cy = EXPAND_BTN_SIZE / 2;
+  const arm = 7; // half-length of each arm
+  const thick = 2;
+  // Horizontal bar
+  g.rect(cx - arm, cy - thick / 2, arm * 2, thick);
+  g.fill(color);
+  // Vertical bar
+  g.rect(cx - thick / 2, cy - arm, thick, arm * 2);
+  g.fill(color);
 }
 
 function drawExpandNormal(bg: Graphics): void {
