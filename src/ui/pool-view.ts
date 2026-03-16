@@ -378,22 +378,28 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
   for (const slot of allSlotsList) {
     currentSlotIds.add(slot.id);
 
+    const aff = !slot.unlocked && canAffordSlot(state.resources, slot.tier);
+
     if (!poolView.slotGraphics.has(slot.id)) {
       const gfx = new Graphics();
-      drawSlot(gfx, slot);
-      ensureSlotCostText(gfx, slot);
+      drawSlot(gfx, slot, aff);
+      ensureSlotCostText(gfx, slot, aff);
 
       gfx.eventMode = 'static';
       gfx.cursor = 'pointer';
 
       gfx.on('pointerenter', () => {
+        const res = poolView._stateRef?.resources ?? { plankton: 0, minerite: 0, lux: 0 };
+        const canBuy = !slot.unlocked && canAffordSlot(res, slot.tier);
         gfx.clear();
-        drawSlotHighlight(gfx, slot);
+        drawSlotHighlight(gfx, slot, canBuy);
       });
 
       gfx.on('pointerleave', () => {
+        const res = poolView._stateRef?.resources ?? { plankton: 0, minerite: 0, lux: 0 };
+        const canBuy = !slot.unlocked && canAffordSlot(res, slot.tier);
         gfx.clear();
-        drawSlot(gfx, slot);
+        drawSlot(gfx, slot, canBuy);
       });
 
       gfx.on('pointertap', () => {
@@ -410,8 +416,8 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
     } else {
       const gfx = poolView.slotGraphics.get(slot.id)!;
       gfx.clear();
-      drawSlot(gfx, slot);
-      ensureSlotCostText(gfx, slot);
+      drawSlot(gfx, slot, aff);
+      ensureSlotCostText(gfx, slot, aff);
     }
   }
 
@@ -534,13 +540,25 @@ export function updatePoolVisuals(poolView: PoolView, deltaSec: number, totalTim
 
 // --- Drawing helpers ---
 
-/** Shared text style for cost labels on locked slots */
-const COST_STYLE = new TextStyle({
+/** Shared text styles for cost labels on locked slots */
+const COST_STYLE_AFFORDABLE = new TextStyle({
   fontFamily: '"Press Start 2P", monospace',
   fontSize: 7,
-  fill: '#5a8a8f',
+  fill: '#7eeee4',
   align: 'center',
 });
+const COST_STYLE_LOCKED = new TextStyle({
+  fontFamily: '"Press Start 2P", monospace',
+  fontSize: 7,
+  fill: '#2a4a4f',
+  align: 'center',
+});
+
+/** Check if the player can afford a slot's unlock cost */
+function canAffordSlot(res: ResourceBundle, tier: number): boolean {
+  const cost = getSlotUnlockCost(tier);
+  return res.plankton >= cost.plankton && res.minerite >= cost.minerite && res.lux >= cost.lux;
+}
 
 /** Format a ResourceBundle as multi-line cost string for slot display */
 function formatSlotCost(cost: ResourceBundle): string {
@@ -552,9 +570,9 @@ function formatSlotCost(cost: ResourceBundle): string {
 }
 
 /** Draw a pixel-art padlock icon centred at (cx, cy) */
-function drawLockIcon(gfx: Graphics, cx: number, cy: number): void {
-  const c = 0x5a8a8f; // brighter teal — visible against dark slot bg
-  const a = 0.85;
+function drawLockIcon(gfx: Graphics, cx: number, cy: number, affordable = false): void {
+  const c = affordable ? 0x7eeee4 : 0x2a4a4f;
+  const a = affordable ? 0.9 : 0.6;
   const px = 2; // pixel size
 
   // Shackle (arch)
@@ -578,7 +596,7 @@ function drawLockIcon(gfx: Graphics, cx: number, cy: number): void {
   gfx.fill({ color: SLOT_BG, alpha: 0.9 });
 }
 
-function drawSlot(gfx: Graphics, slot: SeabedSlot): void {
+function drawSlot(gfx: Graphics, slot: SeabedSlot, affordable = false): void {
   const x = slot.x - SLOT_SIZE / 2;
   const y = slot.y - SLOT_SIZE / 2;
   const themeColor = THEME_COLORS[slot.theme] ?? SLOT_BORDER;
@@ -588,18 +606,25 @@ function drawSlot(gfx: Graphics, slot: SeabedSlot): void {
     gfx.fill({ color: SLOT_BG, alpha: 0.7 });
     gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
     gfx.stroke({ color: themeColor, width: 2, alpha: 0.6 });
+  } else if (affordable) {
+    // Affordable: bright border, inviting appearance
+    gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
+    gfx.fill({ color: SLOT_BG, alpha: 0.6 });
+    gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
+    gfx.stroke({ color: 0x3aada8, width: 2, alpha: 0.8 });
+    drawLockIcon(gfx, slot.x, slot.y - 14, true);
   } else {
+    // Too expensive: dim, ghostly
     gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
-    gfx.fill({ color: SLOT_BG, alpha: 0.45 });
+    gfx.fill({ color: SLOT_BG, alpha: 0.25 });
     gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
-    gfx.stroke({ color: SLOT_BORDER, width: 2, alpha: 0.55 });
-    // Padlock shifted up to leave room for cost text
-    drawLockIcon(gfx, slot.x, slot.y - 14);
+    gfx.stroke({ color: SLOT_BORDER, width: 1, alpha: 0.3 });
+    drawLockIcon(gfx, slot.x, slot.y - 14, false);
   }
 }
 
 /** Create (or update) the cost Text child on a locked slot Graphics */
-function ensureSlotCostText(gfx: Graphics, slot: SeabedSlot): void {
+function ensureSlotCostText(gfx: Graphics, slot: SeabedSlot, affordable = false): void {
   // Remove any previous cost text children
   for (let i = gfx.children.length - 1; i >= 0; i--) {
     const child = gfx.children[i];
@@ -614,24 +639,34 @@ function ensureSlotCostText(gfx: Graphics, slot: SeabedSlot): void {
   const label = formatSlotCost(cost);
   if (!label) return;
 
-  const text = new Text({ text: label, style: COST_STYLE });
+  const style = affordable ? COST_STYLE_AFFORDABLE : COST_STYLE_LOCKED;
+  const text = new Text({ text: label, style });
   text.anchor.set(0.5, 0);
   text.x = slot.x;
   text.y = slot.y + 6; // below padlock
   gfx.addChild(text);
 }
 
-function drawSlotHighlight(gfx: Graphics, slot: SeabedSlot): void {
+function drawSlotHighlight(gfx: Graphics, slot: SeabedSlot, affordable = false): void {
   const x = slot.x - SLOT_SIZE / 2;
   const y = slot.y - SLOT_SIZE / 2;
 
-  gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
-  gfx.fill(slot.unlocked ? { color: SLOT_BG, alpha: 0.8 } : { color: SLOT_BG, alpha: 0.5 });
-  gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
-  gfx.stroke({ color: SLOT_HOVER, width: 2 });
-
-  // Keep padlock visible on hover for locked slots
-  if (!slot.unlocked) {
-    drawLockIcon(gfx, slot.x, slot.y - 14);
+  if (slot.unlocked) {
+    gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
+    gfx.fill({ color: SLOT_BG, alpha: 0.8 });
+    gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
+    gfx.stroke({ color: SLOT_HOVER, width: 2 });
+  } else if (affordable) {
+    gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
+    gfx.fill({ color: SLOT_BG, alpha: 0.65 });
+    gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
+    gfx.stroke({ color: 0x7eeee4, width: 2 });
+    drawLockIcon(gfx, slot.x, slot.y - 14, true);
+  } else {
+    gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
+    gfx.fill({ color: SLOT_BG, alpha: 0.35 });
+    gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
+    gfx.stroke({ color: 0x1a3a3f, width: 1, alpha: 0.5 });
+    drawLockIcon(gfx, slot.x, slot.y - 14, false);
   }
 }
