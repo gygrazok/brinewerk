@@ -39,7 +39,8 @@ export type RareEffect =
   | 'electric'
   | 'shadow'
   | 'pulse'
-  | 'tiny';
+  | 'tiny'
+  | 'holy';
 
 export interface RareInfo {
   id: string;
@@ -52,7 +53,7 @@ export interface RareInfo {
 }
 
 export const RARE_EFFECTS: RareInfo[] = [
-  { id: 'none', label: '', icon: '', chance: 0.15, color: '#8ba0a8' },
+  { id: 'none', label: '', icon: '', chance: 0.11, color: '#8ba0a8' },
   { id: 'metallic', label: 'Metallic', icon: '\u2699', chance: 0.08, color: '#c0c8d0' },
   { id: 'glitch', label: 'Glitch', icon: '\u25A6', chance: 0.05, color: '#00ff88' },
   { id: 'fire', label: 'On Fire', icon: '\uD83D\uDD25', chance: 0.05, color: '#ff6020' },
@@ -71,6 +72,7 @@ export const RARE_EFFECTS: RareInfo[] = [
   { id: 'shadow', label: 'Shadow', icon: '\u2592', chance: 0.04, color: '#404060' },
   { id: 'pulse', label: 'Pulse', icon: '\u2665', chance: 0.04, color: '#ff6080' },
   { id: 'tiny', label: 'Tiny', icon: '\u2022', chance: 0.04, color: '#a0e060' },
+  { id: 'holy', label: 'Holy', icon: '\u2742', chance: 0.04, color: '#fff8e0' },
 ];
 
 export function rollRare(rng: () => number, creatureType?: CreatureType): RareEffect | null {

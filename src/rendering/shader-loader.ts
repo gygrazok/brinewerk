@@ -14,6 +14,7 @@ import waveFrag from './shaders/wave.glsl';
 import rainbowFrag from './shaders/rainbow.glsl';
 import hologramFrag from './shaders/hologram.glsl';
 import negativeFrag from './shaders/negative.glsl';
+import holyFrag from './shaders/holy.glsl';
 import outlineFrag from './shaders/outline.glsl';
 import glowFrag from './shaders/glow.glsl';
 
@@ -30,6 +31,7 @@ const RARE_FRAG: Partial<Record<RareEffect, string>> = {
   rainbow: rainbowFrag,
   hologram: hologramFrag,
   negative: negativeFrag,
+  holy: holyFrag,
 };
 
 // Default vertex shader for PixiJS v8 filters
@@ -58,6 +60,34 @@ void main(void) {
 }
 `;
 
+// Vertex shader for holy effect — passes UV center to fragment
+const holyVertex = `
+attribute vec2 aPosition;
+varying vec2 vTextureCoord;
+varying vec2 vUvCenter;
+
+uniform vec4 uInputSize;
+uniform vec4 uOutputFrame;
+uniform vec4 uOutputTexture;
+
+vec4 filterVertexPosition(void) {
+  vec2 position = aPosition * uOutputFrame.zw + uOutputFrame.xy;
+  position.x = position.x * (2.0 / uOutputTexture.x) - 1.0;
+  position.y = position.y * (2.0 * uOutputTexture.z / uOutputTexture.y) - uOutputTexture.z;
+  return vec4(position, 0.0, 1.0);
+}
+
+vec2 filterTextureCoord(void) {
+  return aPosition * (uOutputFrame.zw * uInputSize.zw);
+}
+
+void main(void) {
+  gl_Position = filterVertexPosition();
+  vTextureCoord = filterTextureCoord();
+  vUvCenter = (uOutputFrame.zw * uInputSize.zw) * 0.5;
+}
+`;
+
 // Shared filter cache — one Filter per rare effect type
 const rareFilterCache = new Map<RareEffect, Filter>();
 
@@ -67,9 +97,10 @@ export function createRareFilter(rare: RareEffect): Filter | null {
   if (!fragment) return null;
 
   try {
+    const vertex = rare === 'holy' ? holyVertex : defaultVertex;
     return new Filter({
-      glProgram: new GlProgram({ vertex: defaultVertex, fragment }),
-      padding: 12,
+      glProgram: new GlProgram({ vertex, fragment }),
+      padding: rare === 'holy' ? 20 : 12,
       resources: {
         rareUniforms: {
           uTime: { value: 0, type: 'f32' },
