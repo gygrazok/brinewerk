@@ -174,14 +174,9 @@ function ensurePanel(): { overlay: HTMLDivElement; panel: HTMLDivElement } {
   return { overlay: overlayEl, panel: panelEl };
 }
 
-async function ensurePreviewApp(container: HTMLElement): Promise<Application> {
-  if (previewApp) {
-    container.appendChild(previewApp.canvas as HTMLCanvasElement);
-    return previewApp;
-  }
-
-  previewApp = new Application();
-  await previewApp.init({
+async function createPreviewApp(container: HTMLElement): Promise<Application> {
+  const app = new Application();
+  await app.init({
     width: PREVIEW_SIZE,
     height: PREVIEW_SIZE,
     background: '#060e12',
@@ -191,9 +186,9 @@ async function ensurePreviewApp(container: HTMLElement): Promise<Application> {
     autoDensity: true,
     preference: 'webgl',
   });
-
-  container.appendChild(previewApp.canvas as HTMLCanvasElement);
-  return previewApp;
+  container.appendChild(app.canvas as HTMLCanvasElement);
+  previewApp = app;
+  return app;
 }
 
 function cleanupPreview(): void {
@@ -203,6 +198,8 @@ function cleanupPreview(): void {
   }
   if (previewApp) {
     previewApp.stage.removeChildren();
+    previewApp.destroy(false);
+    previewApp = null;
   }
 }
 
@@ -270,7 +267,7 @@ export async function showCreaturePanel(creature: Creature, adjacencyBonus: numb
 
   // Setup PixiJS preview with creature visual (sprite + shader filters)
   const container = document.getElementById('preview-container')!;
-  const app = await ensurePreviewApp(container);
+  const app = await createPreviewApp(container);
 
   previewVisual = createCreatureVisual(creature);
   // Scale children to fill the preview area

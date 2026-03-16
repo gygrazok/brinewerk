@@ -13,8 +13,12 @@ interface ToxicBubble {
   size: number;
 }
 
+const SPAWN_INTERVAL = 0.4; // seconds between bubble spawns
+
+interface BubbleCtx { bubbles: ToxicBubble[]; lastSpawnTime: number; }
+
 /** Per-creature toxic bubble state, keyed by creature id */
-const bubbleState = new Map<string, ToxicBubble[]>();
+const bubbleState = new Map<string, BubbleCtx>();
 
 /**
  * Pixel-level toxic bubbles rising from creature body.
@@ -33,54 +37,38 @@ export function applyToxicEffect(grid: PixelGrid, time: number, creatureId: stri
 
   if (topPixels.size === 0) return;
 
-  // Get or create bubble array for this creature
-  let bubbles = bubbleState.get(creatureId);
-  if (!bubbles) {
-    bubbles = [];
-    bubbleState.set(creatureId, bubbles);
+  // Get or create state for this creature
+  let ctx = bubbleState.get(creatureId);
+  if (!ctx) {
+    ctx = { bubbles: [], lastSpawnTime: 0 };
+    bubbleState.set(creatureId, ctx);
   }
 
   // Remove expired bubbles
-  bubbles = bubbles.filter(b => (time - b.birthTime) < BUBBLE_LIFE);
+  ctx.bubbles = ctx.bubbles.filter(b => (time - b.birthTime) < BUBBLE_LIFE);
 
-  // Spawn new bubbles occasionally
-  const spawnCheck = effectHash(Math.floor(time * 3), creatureId.length);
-  const spawnCheck2 = effectHash(Math.floor(time * 5 + 0.5), creatureId.length + 7);
+  // Spawn on cooldown — guaranteed regular spawns
   const columns = Array.from(topPixels.keys());
 
-  if (bubbles.length < MAX_BUBBLES && spawnCheck > 0.55) {
-    const ci = Math.floor(effectHash(time * 17.3, creatureId.length + 3) * columns.length);
+  if (ctx.bubbles.length < MAX_BUBBLES && (time - ctx.lastSpawnTime) >= SPAWN_INTERVAL) {
+    ctx.lastSpawnTime = time;
+    const seed = Math.floor(time * 100);
+    const ci = Math.floor(effectHash(seed * 17.3, columns.length) * columns.length);
     const x = columns[ci];
     const y = topPixels.get(x)!;
 
-    bubbles.push({
+    ctx.bubbles.push({
       x,
       startY: y - 1,
       birthTime: time,
-      dx: (effectHash(time * 7.1, x) - 0.5) * 3,
-      speed: 3 + effectHash(time * 13.7, x + 1) * 4,
-      size: effectHash(time * 19.3, x + 2) > 0.6 ? 2 : 1,
+      dx: (effectHash(seed * 7.1, x) - 0.5) * 3,
+      speed: 3 + effectHash(seed * 13.7, x + 1) * 4,
+      size: effectHash(seed * 19.3, x + 2) > 0.6 ? 2 : 1,
     });
   }
-  if (bubbles.length < MAX_BUBBLES && spawnCheck2 > 0.65) {
-    const ci = Math.floor(effectHash(time * 23.1, creatureId.length + 11) * columns.length);
-    const x = columns[ci];
-    const y = topPixels.get(x)!;
-
-    bubbles.push({
-      x,
-      startY: y - 1,
-      birthTime: time,
-      dx: (effectHash(time * 11.3, x + 5) - 0.5) * 3,
-      speed: 3 + effectHash(time * 9.7, x + 6) * 4,
-      size: 1,
-    });
-  }
-
-  bubbleState.set(creatureId, bubbles);
 
   // Render each bubble
-  for (const b of bubbles) {
+  for (const b of ctx.bubbles) {
     const age = time - b.birthTime;
     const t = age / BUBBLE_LIFE;
 
