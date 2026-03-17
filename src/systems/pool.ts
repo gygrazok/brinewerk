@@ -49,19 +49,15 @@ export function findEmptySlot(state: GameState): string | null {
   return null;
 }
 
-/** Unlock a locked seabed slot. Deducts resources. */
+/** Unlock a locked seabed slot. Deducts Nacre. */
 export function expandPool(state: GameState, slotId: string): boolean {
   const slot = getSlotById(state.pool, slotId);
   if (!slot || slot.unlocked) return false;
 
   const cost = getSlotUnlockCost(slot.tier);
-  if (state.resources.plankton < cost.plankton) return false;
-  if (state.resources.minerite < cost.minerite) return false;
-  if (state.resources.lux < cost.lux) return false;
+  if (state.resources.nacre < cost.nacre) return false;
 
-  state.resources.plankton -= cost.plankton;
-  state.resources.minerite -= cost.minerite;
-  state.resources.lux -= cost.lux;
+  state.resources.nacre -= cost.nacre;
 
   slot.unlocked = true;
   return true;

@@ -28,16 +28,11 @@ export const NACRE_RARE_RARE_MUL = 3.0; // rare chance < 4%
 
 /**
  * Slot unlock cost by tier (position-based).
- * Inner slots (tier 1) are cheap; outer slots (tier 4) require all 3 resources.
+ * Cost is in Nacre only, growing exponentially: 2^(tier-1).
  * Tier 0 slots are free (starter, unlocked by default).
  */
 export function getSlotUnlockCost(tier: number): import('./game-state').ResourceBundle {
-  switch (tier) {
-    case 0:  return { plankton: 0,    minerite: 0,   lux: 0,   nacre: 0 };
-    case 1:  return { plankton: 100,  minerite: 0,   lux: 0,   nacre: 0 };
-    case 2:  return { plankton: 400,  minerite: 40,  lux: 0,   nacre: 0 };
-    case 3:  return { plankton: 1200, minerite: 150, lux: 20,  nacre: 0 };
-    case 4:  return { plankton: 3500, minerite: 400, lux: 80,  nacre: 0 };
-    default: return { plankton: 5000, minerite: 500, lux: 100, nacre: 0 };
-  }
+  if (tier <= 0) return { plankton: 0, minerite: 0, lux: 0, nacre: 0 };
+  const nacre = Math.pow(2, tier - 1); // 1, 2, 4, 8, ...
+  return { plankton: 0, minerite: 0, lux: 0, nacre };
 }
