@@ -1,9 +1,10 @@
 import { Application } from 'pixi.js';
-import { initGameLoop, getState, getClock, onTide } from './core/game-loop';
+import { initGameLoop, getState, getClock, onTide, onReleaseUnlock } from './core/game-loop';
 import { initRenderer } from './rendering/renderer';
 import { createPoolView, destroyPoolView, syncPoolVisuals, updatePoolVisuals } from './ui/pool-view';
-import { showCreaturePanel, hideCreaturePanel } from './ui/creature-panel';
+import { showCreaturePanel, hideCreaturePanel, type CreaturePanelOptions } from './ui/creature-panel';
 import { getCreatureAt, calculateAdjacencyBonus, placeCreature, removeCreature, findEmptySlot, expandPool } from './systems/pool';
+import { releaseCreature } from './systems/release';
 import { forceInitialTide } from './systems/tides';
 import { renderShore, setOnPickUp } from './ui/tide-shore';
 import { updateHud } from './ui/hud';
@@ -63,7 +64,17 @@ async function init() {
     const creature = getCreatureAt(state, slotId);
     if (creature) {
       const bonus = calculateAdjacencyBonus(state, slotId);
-      showCreaturePanel(creature, bonus);
+      const panelOpts: CreaturePanelOptions = {
+        adjacencyBonus: bonus,
+        releaseUnlocked: state.releaseUnlocked,
+        onRelease: (c) => {
+          releaseCreature(state, c.id);
+          syncPoolVisuals(poolView, state);
+          updateHud(state);
+          renderShore(state);
+        },
+      };
+      showCreaturePanel(creature, panelOpts);
     } else {
       hideCreaturePanel();
     }
@@ -105,6 +116,12 @@ async function init() {
   // Tide callback
   onTide(() => {
     renderShore(state);
+  });
+
+  // Release unlock notification
+  onReleaseUnlock(() => {
+    updateHud(state);
+    console.log('Creature release unlocked — pool is full');
   });
 
   // Initial render

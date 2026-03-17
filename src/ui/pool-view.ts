@@ -389,14 +389,14 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
       gfx.cursor = 'pointer';
 
       gfx.on('pointerenter', () => {
-        const res = poolView._stateRef?.resources ?? { plankton: 0, minerite: 0, lux: 0 };
+        const res = poolView._stateRef?.resources ?? { plankton: 0, minerite: 0, lux: 0, nacre: 0 };
         const canBuy = !slot.unlocked && canAffordSlot(res, slot.tier);
         gfx.clear();
         drawSlotHighlight(gfx, slot, canBuy);
       });
 
       gfx.on('pointerleave', () => {
-        const res = poolView._stateRef?.resources ?? { plankton: 0, minerite: 0, lux: 0 };
+        const res = poolView._stateRef?.resources ?? { plankton: 0, minerite: 0, lux: 0, nacre: 0 };
         const canBuy = !slot.unlocked && canAffordSlot(res, slot.tier);
         gfx.clear();
         drawSlot(gfx, slot, canBuy);

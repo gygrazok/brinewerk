@@ -10,6 +10,7 @@ import {
   destroyCreatureVisual,
   type CreatureVisual,
 } from '../rendering/creature-renderer';
+import { calculateNacreYield } from '../systems/release';
 
 
 let overlayEl: HTMLDivElement | null = null;
@@ -153,6 +154,60 @@ function injectStyles(): void {
       width: 30px; text-align: right;
       font-size: 7px; color: #5a8a8f; flex-shrink: 0;
     }
+
+    #creature-detail .release-btn {
+      background: #1a2a2f; border: 1px solid #3a5a5f;
+      color: #e8d0c0; font-family: 'Press Start 2P', monospace;
+      font-size: 9px; padding: 10px 16px;
+      cursor: pointer; border-radius: 4px;
+      transition: background 0.15s, border-color 0.15s;
+      text-align: center;
+    }
+    #creature-detail .release-btn:hover {
+      background: #2a3a3f; border-color: #e8d0c0;
+    }
+    #creature-detail .release-btn.disabled {
+      opacity: 0.4; pointer-events: none;
+    }
+
+    #release-confirm-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(4, 10, 14, 0.75);
+      display: flex; align-items: center; justify-content: center;
+    }
+    #release-confirm-dialog {
+      background: #0a1a20; border: 1px solid #3a5a5f;
+      border-radius: 8px; padding: 24px;
+      font-family: 'Press Start 2P', monospace;
+      color: #b8d4d8; max-width: 300px;
+      text-align: center;
+    }
+    #release-confirm-dialog .confirm-title {
+      font-size: 10px; color: #e8d0c0; margin-bottom: 12px;
+    }
+    #release-confirm-dialog .confirm-text {
+      font-size: 7px; line-height: 1.6; margin-bottom: 16px; color: #7a9a9f;
+    }
+    #release-confirm-dialog .confirm-nacre {
+      font-size: 12px; color: #e8d0c0; margin-bottom: 16px;
+    }
+    #release-confirm-dialog .confirm-actions {
+      display: flex; gap: 12px; justify-content: center;
+    }
+    #release-confirm-dialog .confirm-actions button {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px; padding: 8px 14px;
+      border-radius: 4px; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .confirm-cancel {
+      background: #1a2a2f; border: 1px solid #3a5a5f; color: #7a9a9f;
+    }
+    .confirm-cancel:hover { background: #2a3a3f; }
+    .confirm-release {
+      background: #2a1a1f; border: 1px solid #e8d0c0; color: #e8d0c0;
+    }
+    .confirm-release:hover { background: #3a2a2f; }
   `;
   document.head.appendChild(style);
 }
@@ -203,7 +258,17 @@ function cleanupPreview(): void {
   }
 }
 
-export async function showCreaturePanel(creature: Creature, adjacencyBonus: number = 0): Promise<void> {
+export interface CreaturePanelOptions {
+  adjacencyBonus?: number;
+  releaseUnlocked?: boolean;
+  onRelease?: (creature: Creature) => void;
+}
+
+export async function showCreaturePanel(creature: Creature, optionsOrBonus: number | CreaturePanelOptions = 0): Promise<void> {
+  const opts: CreaturePanelOptions = typeof optionsOrBonus === 'number'
+    ? { adjacencyBonus: optionsOrBonus }
+    : optionsOrBonus;
+  const adjacencyBonus = opts.adjacencyBonus ?? 0;
   const { overlay, panel } = ensurePanel();
 
   // Clean previous preview
@@ -257,6 +322,27 @@ export async function showCreaturePanel(creature: Creature, adjacencyBonus: numb
 
   html += `
       </div>
+  `;
+
+  // Release button (only if feature is unlocked)
+  if (opts.releaseUnlocked) {
+    const nacreYield = calculateNacreYield(creature);
+    if (nacreYield > 0) {
+      html += `
+        <button class="release-btn" id="release-btn">
+          ⚬ Rilascia per ${nacreYield} Nacre
+        </button>
+      `;
+    } else {
+      html += `
+        <button class="release-btn disabled">
+          ⚬ 0 Nacre accumulato
+        </button>
+      `;
+    }
+  }
+
+  html += `
     </div>
   `;
 
@@ -264,6 +350,15 @@ export async function showCreaturePanel(creature: Creature, adjacencyBonus: numb
 
   // Close button
   document.getElementById('panel-close-btn')!.addEventListener('click', () => hideCreaturePanel());
+
+  // Release button
+  const releaseBtn = document.getElementById('release-btn');
+  if (releaseBtn && opts.onRelease) {
+    const onRelease = opts.onRelease;
+    releaseBtn.addEventListener('click', () => {
+      showReleaseConfirm(creature, onRelease);
+    });
+  }
 
   // Setup PixiJS preview with creature visual (sprite + shader filters)
   const container = document.getElementById('preview-container')!;
@@ -314,6 +409,39 @@ export async function showCreaturePanel(creature: Creature, adjacencyBonus: numb
     panel.classList.add('open');
   });
   panelOpen = true;
+}
+
+function showReleaseConfirm(creature: Creature, onRelease: (creature: Creature) => void): void {
+  const nacreYield = calculateNacreYield(creature);
+
+  const confirmOverlay = document.createElement('div');
+  confirmOverlay.id = 'release-confirm-overlay';
+  confirmOverlay.innerHTML = `
+    <div id="release-confirm-dialog">
+      <div class="confirm-title">Rilasciare ${creature.name}?</div>
+      <div class="confirm-text">Tornerà nell'oceano per sempre.</div>
+      <div class="confirm-nacre">⚬ ${nacreYield} Nacre</div>
+      <div class="confirm-actions">
+        <button class="confirm-cancel" id="confirm-cancel">Annulla</button>
+        <button class="confirm-release" id="confirm-release">Rilascia ⚬${nacreYield}</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(confirmOverlay);
+
+  document.getElementById('confirm-cancel')!.addEventListener('click', () => {
+    confirmOverlay.remove();
+  });
+  confirmOverlay.addEventListener('click', (e) => {
+    if (e.target === confirmOverlay) confirmOverlay.remove();
+  });
+
+  document.getElementById('confirm-release')!.addEventListener('click', () => {
+    confirmOverlay.remove();
+    hideCreaturePanel();
+    onRelease(creature);
+  });
 }
 
 export function hideCreaturePanel(): void {

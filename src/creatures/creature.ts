@@ -115,6 +115,8 @@ export interface Creature {
   genes: Genotype;
   seed: number;
   rare: RareEffect | null;
+  /** Cumulative plankton produced by this creature (for nacre yield on release) */
+  lifetimePlankton: number;
 }
 
 let _nextId = 0;
@@ -135,5 +137,5 @@ export function createCreature(
   const name = generateName(type, nameRng);
   const id = `c_${Date.now()}_${_nextId++}`;
 
-  return { id, name, type, genes, seed, rare };
+  return { id, name, type, genes, seed, rare, lifetimePlankton: 0 };
 }
