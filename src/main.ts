@@ -3,7 +3,7 @@ import { initGameLoop, getState, getClock, onTide, onReleaseUnlock } from './cor
 import { initRenderer } from './rendering/renderer';
 import { createPoolView, destroyPoolView, syncPoolVisuals, updatePoolVisuals } from './ui/pool-view';
 import { showCreaturePanel, hideCreaturePanel, type CreaturePanelOptions } from './ui/creature-panel';
-import { getCreatureAt, calculateAdjacencyBonus, placeCreature, removeCreature, findEmptySlot, expandPool } from './systems/pool';
+import { getCreatureAt, placeCreature, removeCreature, findEmptySlot, expandPool } from './systems/pool';
 import { releaseCreature } from './systems/release';
 import { forceInitialTide } from './systems/tides';
 import { renderShore, setOnPickUp } from './ui/tide-shore';
@@ -63,9 +63,7 @@ async function init() {
 
     const creature = getCreatureAt(state, slotId);
     if (creature) {
-      const bonus = calculateAdjacencyBonus(state, slotId);
       const panelOpts: CreaturePanelOptions = {
-        adjacencyBonus: bonus,
         releaseUnlocked: state.releaseUnlocked,
         onRelease: (c) => {
           releaseCreature(state, c.id);

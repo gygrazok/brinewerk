@@ -68,7 +68,7 @@ brinewerk/
 │   │   ├── prestige.ts         # Fossilization reset logic
 │   │   └── biomes.ts           # Biome unlocks, creature pool per biome
 │   ├── systems/
-│   │   ├── pool.ts             # The tide pool: creature slots, adjacency, symbiosis
+│   │   ├── pool.ts             # The tide pool: creature slots, placement, expansion
 │   │   ├── expeditions.ts      # Send creatures out, risk/reward, timers
 │   │   ├── tides.ts            # Tide arrival: random creatures on shore, pickup cost
 │   │   └── bestiary.ts         # Collection tracking, discovery log

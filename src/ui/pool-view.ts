@@ -174,7 +174,7 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
   };
   updateMinZoom();
 
-  // --- Zoom ---
+  // --- Zoom (wheel) ---
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? -0.1 : 0.1;
@@ -191,6 +191,56 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
     viewport.scale.set(poolView.zoom);
     clampViewport(poolView);
   }, { passive: false });
+
+  // --- Pinch-to-zoom (touch) ---
+  let pinchStartDist = 0;
+  let pinchStartZoom = 1;
+  let pinchMidX = 0;
+  let pinchMidY = 0;
+  let isPinching = false;
+
+  function touchDist(t1: Touch, t2: Touch): number {
+    const dx = t1.clientX - t2.clientX;
+    const dy = t1.clientY - t2.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  const onTouchStart = (e: TouchEvent) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      isPinching = true;
+      isPanning = false;
+      pinchStartDist = touchDist(e.touches[0], e.touches[1]);
+      pinchStartZoom = poolView.zoom;
+      const rect = canvas.getBoundingClientRect();
+      pinchMidX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+      pinchMidY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+    }
+  };
+
+  const onTouchMove = (e: TouchEvent) => {
+    if (!isPinching || e.touches.length < 2) return;
+    e.preventDefault();
+    const dist = touchDist(e.touches[0], e.touches[1]);
+    const ratio = dist / pinchStartDist;
+    const oldZoom = poolView.zoom;
+    poolView.zoom = Math.max(poolView._zoomMin, Math.min(ZOOM_MAX, pinchStartZoom * ratio));
+    const scale = poolView.zoom / oldZoom;
+    viewport.x = pinchMidX - (pinchMidX - viewport.x) * scale;
+    viewport.y = pinchMidY - (pinchMidY - viewport.y) * scale;
+    viewport.scale.set(poolView.zoom);
+    clampViewport(poolView);
+  };
+
+  const onTouchEnd = (e: TouchEvent) => {
+    if (e.touches.length < 2) {
+      isPinching = false;
+    }
+  };
+
+  canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+  canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+  canvas.addEventListener('touchend', onTouchEnd);
 
   // --- Pointerdown: start creature drag or pan ---
   canvas.addEventListener('pointerdown', (e) => {
@@ -311,6 +361,9 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
   poolView._cleanup = () => {
     window.removeEventListener('pointermove', onPointerMove);
     window.removeEventListener('pointerup', onPointerUp);
+    canvas.removeEventListener('touchstart', onTouchStart);
+    canvas.removeEventListener('touchmove', onTouchMove);
+    canvas.removeEventListener('touchend', onTouchEnd);
     app.renderer.off('resize', updateMinZoom);
     app.renderer.off('resize', onResize);
   };

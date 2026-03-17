@@ -7,9 +7,12 @@ import { checkReleaseUnlock } from '../systems/release';
 
 const AUTO_SAVE_INTERVAL = 30; // seconds
 
+const PRODUCTION_TICK_INTERVAL = 0.25; // seconds — throttle heavy production calc
+
 let state: GameState;
 let clock: Clock;
 let saveTimer = 0;
+let productionTimer = 0;
 let savingEnabled = true;
 const onTideCallbacks: (() => void)[] = [];
 const onReleaseUnlockCallbacks: (() => void)[] = [];
@@ -50,7 +53,11 @@ export function initGameLoop(ticker: Ticker): void {
     tickClock(clock, deltaSec);
     state.totalPlaytime += deltaSec;
 
-    tickProduction(state, deltaSec);
+    productionTimer += deltaSec;
+    if (productionTimer >= PRODUCTION_TICK_INTERVAL) {
+      tickProduction(state, productionTimer);
+      productionTimer = 0;
+    }
     if (checkTide(state, Date.now())) {
       onTideCallbacks.forEach((cb) => cb());
     }
