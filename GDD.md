@@ -115,12 +115,13 @@ The pool is an expandable grid where creatures are placed.
 
 The player starts with a **single creature slot (1×1)**. On each edge of the grid where an empty cell is adjacent to an occupied one, a **"+" expansion button** appears. Clicking it pays a resource cost to unlock that cell.
 
-**Expansion costs** scale with total grid size:
-- Slots 2-4: 50 Plankton each
-- Slots 5-9: 150 Plankton each
-- Slots 10-16: 500 Plankton + 50 Minerite each
-- Slots 17-25: 2000 Plankton + 200 Minerite each
-- Slots 26+: 5000 Plankton + 500 Minerite + 50 Lux each
+**Expansion costs** are paid in **Nacre** (obtained by releasing creatures) and grow exponentially by tier:
+- Tier 1 (near center): 1 Nacre
+- Tier 2 (spreading out): 2 Nacre
+- Tier 3 (periphery): 4 Nacre
+- Tier 4 (edges/deep): 8 Nacre
+
+This creates a release-to-expand loop: the player must sacrifice creatures to earn Nacre, then spend Nacre to unlock new slots for future creatures.
 
 **Grid shape is freeform**: the player chooses where to expand. They can grow horizontally, vertically, in an L-shape, or as a compact square. Compact shapes are optimal because they create more upgrade node intersections, but the player is free to build however they want.
 

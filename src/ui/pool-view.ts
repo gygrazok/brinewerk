@@ -583,16 +583,13 @@ const COST_STYLE_LOCKED = new TextStyle({
 /** Check if the player can afford a slot's unlock cost */
 function canAffordSlot(res: ResourceBundle, tier: number): boolean {
   const cost = getSlotUnlockCost(tier);
-  return res.plankton >= cost.plankton && res.minerite >= cost.minerite && res.lux >= cost.lux;
+  return res.nacre >= cost.nacre;
 }
 
-/** Format a ResourceBundle as multi-line cost string for slot display */
+/** Format slot cost as a display string */
 function formatSlotCost(cost: ResourceBundle): string {
-  const lines: string[] = [];
-  if (cost.plankton > 0) lines.push(`${cost.plankton} \u{1F7E2}`);
-  if (cost.minerite > 0) lines.push(`${cost.minerite} \u{1F535}`);
-  if (cost.lux > 0) lines.push(`${cost.lux} \u2728`);
-  return lines.join('\n');
+  if (cost.nacre > 0) return `${cost.nacre} \u26AC`;
+  return '';
 }
 
 /** Draw a pixel-art padlock icon centred at (cx, cy) */
