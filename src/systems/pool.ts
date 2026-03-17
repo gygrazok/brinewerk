@@ -43,11 +43,20 @@ export function getAdjacentCreatures(state: GameState, slotId: string): Creature
   const result: Creature[] = [];
   for (const ns of nearby) {
     if (ns.creatureId) {
-      const creature = state.creatures.find(c => c.id === ns.creatureId);
+      const creature = _creatureLookup?.get(ns.creatureId)
+        ?? state.creatures.find(c => c.id === ns.creatureId);
       if (creature) result.push(creature);
     }
   }
   return result;
+}
+
+/** Temporary creature lookup cache, set externally to avoid repeated .find() in hot paths */
+let _creatureLookup: Map<string, Creature> | null = null;
+
+/** Set/clear creature lookup cache for batch operations */
+export function setCreatureLookup(map: Map<string, Creature> | null): void {
+  _creatureLookup = map;
 }
 
 /** Calculate adjacency bonus for a slot (Blobid symbiosis) */
