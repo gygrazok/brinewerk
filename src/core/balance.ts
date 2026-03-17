@@ -23,6 +23,12 @@ export const BLOBID_SYMBIOSIS_SCALE = 0.10; // +10% per tentacles gene
 /** Initial game state */
 export const INITIAL_PLANKTON = 50;
 
+/** Nacre / creature release */
+export const NACRE_CONVERSION_RATE = 100; // plankton produced per 1 nacre
+export const NACRE_RARE_COMMON_MUL = 1.5; // rare chance >= 5%
+export const NACRE_RARE_UNCOMMON_MUL = 2.0; // rare chance 4-5%
+export const NACRE_RARE_RARE_MUL = 3.0; // rare chance < 4%
+
 
 /**
  * Slot unlock cost by tier (position-based).
@@ -31,11 +37,11 @@ export const INITIAL_PLANKTON = 50;
  */
 export function getSlotUnlockCost(tier: number): import('./game-state').ResourceBundle {
   switch (tier) {
-    case 0:  return { plankton: 0,    minerite: 0,   lux: 0 };
-    case 1:  return { plankton: 100,  minerite: 0,   lux: 0 };
-    case 2:  return { plankton: 400,  minerite: 40,  lux: 0 };
-    case 3:  return { plankton: 1200, minerite: 150, lux: 20 };
-    case 4:  return { plankton: 3500, minerite: 400, lux: 80 };
-    default: return { plankton: 5000, minerite: 500, lux: 100 };
+    case 0:  return { plankton: 0,    minerite: 0,   lux: 0,   nacre: 0 };
+    case 1:  return { plankton: 100,  minerite: 0,   lux: 0,   nacre: 0 };
+    case 2:  return { plankton: 400,  minerite: 40,  lux: 0,   nacre: 0 };
+    case 3:  return { plankton: 1200, minerite: 150, lux: 20,  nacre: 0 };
+    case 4:  return { plankton: 3500, minerite: 400, lux: 80,  nacre: 0 };
+    default: return { plankton: 5000, minerite: 500, lux: 100, nacre: 0 };
   }
 }

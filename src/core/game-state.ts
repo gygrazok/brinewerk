@@ -2,7 +2,7 @@ import type { Creature } from '../creatures/creature';
 import { SEABED_SLOTS } from '../systems/seabed-layout';
 
 const SAVE_KEY = 'brinewerk_save';
-const CURRENT_SAVE_VERSION = 4;
+const CURRENT_SAVE_VERSION = 5;
 
 // --- Seabed pool (v3+) ---
 
@@ -24,7 +24,7 @@ export interface SeabedPool {
   worldHeight: number;
 }
 
-export type ResourceBundle = { plankton: number; minerite: number; lux: number };
+export type ResourceBundle = { plankton: number; minerite: number; lux: number; nacre: number };
 
 export interface GameState {
   saveVersion: number;
@@ -36,6 +36,8 @@ export interface GameState {
   lastSaveTimestamp: number;
   lastTideTimestamp: number;
   totalPlaytime: number; // seconds
+  /** True once all tier-0 slots have been filled (unlocks creature release) */
+  releaseUnlocked: boolean;
 }
 
 export function createDefaultState(): GameState {
@@ -49,11 +51,12 @@ export function createDefaultState(): GameState {
     seabedSeed: Math.floor(Math.random() * 2_147_483_647),
     creatures: [],
     pool,
-    resources: { plankton: 0, minerite: 0, lux: 0 },
+    resources: { plankton: 0, minerite: 0, lux: 0, nacre: 0 },
     shore: [],
     lastSaveTimestamp: Date.now(),
     lastTideTimestamp: Date.now(),
     totalPlaytime: 0,
+    releaseUnlocked: false,
   };
 }
 
@@ -156,6 +159,27 @@ function migrateState(data: Record<string, unknown>): GameState {
   // V3 → V4: add seabedSeed for procedural decoration generation
   if ((data.saveVersion as number) < 4) {
     data.seabedSeed = Math.floor(Math.random() * 2_147_483_647);
+    data.saveVersion = 4;
+  }
+
+  // V4 → V5: add nacre resource, lifetimePlankton per creature, releaseUnlocked flag
+  if ((data.saveVersion as number) < 5) {
+    const resources = data.resources as Record<string, number>;
+    if (resources.nacre === undefined) resources.nacre = 0;
+
+    const creatures = data.creatures as { lifetimePlankton?: number }[];
+    for (const c of creatures) {
+      if (c.lifetimePlankton === undefined) c.lifetimePlankton = 0;
+    }
+    const shore = data.shore as { lifetimePlankton?: number }[];
+    for (const c of shore) {
+      if (c.lifetimePlankton === undefined) c.lifetimePlankton = 0;
+    }
+
+    if ((data as Record<string, unknown>).releaseUnlocked === undefined) {
+      (data as Record<string, unknown>).releaseUnlocked = false;
+    }
+
     data.saveVersion = CURRENT_SAVE_VERSION;
   }
 

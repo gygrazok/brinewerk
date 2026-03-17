@@ -3,6 +3,7 @@ import { type Clock, createClock, tickClock, calculateOfflineElapsed } from './c
 import { type GameState, createDefaultState, loadState, saveState } from './game-state';
 import { tickProduction } from '../economy/production-engine';
 import { checkTide } from '../systems/tides';
+import { checkReleaseUnlock } from '../systems/release';
 
 const AUTO_SAVE_INTERVAL = 30; // seconds
 
@@ -11,9 +12,14 @@ let clock: Clock;
 let saveTimer = 0;
 let savingEnabled = true;
 const onTideCallbacks: (() => void)[] = [];
+const onReleaseUnlockCallbacks: (() => void)[] = [];
 
 export function onTide(cb: () => void): void {
   onTideCallbacks.push(cb);
+}
+
+export function onReleaseUnlock(cb: () => void): void {
+  onReleaseUnlockCallbacks.push(cb);
 }
 
 export function getState(): GameState {
@@ -47,6 +53,9 @@ export function initGameLoop(ticker: Ticker): void {
     tickProduction(state, deltaSec);
     if (checkTide(state, Date.now())) {
       onTideCallbacks.forEach((cb) => cb());
+    }
+    if (checkReleaseUnlock(state)) {
+      onReleaseUnlockCallbacks.forEach((cb) => cb());
     }
 
     // Auto-save

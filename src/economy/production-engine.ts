@@ -13,7 +13,9 @@ export function tickProduction(state: GameState, deltaSec: number): void {
     if (!creature) continue;
 
     const adjacencyBonus = calculateAdjacencyBonus(state, slot.id);
-    totalPlanktonPerSec += calculateProduction(creature, adjacencyBonus);
+    const prod = calculateProduction(creature, adjacencyBonus);
+    totalPlanktonPerSec += prod;
+    creature.lifetimePlankton += prod * deltaSec;
   }
 
   state.resources.plankton += totalPlanktonPerSec * deltaSec;

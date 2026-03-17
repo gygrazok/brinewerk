@@ -14,6 +14,7 @@ const RESOURCES: ResourceDef[] = [
   { key: 'plankton', icon: '🟢', showRate: true },
   { key: 'minerite', icon: '🔵' },
   { key: 'lux',      icon: '✨' },
+  { key: 'nacre',    icon: '⚬' },
 ];
 
 export function updateHud(state: GameState): void {
@@ -27,7 +28,10 @@ export function updateHud(state: GameState): void {
 
   const rate = getTotalProductionRate(state);
   const resList = document.getElementById('resource-list')!;
-  resList.innerHTML = RESOURCES
+  const visibleResources = RESOURCES.filter(
+    (r) => r.key !== 'nacre' || state.releaseUnlocked,
+  );
+  resList.innerHTML = visibleResources
     .map((r) => {
       const val = Math.floor(state.resources[r.key]);
       const rateHtml = r.showRate
