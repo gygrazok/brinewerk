@@ -16,10 +16,6 @@ export const PICKUP_SIZE_SCALE = 20;
 export const PICKUP_ARMS_SCALE = 10;
 export const PICKUP_RARE_MULTIPLIER = 2.5;
 
-/** Blobid symbiosis */
-export const BLOBID_SYMBIOSIS_BASE = 0.15; // +15% minimum
-export const BLOBID_SYMBIOSIS_SCALE = 0.10; // +10% per tentacles gene
-
 /** Initial game state */
 export const INITIAL_PLANKTON = 50;
 

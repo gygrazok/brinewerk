@@ -17,8 +17,8 @@ Four base phyla, each with distinct visual rendering and gameplay role:
 
 ### Blobid (◎)
 - **Appearance**: Jellyfish dome with hanging tentacles, fringe, translucent patterns
-- **Role**: Catalysts. Boost adjacent creatures' output (symbiosis).
-- **Special trait**: Tentacles — more tentacles = wider symbiosis radius
+- **Role**: Passive producers with unique visual style.
+- **Special trait**: Tentacles — cosmetic, affects tentacle count and animation
 
 ### Corallid (❋)
 - **Appearance**: Branching coral structure with sub-branches and tip blooms
@@ -101,10 +101,9 @@ Each creature in the pool produces resources per second based on its traits:
 
 ```
 Base output = type_multiplier × size × relevant_trait_value
-Symbiosis bonus = sum of adjacent Blobid bonuses
 Upgrade bonus = multiplier from nearby node upgrades
 Skill tree bonus = global multipliers from Phylogenesis
-Final output = base × (1 + symbiosis) × (1 + upgrade) × (1 + skill)
+Final output = base × (1 + upgrade) × (1 + skill)
 ```
 
 ## The Tide Pool (Main Play Area)
@@ -156,25 +155,13 @@ The pool view supports **zoom and pan** to accommodate the growing grid:
 - **Auto-center**: On first load and after expansion, the view smoothly centers on the grid.
 - Zoom in to inspect creature details and shader effects up close; zoom out to see the full grid layout.
 
-### Adjacency & Symbiosis
-
-Creature placement matters:
-- **Blobid symbiosis**: Boosts all orthogonally adjacent creatures based on tentacle count
-- **Fire creatures**: Damage adjacent non-Fire creatures over time (reduce output by 5%/hr)
-- **Toxic creatures**: Reduce adjacent output by 10%, but are immune to Fire damage
-- **Frost creatures**: Slow adjacent breeding/expedition timers (beneficial for breeding)
-- **Phantom creatures**: Can stack in an occupied slot (only rare effect that bypasses the slot limit)
-
-This creates a spatial puzzle: where to place creatures for maximum synergy?
-
 ### Pool Strategy
 
 With the expandable grid and upgrade nodes, the player faces layered decisions:
 - **Expansion direction**: Grow compact (more upgrade nodes) or spread out (cheaper, but fewer synergies)?
 - **Creature placement**: Which creatures go next to which upgrade nodes?
 - **Upgrade selection**: Which upgrade fits this cluster of 4 creatures best?
-- **Blobid positioning**: Place the Blobid centrally for maximum symbiosis reach?
-- **Risk management**: Keep the Toxic creature (great for expeditions, bad for neighbors)?
+- **Risk management**: Balance creature variety against production efficiency
 
 ## Creature Acquisition
 
@@ -219,7 +206,7 @@ The key tension: breeding removes two producers from the pool for hours. This is
 
 ### Phase 1 — The Shallows (0-2 hours)
 
-Player starts with a single creature slot and one creature. Learns basic mechanics: creature produces Plankton, Plankton buys grid expansion. First tide arrives with 2 creatures. Player expands grid, places creatures, discovers adjacency bonuses. First upgrade node appears when they have a 2×2 grid.
+Player starts with a single creature slot and one creature. Learns basic mechanics: creature produces Plankton, Plankton buys grid expansion. First tide arrives with 2 creatures. Player expands grid, places creatures. First upgrade node appears when they have a 2×2 grid.
 
 Goal: Expand to 3×3, install first Algae Colony upgrade, fill pool to 6+ creatures.
 
@@ -264,7 +251,6 @@ Shaped like a phylogenetic tree. Three main branches:
 
 Focus: Make creatures produce more.
 - Efficient Filtration: +15% Plankton per node (5 nodes)
-- Symbiosis Amplification: Blobid bonus range +1 per node
 - Colony Density: Expansion cost -20% per node
 - Deep Specialization: Creatures producing a single resource get 3x output
 - Ecosystem Harmony: Biodiversity bonus — each unique species type adds +10% global output

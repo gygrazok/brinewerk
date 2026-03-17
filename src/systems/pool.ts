@@ -1,11 +1,7 @@
 import type { GameState } from '../core/game-state';
 import type { Creature } from '../creatures/creature';
-import { CreatureType } from '../creatures/types';
-import { getSlotById, unlockedSlots, getNearbySlots } from './coords';
-import { getSlotUnlockCost, BLOBID_SYMBIOSIS_BASE, BLOBID_SYMBIOSIS_SCALE } from '../core/balance';
-
-/** Adjacency radius for proximity-based bonuses (px in world space) */
-const ADJACENCY_RADIUS = 120;
+import { getSlotById, unlockedSlots } from './coords';
+import { getSlotUnlockCost } from '../core/balance';
 
 /** Place a creature in a specific seabed slot */
 export function placeCreature(state: GameState, creature: Creature, slotId: string): boolean {
@@ -35,40 +31,6 @@ export function getCreatureAt(state: GameState, slotId: string): Creature | null
   const slot = getSlotById(state.pool, slotId);
   if (!slot?.creatureId) return null;
   return state.creatures.find(c => c.id === slot.creatureId) ?? null;
-}
-
-/** Get creatures in nearby slots (proximity-based adjacency) */
-export function getAdjacentCreatures(state: GameState, slotId: string): Creature[] {
-  const nearby = getNearbySlots(state.pool, slotId, ADJACENCY_RADIUS);
-  const result: Creature[] = [];
-  for (const ns of nearby) {
-    if (ns.creatureId) {
-      const creature = _creatureLookup?.get(ns.creatureId)
-        ?? state.creatures.find(c => c.id === ns.creatureId);
-      if (creature) result.push(creature);
-    }
-  }
-  return result;
-}
-
-/** Temporary creature lookup cache, set externally to avoid repeated .find() in hot paths */
-let _creatureLookup: Map<string, Creature> | null = null;
-
-/** Set/clear creature lookup cache for batch operations */
-export function setCreatureLookup(map: Map<string, Creature> | null): void {
-  _creatureLookup = map;
-}
-
-/** Calculate adjacency bonus for a slot (Blobid symbiosis) */
-export function calculateAdjacencyBonus(state: GameState, slotId: string): number {
-  const adjacent = getAdjacentCreatures(state, slotId);
-  let bonus = 0;
-  for (const adj of adjacent) {
-    if (adj.type === CreatureType.Blobid) {
-      bonus += BLOBID_SYMBIOSIS_BASE + adj.genes.tentacles * BLOBID_SYMBIOSIS_SCALE;
-    }
-  }
-  return bonus;
 }
 
 /** Find the slot ID where a creature is placed */

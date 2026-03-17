@@ -1,6 +1,5 @@
 import type { GameState } from '../core/game-state';
 import { calculateProduction } from '../creatures/production';
-import { calculateAdjacencyBonus, setCreatureLookup } from '../systems/pool';
 import { unlockedSlots } from '../systems/coords';
 
 /** Build a fast creature-id lookup map */
@@ -14,20 +13,17 @@ function buildCreatureMap(state: GameState): Map<string, typeof state.creatures[
 export function tickProduction(state: GameState, deltaSec: number): void {
   let totalPlanktonPerSec = 0;
   const creatureMap = buildCreatureMap(state);
-  setCreatureLookup(creatureMap);
 
   for (const slot of unlockedSlots(state.pool)) {
     if (!slot.creatureId) continue;
     const creature = creatureMap.get(slot.creatureId);
     if (!creature) continue;
 
-    const adjacencyBonus = calculateAdjacencyBonus(state, slot.id);
-    const prod = calculateProduction(creature, adjacencyBonus);
+    const prod = calculateProduction(creature);
     totalPlanktonPerSec += prod;
     creature.lifetimePlankton += prod * deltaSec;
   }
 
-  setCreatureLookup(null);
   state.resources.plankton += totalPlanktonPerSec * deltaSec;
 }
 
@@ -35,14 +31,11 @@ export function tickProduction(state: GameState, deltaSec: number): void {
 export function getTotalProductionRate(state: GameState): number {
   let total = 0;
   const creatureMap = buildCreatureMap(state);
-  setCreatureLookup(creatureMap);
   for (const slot of unlockedSlots(state.pool)) {
     if (!slot.creatureId) continue;
     const creature = creatureMap.get(slot.creatureId);
     if (!creature) continue;
-    const adjacencyBonus = calculateAdjacencyBonus(state, slot.id);
-    total += calculateProduction(creature, adjacencyBonus);
+    total += calculateProduction(creature);
   }
-  setCreatureLookup(null);
   return total;
 }

@@ -259,16 +259,11 @@ function cleanupPreview(): void {
 }
 
 export interface CreaturePanelOptions {
-  adjacencyBonus?: number;
   releaseUnlocked?: boolean;
   onRelease?: (creature: Creature) => void;
 }
 
-export async function showCreaturePanel(creature: Creature, optionsOrBonus: number | CreaturePanelOptions = 0): Promise<void> {
-  const opts: CreaturePanelOptions = typeof optionsOrBonus === 'number'
-    ? { adjacencyBonus: optionsOrBonus }
-    : optionsOrBonus;
-  const adjacencyBonus = opts.adjacencyBonus ?? 0;
+export async function showCreaturePanel(creature: Creature, opts: CreaturePanelOptions = {}): Promise<void> {
   const { overlay, panel } = ensurePanel();
 
   // Clean previous preview
@@ -276,7 +271,7 @@ export async function showCreaturePanel(creature: Creature, optionsOrBonus: numb
   currentCreature = creature;
 
   const rareInfo = getRareInfo(creature.rare);
-  const production = calculateProduction(creature, adjacencyBonus);
+  const production = calculateProduction(creature);
   const traits = getDisplayTraits(creature.type);
 
   // Build HTML
