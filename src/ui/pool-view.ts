@@ -26,7 +26,7 @@ const SLOT_BORDER = 0x1a3a3f;
 const SLOT_HOVER = 0x3aada8;
 const HIT_RADIUS = 50;
 
-const ZOOM_MAX = 2.0;
+const ZOOM_MAX = 4.0;
 const DRAG_THRESHOLD = 4;
 
 // Theme-specific slot border colors
@@ -667,6 +667,7 @@ function ensureSlotCostText(gfx: Graphics, slot: SeabedSlot, affordable = false)
 
   const style = affordable ? COST_STYLE_AFFORDABLE : COST_STYLE_LOCKED;
   const text = new Text({ text: label, style });
+  text.resolution = ZOOM_MAX;
   text.anchor.set(0.5, 0);
   text.x = slot.x;
   text.y = slot.y + 6; // below padlock
