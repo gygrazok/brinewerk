@@ -241,7 +241,18 @@ async function createPreviewApp(container: HTMLElement): Promise<Application> {
     autoDensity: true,
     preference: 'webgl',
   });
-  container.appendChild(app.canvas as HTMLCanvasElement);
+  const canvas = app.canvas as HTMLCanvasElement;
+  container.appendChild(canvas);
+
+  // Pause preview rendering on context loss; restore rebuilds the main app
+  canvas.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    app.ticker.stop();
+  });
+  canvas.addEventListener('webglcontextrestored', () => {
+    app.ticker.start();
+  });
+
   previewApp = app;
   return app;
 }

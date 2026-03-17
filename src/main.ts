@@ -15,6 +15,25 @@ import { destroyRareFilterCache } from './rendering/shader-loader';
 
 const app = new Application();
 let currentPoolView: import('./ui/pool-view').PoolView | null = null;
+let contextLostOverlay: HTMLDivElement | null = null;
+
+/** Show a non-interactive overlay while WebGL context is lost */
+function showContextLostOverlay(): void {
+  if (contextLostOverlay) return;
+  contextLostOverlay = document.createElement('div');
+  contextLostOverlay.id = 'webgl-context-lost';
+  contextLostOverlay.style.cssText =
+    'position:fixed;inset:0;z-index:999;display:flex;align-items:center;justify-content:center;' +
+    'background:rgba(6,14,18,0.85);color:#5a8a8f;font-family:"Press Start 2P",monospace;font-size:10px;' +
+    'text-align:center;line-height:2;pointer-events:none;';
+  contextLostOverlay.textContent = 'Rendering paused\u2026\nSwitch back to restore';
+  document.body.appendChild(contextLostOverlay);
+}
+
+function hideContextLostOverlay(): void {
+  contextLostOverlay?.remove();
+  contextLostOverlay = null;
+}
 
 async function init() {
   // Load render settings before anything renders
@@ -34,6 +53,29 @@ async function init() {
   });
 
   gameContainer.appendChild(app.canvas as HTMLCanvasElement);
+
+  // --- WebGL context loss / restore handling ---
+  const canvas = app.canvas as HTMLCanvasElement;
+  canvas.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault(); // Allow context to be restored
+    console.warn('[webgl] context lost — pausing rendering');
+    app.ticker.stop();
+    showContextLostOverlay();
+  });
+  canvas.addEventListener('webglcontextrestored', () => {
+    console.log('[webgl] context restored — rebuilding GPU resources');
+    // Invalidate all cached GPU resources (compiled shaders)
+    destroyRareFilterCache();
+
+    // Rebuild creature visuals (textures + filters are now stale)
+    if (currentPoolView) {
+      const state = getState();
+      syncPoolVisuals(currentPoolView, state);
+    }
+
+    hideContextLostOverlay();
+    app.ticker.start();
+  });
 
   initGameLoop(app.ticker);
   initRenderer(app);
