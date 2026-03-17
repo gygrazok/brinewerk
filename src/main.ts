@@ -123,6 +123,7 @@ async function init() {
     if (hudTimer >= 1) {
       hudTimer = 0;
       updateHud(state);
+      renderShore(state);
     }
   });
 
