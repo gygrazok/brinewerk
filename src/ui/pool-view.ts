@@ -62,6 +62,7 @@ export interface PoolView {
   _dragState: DragState | null;
   _slotLayer: Container;
   _creatureLayer: Container;
+  _collectibleLayer: Container;
   _seabedBg: SeabedBackground | null;
   _slotGlowLayer: Container;
   _slotGlowGraphics: Map<string, Graphics>;
@@ -69,6 +70,9 @@ export interface PoolView {
   _worldW: number;
   _worldH: number;
   _zoomMin: number;
+  /** Mouse position in world space (NaN when outside canvas) */
+  mouseWorldX: number;
+  mouseWorldY: number;
   /** Cleanup function — removes all event listeners and destroys resources */
   _cleanup: (() => void) | null;
 }
@@ -121,8 +125,10 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
   gridContainer.addChild(slotGlowLayer);
 
   const slotLayer = new Container();
+  const collectibleLayer = new Container();
   const creatureLayer = new Container();
   gridContainer.addChild(slotLayer);
+  gridContainer.addChild(collectibleLayer);
   gridContainer.addChild(creatureLayer);
   viewport.addChild(gridContainer);
   app.stage.addChild(viewport);
@@ -142,6 +148,7 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
     _dragState: null,
     _slotLayer: slotLayer,
     _creatureLayer: creatureLayer,
+    _collectibleLayer: collectibleLayer,
     _seabedBg: seabedBg,
     _slotGlowLayer: slotGlowLayer,
     _slotGlowGraphics: new Map(),
@@ -149,6 +156,8 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
     _worldW: pool.worldWidth,
     _worldH: pool.worldHeight,
     _zoomMin: 0.5,
+    mouseWorldX: NaN,
+    mouseWorldY: NaN,
     _cleanup: null,
   };
 
@@ -273,6 +282,14 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
   });
 
   const onPointerMove = (e: PointerEvent) => {
+    // Track mouse world position for collectible system
+    const mRect = canvas.getBoundingClientRect();
+    const msx = e.clientX - mRect.left;
+    const msy = e.clientY - mRect.top;
+    const [mwx, mwy] = screenToWorld(poolView, msx, msy);
+    poolView.mouseWorldX = mwx;
+    poolView.mouseWorldY = mwy;
+
     const ds = poolView._dragState;
 
     if (ds) {
@@ -349,8 +366,14 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
     isPanning = false;
   };
 
+  const onPointerLeave = () => {
+    poolView.mouseWorldX = NaN;
+    poolView.mouseWorldY = NaN;
+  };
+
   window.addEventListener('pointermove', onPointerMove);
   window.addEventListener('pointerup', onPointerUp);
+  canvas.addEventListener('pointerleave', onPointerLeave);
 
   centerViewport(poolView, app);
   const onResize = () => centerViewport(poolView, app);
@@ -364,6 +387,7 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
     canvas.removeEventListener('touchstart', onTouchStart);
     canvas.removeEventListener('touchmove', onTouchMove);
     canvas.removeEventListener('touchend', onTouchEnd);
+    canvas.removeEventListener('pointerleave', onPointerLeave);
     app.renderer.off('resize', updateMinZoom);
     app.renderer.off('resize', onResize);
   };

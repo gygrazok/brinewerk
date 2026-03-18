@@ -13,11 +13,20 @@ import { initDebugMenu } from './ui/debug-menu';
 import { injectTheme } from './ui/theme';
 import { loadRenderSettings } from './rendering/render-settings';
 import { destroyRareFilterCache } from './rendering/shader-loader';
+import { createCollectibleManager, updateCollectibles, clearCollectibles, type CollectibleManager } from './systems/collectibles';
+import {
+  createCollectibleLayer, syncCollectibleVisuals, destroyCollectibleLayer, type CollectibleLayer,
+  createPopupLayer, spawnPickupPopups, updatePopups, destroyPopupLayer, type PopupLayer,
+} from './rendering/collectible-renderer';
+import { COLLECTIBLE_COLLECT_RADIUS } from './core/balance';
 
 const app = new Application();
 let currentPoolView: import('./ui/pool-view').PoolView | null = null;
 let contextLostOverlay: HTMLDivElement | null = null;
 let cleanupContextHandlers: (() => void) | null = null;
+let collectibleMgr: CollectibleManager | null = null;
+let collectibleLayer: CollectibleLayer | null = null;
+let popupLayer: PopupLayer | null = null;
 
 /** Show a non-interactive overlay while WebGL context is lost */
 function showContextLostOverlay(): void {
@@ -80,6 +89,15 @@ async function init() {
       syncPoolVisuals(currentPoolView, state);
     }
 
+    // Clear collectible sprites (textures are invalid after context loss)
+    if (collectibleLayer && collectibleMgr) {
+      for (const s of collectibleLayer.sprites.values()) s.destroy();
+      for (const t of collectibleLayer.textures.values()) t.destroy(true);
+      collectibleLayer.sprites.clear();
+      collectibleLayer.textures.clear();
+      clearCollectibles(collectibleMgr);
+    }
+
     hideContextLostOverlay();
     app.ticker.start();
   };
@@ -100,6 +118,13 @@ async function init() {
 
   const poolView = createPoolView(app, state);
   currentPoolView = poolView;
+
+  // Initialize floating collectibles
+  collectibleMgr = createCollectibleManager(state.seabedSeed + 999);
+  collectibleLayer = createCollectibleLayer();
+  popupLayer = createPopupLayer();
+  poolView._collectibleLayer.addChild(collectibleLayer.container);
+  poolView._collectibleLayer.addChild(popupLayer.container);
 
   // Handle slot clicks
   let heldCreature: import('./creatures/creature').Creature | null = null;
@@ -189,6 +214,32 @@ async function init() {
     const deltaSec = tick.deltaTime / 60;
     updatePoolVisuals(poolView, deltaSec, clock.elapsed);
 
+    // Update floating collectibles
+    if (collectibleMgr && collectibleLayer) {
+      const collected = updateCollectibles(
+        collectibleMgr,
+        deltaSec,
+        state.pool.worldWidth,
+        state.pool.worldHeight,
+        poolView.mouseWorldX,
+        poolView.mouseWorldY,
+        COLLECTIBLE_COLLECT_RADIUS / poolView.zoom,
+      );
+      syncCollectibleVisuals(collectibleLayer, collectibleMgr, state.pool.worldWidth);
+
+      // Apply collected resources
+      if (collected.plankton > 0) state.resources.plankton += collected.plankton;
+      if (collected.minerite > 0) state.resources.minerite += collected.minerite;
+      if (collected.lux > 0) state.resources.lux += collected.lux;
+      if (collected.nacre > 0) state.resources.nacre += collected.nacre;
+
+      // Spawn floating "+N 🟢" popups and animate existing ones
+      if (popupLayer) {
+        if (collected.events.length > 0) spawnPickupPopups(popupLayer, collected.events);
+        updatePopups(popupLayer, deltaSec);
+      }
+    }
+
     hudTimer += deltaSec;
     if (hudTimer >= 1) {
       hudTimer = 0;
@@ -218,6 +269,18 @@ function cleanup(): void {
   cleanupContextHandlers?.();
   cleanupContextHandlers = null;
   hideContextLostOverlay();
+  if (popupLayer) {
+    destroyPopupLayer(popupLayer);
+    popupLayer = null;
+  }
+  if (collectibleLayer) {
+    destroyCollectibleLayer(collectibleLayer);
+    collectibleLayer = null;
+  }
+  if (collectibleMgr) {
+    clearCollectibles(collectibleMgr);
+    collectibleMgr = null;
+  }
   if (currentPoolView) {
     destroyPoolView(currentPoolView);
     currentPoolView = null;

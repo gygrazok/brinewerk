@@ -26,6 +26,23 @@ export const NACRE_RARE_UNCOMMON_MUL = 2.0; // rare chance 4-5%
 export const NACRE_RARE_RARE_MUL = 3.0; // rare chance < 4%
 
 
+/** Floating collectibles */
+export const COLLECTIBLE_SPAWN_INTERVAL = 3.0;       // seconds between spawns
+export const COLLECTIBLE_SPAWN_JITTER = 1.5;          // random ± jitter on interval
+export const COLLECTIBLE_DRIFT_SPEED = 30;             // px/sec base horizontal
+export const COLLECTIBLE_DRIFT_SPEED_JITTER = 15;      // random ± speed variation
+export const COLLECTIBLE_WOBBLE_AMP = 8;               // vertical sine amplitude (px)
+export const COLLECTIBLE_WOBBLE_FREQ = 0.5;            // vertical wobble Hz
+export const COLLECTIBLE_MAX_AGE = 30;                 // seconds before despawn
+export const COLLECTIBLE_COLLECT_RADIUS = 60;          // base mouse proximity (px)
+export const COLLECTIBLE_MAGNET_SPEED = 200;           // base magnetism speed (px/sec), accelerates over time
+export const COLLECTIBLE_PLANKTON_BASE = 5;            // base plankton per clump
+export const COLLECTIBLE_PLANKTON_JITTER = 3;          // random ± amount
+export const COLLECTIBLE_MAX_ACTIVE = 15;              // max simultaneous clumps
+export const COLLECTIBLE_SPRITE_SIZE = 10;             // pixel grid resolution
+export const COLLECTIBLE_DISPLAY_SIZE = 48;            // on-screen world px
+export const COLLECTIBLE_FADE_IN_DIST = 50;            // px from spawn edge to full alpha
+
 /**
  * Slot unlock cost by tier (position-based).
  * Cost is in Nacre only, growing exponentially: 2^(tier-1).
