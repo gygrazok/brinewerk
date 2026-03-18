@@ -19,6 +19,7 @@ let previewApp: Application | null = null;
 let previewVisual: CreatureVisual | null = null;
 let currentCreature: Creature | null = null;
 let panelOpen = false;
+let cleanupPreviewListeners: (() => void) | null = null;
 
 /** Size of the preview PixiJS canvas in actual pixels */
 const PREVIEW_SIZE = 200;
@@ -245,19 +246,22 @@ async function createPreviewApp(container: HTMLElement): Promise<Application> {
   container.appendChild(canvas);
 
   // Pause preview rendering on context loss; restore rebuilds the main app
-  canvas.addEventListener('webglcontextlost', (e) => {
-    e.preventDefault();
-    app.ticker.stop();
-  });
-  canvas.addEventListener('webglcontextrestored', () => {
-    app.ticker.start();
-  });
+  const onLost = (e: Event) => { e.preventDefault(); app.ticker.stop(); };
+  const onRestored = () => { app.ticker.start(); };
+  canvas.addEventListener('webglcontextlost', onLost);
+  canvas.addEventListener('webglcontextrestored', onRestored);
+  cleanupPreviewListeners = () => {
+    canvas.removeEventListener('webglcontextlost', onLost);
+    canvas.removeEventListener('webglcontextrestored', onRestored);
+  };
 
   previewApp = app;
   return app;
 }
 
 function cleanupPreview(): void {
+  cleanupPreviewListeners?.();
+  cleanupPreviewListeners = null;
   if (previewVisual) {
     destroyCreatureVisual(previewVisual);
     previewVisual = null;

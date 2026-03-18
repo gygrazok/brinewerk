@@ -2,6 +2,7 @@ import { Application } from 'pixi.js';
 import { initGameLoop, getState, getClock, onTide, onReleaseUnlock } from './core/game-loop';
 import { initRenderer } from './rendering/renderer';
 import { createPoolView, destroyPoolView, syncPoolVisuals, updatePoolVisuals } from './ui/pool-view';
+import { destroyCreatureVisual } from './rendering/creature-renderer';
 import { showCreaturePanel, hideCreaturePanel, type CreaturePanelOptions } from './ui/creature-panel';
 import { getCreatureAt, placeCreature, removeCreature, findEmptySlot, expandPool } from './systems/pool';
 import { releaseCreature } from './systems/release';
@@ -16,6 +17,7 @@ import { destroyRareFilterCache } from './rendering/shader-loader';
 const app = new Application();
 let currentPoolView: import('./ui/pool-view').PoolView | null = null;
 let contextLostOverlay: HTMLDivElement | null = null;
+let cleanupContextHandlers: (() => void) | null = null;
 
 /** Show a non-interactive overlay while WebGL context is lost */
 function showContextLostOverlay(): void {
@@ -25,7 +27,7 @@ function showContextLostOverlay(): void {
   contextLostOverlay.style.cssText =
     'position:fixed;inset:0;z-index:999;display:flex;align-items:center;justify-content:center;' +
     'background:rgba(6,14,18,0.85);color:#5a8a8f;font-family:"Press Start 2P",monospace;font-size:10px;' +
-    'text-align:center;line-height:2;pointer-events:none;';
+    'text-align:center;line-height:2;white-space:pre-line;pointer-events:none;';
   contextLostOverlay.textContent = 'Rendering paused\u2026\nSwitch back to restore';
   document.body.appendChild(contextLostOverlay);
 }
@@ -56,26 +58,37 @@ async function init() {
 
   // --- WebGL context loss / restore handling ---
   const canvas = app.canvas as HTMLCanvasElement;
-  canvas.addEventListener('webglcontextlost', (e) => {
+  const onContextLost = (e: Event) => {
     e.preventDefault(); // Allow context to be restored
     console.warn('[webgl] context lost — pausing rendering');
     app.ticker.stop();
     showContextLostOverlay();
-  });
-  canvas.addEventListener('webglcontextrestored', () => {
+  };
+  const onContextRestored = () => {
     console.log('[webgl] context restored — rebuilding GPU resources');
     // Invalidate all cached GPU resources (compiled shaders)
     destroyRareFilterCache();
 
-    // Rebuild creature visuals (textures + filters are now stale)
+    // Force full rebuild: destroy stale visuals so syncPoolVisuals recreates them
     if (currentPoolView) {
+      for (const visual of currentPoolView.visuals.values()) {
+        destroyCreatureVisual(visual);
+      }
+      currentPoolView.visuals.clear();
+
       const state = getState();
       syncPoolVisuals(currentPoolView, state);
     }
 
     hideContextLostOverlay();
     app.ticker.start();
-  });
+  };
+  canvas.addEventListener('webglcontextlost', onContextLost);
+  canvas.addEventListener('webglcontextrestored', onContextRestored);
+  cleanupContextHandlers = () => {
+    canvas.removeEventListener('webglcontextlost', onContextLost);
+    canvas.removeEventListener('webglcontextrestored', onContextRestored);
+  };
 
   initGameLoop(app.ticker);
   initRenderer(app);
@@ -202,6 +215,9 @@ async function init() {
 
 /** Tear down all game resources (for HMR or full app destroy) */
 function cleanup(): void {
+  cleanupContextHandlers?.();
+  cleanupContextHandlers = null;
+  hideContextLostOverlay();
   if (currentPoolView) {
     destroyPoolView(currentPoolView);
     currentPoolView = null;
