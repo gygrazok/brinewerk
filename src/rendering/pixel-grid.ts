@@ -77,14 +77,39 @@ export function addEyes(
   }
 }
 
-/** Render pixel grid onto a canvas context */
+/** Parse "#rrggbb" hex color into [r, g, b] bytes */
+function hexToRgb(hex: string): [number, number, number] {
+  const v = parseInt(hex.slice(1), 16);
+  return [(v >> 16) & 0xff, (v >> 8) & 0xff, v & 0xff];
+}
+
+/** Render pixel grid onto a canvas context using bulk ImageData writes */
 export function renderGridToCanvas(grid: PixelGrid, ctx: CanvasRenderingContext2D): void {
-  ctx.clearRect(0, 0, CANVAS_PX, CANVAS_PX);
+  const imageData = ctx.createImageData(CANVAS_PX, CANVAS_PX);
+  const data = imageData.data; // Uint8ClampedArray [r,g,b,a, r,g,b,a, ...]
+
   for (const key in grid) {
-    const [x, y] = key.split(',').map(Number);
-    ctx.fillStyle = grid[key];
-    ctx.fillRect(x * BLOCK_PX, y * BLOCK_PX, BLOCK_PX, BLOCK_PX);
+    const comma = key.indexOf(',');
+    const gx = +key.slice(0, comma);
+    const gy = +key.slice(comma + 1);
+    const [r, g, b] = hexToRgb(grid[key]);
+
+    // Fill the BLOCK_PX × BLOCK_PX block for this grid cell
+    const startRow = gy * BLOCK_PX;
+    const startCol = gx * BLOCK_PX;
+    for (let py = 0; py < BLOCK_PX; py++) {
+      const rowOffset = (startRow + py) * CANVAS_PX + startCol;
+      for (let px = 0; px < BLOCK_PX; px++) {
+        const i = (rowOffset + px) * 4;
+        data[i] = r;
+        data[i + 1] = g;
+        data[i + 2] = b;
+        data[i + 3] = 255;
+      }
+    }
   }
+
+  ctx.putImageData(imageData, 0, 0);
 }
 
 /** Re-export for creature type renderers that need seeded noise per pixel */

@@ -115,9 +115,10 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
   const viewport = new Container();
   const gridContainer = new Container();
 
-  // Create seabed background as the bottom-most layer
+  // Create seabed background as the bottom-most layer (own render group — mostly static)
   const pool = _state.pool;
   const seabedBg = createSeabedBackground(pool.worldWidth, pool.worldHeight, _state.seabedSeed);
+  seabedBg.container.isRenderGroup = true;
   gridContainer.addChild(seabedBg.container);
 
   // Slot glow layer (behind slots)
@@ -126,7 +127,9 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
 
   const slotLayer = new Container();
   const collectibleLayer = new Container();
+  // Creature layer gets its own render group — many per-frame transforms
   const creatureLayer = new Container();
+  creatureLayer.isRenderGroup = true;
   gridContainer.addChild(slotLayer);
   gridContainer.addChild(collectibleLayer);
   gridContainer.addChild(creatureLayer);
@@ -617,6 +620,15 @@ function drawSlotGlow(gfx: Graphics, slot: SeabedSlot): void {
   gfx.fill({ color: themeColor, alpha: 0.06 });
 }
 
+/** Check if a world-space point is within the visible viewport (with margin) */
+function isInViewport(pv: PoolView, worldX: number, worldY: number, margin: number): boolean {
+  const screenX = worldX * pv.zoom + pv.viewport.x;
+  const screenY = worldY * pv.zoom + pv.viewport.y;
+  const sw = pv._app.screen.width;
+  const sh = pv._app.screen.height;
+  return screenX > -margin && screenX < sw + margin && screenY > -margin && screenY < sh + margin;
+}
+
 /** Update all creature animations + seabed background */
 export function updatePoolVisuals(poolView: PoolView, deltaSec: number, totalTime: number): void {
   // Update seabed background (particles, light rays)
@@ -635,9 +647,14 @@ export function updatePoolVisuals(poolView: PoolView, deltaSec: number, totalTim
     }
   }
 
-  // Update creature animations
+  // Update creature animations (skip off-screen creatures)
+  const cullMargin = CREATURE_DISPLAY * poolView.zoom + 20;
   for (const visual of poolView.visuals.values()) {
-    updateCreatureVisual(visual, deltaSec, totalTime);
+    const wx = visual.sprite.x;
+    const wy = visual.sprite.y;
+    if (isInViewport(poolView, wx, wy, cullMargin)) {
+      updateCreatureVisual(visual, deltaSec, totalTime);
+    }
   }
 }
 

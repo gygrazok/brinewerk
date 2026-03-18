@@ -61,6 +61,10 @@ async function init() {
     resolution: window.devicePixelRatio || 1,
     autoDensity: true,
     preference: 'webgl',
+    // Automatic texture garbage collection — frees GPU memory for unused textures
+    textureGCActive: true,
+    textureGCMaxIdle: 3600,        // ~60s at 60fps before cleanup
+    textureGCCheckCountMax: 600,   // check every ~10s
   });
 
   gameContainer.appendChild(app.canvas as HTMLCanvasElement);
