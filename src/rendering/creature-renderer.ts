@@ -151,8 +151,13 @@ export function updateCreatureVisual(visual: CreatureVisual, _deltaSec: number, 
 
   renderGridToCanvas(grid, visual.ctx);
 
-  // Tell PixiJS the texture source has changed
-  visual.texture.source.update();
+  // Tell PixiJS the texture source has changed (no-op if context lost)
+  try {
+    visual.texture.source.update();
+  } catch {
+    // WebGL context lost — skip this frame
+    return;
+  }
 
   // Update uTime on privately-owned filter (preview panels)
   if (visual._ownedFilter) {
