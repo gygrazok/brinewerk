@@ -1,5 +1,10 @@
 /** Phase 1 balance constants */
 
+/** Rare effect system */
+export const DEFAULT_RARE_CHANCE = 0.01; // 1% base chance of any rare
+/** Rare effect IDs unlocked at game start (tier 1) */
+export const DEFAULT_UNLOCKED_RARE_IDS: readonly string[] = ['metallic', 'shiny'];
+
 /** Tide timing (seconds) */
 export const TIDE_INTERVAL_MIN = 180; // 3 min
 export const TIDE_INTERVAL_MAX = 300; // 5 min
@@ -11,10 +16,11 @@ export const PROD_ARMS_BASE = 0.8;
 export const PROD_ARMS_SCALE = 0.4;
 
 /** Shore pickup costs */
-export const PICKUP_BASE_COST = 30;
-export const PICKUP_SIZE_SCALE = 20;
-export const PICKUP_ARMS_SCALE = 10;
-export const PICKUP_RARE_MULTIPLIER = 2.5;
+export const PICKUP_BASE_COST = 20;
+/** Extra cost per unit of trait deviation (0 = average creature, full deviation adds this much) */
+export const PICKUP_DEVIATION_SCALE = 40;
+/** Pickup cost multiplier by rare tier */
+export const PICKUP_RARE_TIER_MULTIPLIERS: Record<number, number> = { 1: 2, 2: 3, 3: 5 };
 
 /** Initial game state */
 export const INITIAL_PLANKTON = 50;

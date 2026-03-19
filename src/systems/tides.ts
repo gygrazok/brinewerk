@@ -1,24 +1,24 @@
 import type { GameState } from '../core/game-state';
-import { type Creature, createCreature } from '../creatures/creature';
+import { type Creature, spawnCreature, calculateTraitDeviation, getRareInfo } from '../creatures/creature';
 import { CreatureType } from '../creatures/types';
 import {
   TIDE_INTERVAL_MIN, TIDE_INTERVAL_MAX,
-  PICKUP_BASE_COST, PICKUP_SIZE_SCALE, PICKUP_ARMS_SCALE, PICKUP_RARE_MULTIPLIER,
+  PICKUP_BASE_COST, PICKUP_DEVIATION_SCALE, PICKUP_RARE_TIER_MULTIPLIERS,
 } from '../core/balance';
 import { allSlots } from './coords';
 
-const SHORE_CAPACITY = 3;
+const SHORE_CAPACITY = 4;
 
 /** Creature types available from tides */
 const TIDE_TYPES = [CreatureType.Stellarid, CreatureType.Blobid, CreatureType.Corallid, CreatureType.Nucleid];
 
-/** Generate 1-3 random tide creatures */
-function generateTideCreatures(): Creature[] {
+/** Generate 1-3 random tide creatures using state's rare settings */
+function generateTideCreatures(state: GameState): Creature[] {
   const count = 1 + Math.floor(Math.random() * 3);
   const creatures: Creature[] = [];
   for (let i = 0; i < Math.min(count, SHORE_CAPACITY); i++) {
     const type = TIDE_TYPES[Math.floor(Math.random() * TIDE_TYPES.length)];
-    creatures.push(createCreature(type));
+    creatures.push(spawnCreature(state, { type }));
   }
   return creatures;
 }
@@ -30,23 +30,24 @@ export function checkTide(state: GameState, now: number): boolean {
 
   if (elapsed < interval) return false;
 
-  state.shore = generateTideCreatures();
+  state.shore = generateTideCreatures(state);
   state.lastTideTimestamp = now;
   return true;
 }
 
-/** Calculate plankton cost to pick up a creature from shore */
+/** Calculate plankton cost to pick up a creature from shore.
+ *  Cost scales with how much the creature's traits deviate from average (rarer = pricier). */
 export function calculatePickupCost(creature: Creature): number {
-  let baseCost = PICKUP_BASE_COST;
+  const deviation = calculateTraitDeviation(creature); // 0 = average, 1 = max extreme
+  let cost = PICKUP_BASE_COST + deviation * PICKUP_DEVIATION_SCALE;
 
-  // Scale with creature quality
-  baseCost += creature.genes.size * PICKUP_SIZE_SCALE;
-  baseCost += creature.genes.arms * PICKUP_ARMS_SCALE;
+  // Rare creatures cost more based on tier
+  if (creature.rare) {
+    const info = getRareInfo(creature.rare);
+    cost *= PICKUP_RARE_TIER_MULTIPLIERS[info.tier] ?? 1;
+  }
 
-  // Rare creatures cost more
-  if (creature.rare) baseCost *= PICKUP_RARE_MULTIPLIER;
-
-  return Math.round(baseCost);
+  return Math.round(cost);
 }
 
 /** Pick up a creature from the shore (removes it from shore, doesn't place in pool) */
@@ -65,7 +66,7 @@ export function pickUpCreature(state: GameState, shoreIndex: number): Creature |
 
 /** Force a tide immediately (debug / manual trigger) */
 export function forceTide(state: GameState): void {
-  state.shore = generateTideCreatures();
+  state.shore = generateTideCreatures(state);
   state.lastTideTimestamp = Date.now();
 }
 
@@ -75,13 +76,9 @@ export function forceInitialTide(state: GameState): void {
 
   if (hasPoolCreatures) return; // already playing
 
-  // No creatures in pool — ensure shore has creatures and player can afford one
+  // No creatures in pool — spawn one of each type so the player sees all phyla
   if (state.shore.length === 0) {
-    state.shore = [
-      createCreature(CreatureType.Stellarid),
-      createCreature(CreatureType.Blobid),
-      createCreature(TIDE_TYPES[Math.floor(Math.random() * TIDE_TYPES.length)]),
-    ];
+    state.shore = TIDE_TYPES.map((type) => spawnCreature(state, { type }));
     state.lastTideTimestamp = Date.now();
   }
 

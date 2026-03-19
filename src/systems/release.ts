@@ -12,9 +12,9 @@ export function calculateNacreYield(creature: Creature): number {
   let rareMul = 1;
   if (creature.rare) {
     const info = getRareInfo(creature.rare);
-    if (info.chance >= 0.05) rareMul = NACRE_RARE_COMMON_MUL;
-    else if (info.chance >= 0.04) rareMul = NACRE_RARE_UNCOMMON_MUL;
-    else rareMul = NACRE_RARE_RARE_MUL;
+    if (info.tier === 1) rareMul = NACRE_RARE_COMMON_MUL;
+    else if (info.tier === 2) rareMul = NACRE_RARE_UNCOMMON_MUL;
+    else rareMul = NACRE_RARE_RARE_MUL; // tier 3
   }
 
   return Math.floor(baseNacre * rareMul);

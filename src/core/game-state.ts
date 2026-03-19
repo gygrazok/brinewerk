@@ -1,8 +1,9 @@
 import type { Creature } from '../creatures/creature';
 import { SEABED_SLOTS } from '../systems/seabed-layout';
+import { DEFAULT_RARE_CHANCE, DEFAULT_UNLOCKED_RARE_IDS } from './balance';
 
 const SAVE_KEY = 'brinewerk_save';
-const CURRENT_SAVE_VERSION = 5;
+const CURRENT_SAVE_VERSION = 6;
 
 // --- Seabed pool (v3+) ---
 
@@ -38,6 +39,10 @@ export interface GameState {
   totalPlaytime: number; // seconds
   /** True once all tier-0 slots have been filled (unlocks creature release) */
   releaseUnlocked: boolean;
+  /** Current chance of spawning any rare creature (upgradeable, default 1%) */
+  rareChance: number;
+  /** Set of rare effect IDs currently in the spawn pool */
+  unlockedRares: string[];
 }
 
 export function createDefaultState(): GameState {
@@ -57,6 +62,8 @@ export function createDefaultState(): GameState {
     lastTideTimestamp: Date.now(),
     totalPlaytime: 0,
     releaseUnlocked: false,
+    rareChance: DEFAULT_RARE_CHANCE,
+    unlockedRares: [...DEFAULT_UNLOCKED_RARE_IDS],
   };
 }
 
@@ -180,6 +187,14 @@ function migrateState(data: Record<string, unknown>): GameState {
       (data as Record<string, unknown>).releaseUnlocked = false;
     }
 
+    data.saveVersion = 5;
+  }
+
+  // V5 → V6: add rareChance and unlockedRares for tiered rare system
+  if ((data.saveVersion as number) < 6) {
+    const d = data as Record<string, unknown>;
+    if (d.rareChance === undefined) d.rareChance = DEFAULT_RARE_CHANCE;
+    if (d.unlockedRares === undefined) d.unlockedRares = [...DEFAULT_UNLOCKED_RARE_IDS];
     data.saveVersion = CURRENT_SAVE_VERSION;
   }
 
