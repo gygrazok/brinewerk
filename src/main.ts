@@ -16,7 +16,7 @@ import { initDebugMenu } from './ui/debug-menu';
 import { injectTheme } from './ui/theme';
 import { loadRenderSettings } from './rendering/render-settings';
 import { destroyRareFilterCache } from './rendering/shader-loader';
-import { createCollectibleManager, updateCollectibles, clearCollectibles, clickCollect, type CollectibleManager } from './systems/collectibles';
+import { createCollectibleManager, updateCollectibles, clearCollectibles, clickCollect, forceSpawnCoral, type CollectibleManager } from './systems/collectibles';
 import {
   createCollectibleLayer, syncCollectibleVisuals, destroyCollectibleLayer, type CollectibleLayer,
   createPopupLayer, spawnPickupPopups, updatePopups, destroyPopupLayer, type PopupLayer,
@@ -248,6 +248,7 @@ async function init() {
         poolView.mouseWorldX,
         poolView.mouseWorldY,
         COLLECTIBLE_COLLECT_RADIUS / poolView.zoom,
+        state.pool,
       );
       syncCollectibleVisuals(collectibleLayer, collectibleMgr, state.pool.worldWidth);
 
@@ -276,15 +277,17 @@ async function init() {
 
   // Debug menu (dev only)
   if (import.meta.env.DEV) {
-    initDebugMenu(
-      state,
-      () => {
+    initDebugMenu(state, {
+      onStateChange: () => {
         syncPoolVisuals(poolView, state);
         renderShoreButton(state);
         updateHud(state);
       },
-      () => window.location.reload(),
-    );
+      onReset: () => window.location.reload(),
+      onSpawnCoral: () => {
+        if (collectibleMgr) forceSpawnCoral(collectibleMgr, state.pool.worldWidth, state.pool.worldHeight, state.pool);
+      },
+    });
   }
 
   console.log('Brinewerk initialized');

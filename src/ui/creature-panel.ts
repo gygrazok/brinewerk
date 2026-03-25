@@ -1,25 +1,15 @@
-import { Application } from 'pixi.js';
 import type { Creature } from '../creatures/creature';
 import { getRareInfo } from '../creatures/creature';
 import { CREATURE_NAMES, CREATURE_ICONS } from '../creatures/types';
 import { calculateProduction } from '../creatures/production';
 import { getDisplayTraits, TRAIT_COLORS } from '../genetics/traits';
-import {
-  createCreatureVisual,
-  updateCreatureVisual,
-  destroyCreatureVisual,
-  type CreatureVisual,
-} from '../rendering/creature-renderer';
+import { createCreaturePreviewApp, type CreaturePreviewApp } from '../rendering/creature-preview';
 import { calculateNacreYield } from '../systems/release';
-
 
 let overlayEl: HTMLDivElement | null = null;
 let panelEl: HTMLDivElement | null = null;
-let previewApp: Application | null = null;
-let previewVisual: CreatureVisual | null = null;
-let currentCreature: Creature | null = null;
+let previewHandle: CreaturePreviewApp | null = null;
 let panelOpen = false;
-let cleanupPreviewListeners: (() => void) | null = null;
 
 /** Size of the preview PixiJS canvas in actual pixels */
 const PREVIEW_SIZE = 200;
@@ -41,10 +31,10 @@ function injectStyles(): void {
 
     #creature-detail {
       position: fixed; z-index: 101;
-      background: #0a1a20;
-      border: 1px solid #1a3a3f;
-      font-family: 'Press Start 2P', monospace;
-      color: #b8d4d8;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      font-family: var(--font-body);
+      color: var(--text);
       display: flex; flex-direction: column;
       overflow-y: auto;
       transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -54,14 +44,12 @@ function injectStyles(): void {
     @media (min-width: 641px) {
       #creature-detail {
         top: 0; right: 0; bottom: 0;
-        width: 320px;
+        width: 340px;
         border-radius: 8px 0 0 8px;
         border-right: none;
         transform: translateX(100%);
       }
-      #creature-detail.open {
-        transform: translateX(0);
-      }
+      #creature-detail.open { transform: translateX(0); }
     }
 
     /* Mobile: bottom sheet */
@@ -73,24 +61,18 @@ function injectStyles(): void {
         border-bottom: none;
         transform: translateY(100%);
       }
-      #creature-detail.open {
-        transform: translateY(0);
-      }
+      #creature-detail.open { transform: translateY(0); }
     }
 
     #creature-detail .panel-header {
       display: flex; align-items: center; justify-content: space-between;
       padding: 14px 16px 10px;
-      border-bottom: 1px solid #1a3a3f;
+      border-bottom: 1px solid var(--border);
       flex-shrink: 0;
     }
     #creature-detail .panel-close {
-      background: none; border: none; color: #5a8a8f;
-      font-family: 'Press Start 2P', monospace; font-size: 12px;
-      cursor: pointer; padding: 4px 8px;
-      transition: color 0.15s;
+      font-family: var(--font-body);
     }
-    #creature-detail .panel-close:hover { color: #7eeee4; }
 
     #creature-detail .panel-body {
       padding: 16px;
@@ -100,51 +82,46 @@ function injectStyles(): void {
 
     #creature-detail .preview-wrap {
       display: flex; justify-content: center; align-items: center;
-      background: #060e12;
-      border: 1px solid #1a3a3f;
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
       border-radius: 6px;
       padding: 12px;
     }
-    #creature-detail .preview-wrap canvas {
-      image-rendering: pixelated;
-    }
+    #creature-detail .preview-wrap canvas { image-rendering: pixelated; }
     @media (min-width: 641px) {
-      #creature-detail .preview-wrap canvas {
-        width: 180px !important; height: 180px !important;
-      }
+      #creature-detail .preview-wrap canvas { width: 180px !important; height: 180px !important; }
     }
     @media (max-width: 640px) {
-      #creature-detail .preview-wrap canvas {
-        width: 140px !important; height: 140px !important;
-      }
+      #creature-detail .preview-wrap canvas { width: 140px !important; height: 140px !important; }
     }
 
     #creature-detail .type-badge {
       display: inline-block;
-      font-size: 7px; padding: 3px 8px;
-      background: #1a3a3f; border-radius: 3px;
-      color: #7eeee4;
+      font-family: var(--font-body);
+      font-size: 11px; padding: 3px 10px;
+      background: var(--border); border-radius: 3px;
+      color: var(--accent-hi);
     }
     #creature-detail .rare-badge {
       display: inline-block;
-      font-size: 7px; padding: 3px 8px;
+      font-family: var(--font-body);
+      font-size: 11px; padding: 3px 10px;
       border-radius: 3px;
     }
     #creature-detail .production {
-      font-size: 10px; color: #3aada8;
+      font-size: 13px; color: var(--accent);
     }
 
     #creature-detail .traits { display: flex; flex-direction: column; gap: 5px; }
-    #creature-detail .trait-row {
-      display: flex; align-items: center; gap: 6px;
-    }
+    #creature-detail .trait-row { display: flex; align-items: center; gap: 6px; }
     #creature-detail .trait-label {
-      width: 50px; text-align: right;
-      font-size: 7px; color: #5a8a8f; flex-shrink: 0;
+      width: 56px; text-align: right;
+      font-size: 10px; color: var(--text-dim); flex-shrink: 0;
+      text-transform: uppercase; letter-spacing: 0.5px;
     }
     #creature-detail .trait-bar-bg {
       flex: 1; height: 8px;
-      background: #0d2228; border-radius: 2px;
+      background: var(--bg-slot); border-radius: 2px;
       overflow: hidden;
     }
     #creature-detail .trait-bar-fill {
@@ -152,23 +129,8 @@ function injectStyles(): void {
       transition: width 0.3s ease;
     }
     #creature-detail .trait-val {
-      width: 30px; text-align: right;
-      font-size: 7px; color: #5a8a8f; flex-shrink: 0;
-    }
-
-    #creature-detail .release-btn {
-      background: #1a2a2f; border: 1px solid #3a5a5f;
-      color: #e8d0c0; font-family: 'Press Start 2P', monospace;
-      font-size: 9px; padding: 10px 16px;
-      cursor: pointer; border-radius: 4px;
-      transition: background 0.15s, border-color 0.15s;
-      text-align: center;
-    }
-    #creature-detail .release-btn:hover {
-      background: #2a3a3f; border-color: #e8d0c0;
-    }
-    #creature-detail .release-btn.disabled {
-      opacity: 0.4; pointer-events: none;
+      width: 32px; text-align: right;
+      font-size: 10px; color: var(--text-dim); flex-shrink: 0;
     }
 
     #release-confirm-overlay {
@@ -177,38 +139,35 @@ function injectStyles(): void {
       display: flex; align-items: center; justify-content: center;
     }
     #release-confirm-dialog {
-      background: #0a1a20; border: 1px solid #3a5a5f;
+      background: var(--bg-panel); border: 1px solid var(--danger-border);
       border-radius: 8px; padding: 24px;
-      font-family: 'Press Start 2P', monospace;
-      color: #b8d4d8; max-width: 300px;
+      font-family: var(--font-body);
+      color: var(--text); max-width: 320px;
       text-align: center;
     }
     #release-confirm-dialog .confirm-title {
-      font-size: 10px; color: #e8d0c0; margin-bottom: 12px;
+      font-family: var(--font-display);
+      font-size: 10px; color: var(--danger-text); margin-bottom: 12px;
     }
     #release-confirm-dialog .confirm-text {
-      font-size: 7px; line-height: 1.6; margin-bottom: 16px; color: #7a9a9f;
+      font-size: 12px; line-height: 1.5; margin-bottom: 16px; color: var(--text-dim);
     }
     #release-confirm-dialog .confirm-nacre {
-      font-size: 12px; color: #e8d0c0; margin-bottom: 16px;
+      font-size: 16px; color: var(--danger-text); margin-bottom: 16px;
     }
     #release-confirm-dialog .confirm-actions {
       display: flex; gap: 12px; justify-content: center;
     }
-    #release-confirm-dialog .confirm-actions button {
-      font-family: 'Press Start 2P', monospace;
-      font-size: 8px; padding: 8px 14px;
-      border-radius: 4px; cursor: pointer;
-      transition: background 0.15s;
+
+    @media (max-width: 640px) {
+      #creature-detail .type-badge { font-size: 10px; }
+      #creature-detail .rare-badge { font-size: 10px; }
+      #creature-detail .production { font-size: 11px; }
+      #creature-detail .trait-label { font-size: 9px; width: 46px; }
+      #creature-detail .trait-val { font-size: 9px; }
+      #release-confirm-dialog .confirm-text { font-size: 11px; }
+      #release-confirm-dialog .confirm-nacre { font-size: 14px; }
     }
-    .confirm-cancel {
-      background: #1a2a2f; border: 1px solid #3a5a5f; color: #7a9a9f;
-    }
-    .confirm-cancel:hover { background: #2a3a3f; }
-    .confirm-release {
-      background: #2a1a1f; border: 1px solid #e8d0c0; color: #e8d0c0;
-    }
-    .confirm-release:hover { background: #3a2a2f; }
   `;
   document.head.appendChild(style);
 }
@@ -230,46 +189,10 @@ function ensurePanel(): { overlay: HTMLDivElement; panel: HTMLDivElement } {
   return { overlay: overlayEl, panel: panelEl };
 }
 
-async function createPreviewApp(container: HTMLElement): Promise<Application> {
-  const app = new Application();
-  await app.init({
-    width: PREVIEW_SIZE,
-    height: PREVIEW_SIZE,
-    background: '#060e12',
-    antialias: false,
-    roundPixels: true,
-    resolution: window.devicePixelRatio || 1,
-    autoDensity: true,
-    preference: 'webgl',
-  });
-  const canvas = app.canvas as HTMLCanvasElement;
-  container.appendChild(canvas);
-
-  // Pause preview rendering on context loss; restore rebuilds the main app
-  const onLost = (e: Event) => { e.preventDefault(); app.ticker.stop(); };
-  const onRestored = () => { app.ticker.start(); };
-  canvas.addEventListener('webglcontextlost', onLost);
-  canvas.addEventListener('webglcontextrestored', onRestored);
-  cleanupPreviewListeners = () => {
-    canvas.removeEventListener('webglcontextlost', onLost);
-    canvas.removeEventListener('webglcontextrestored', onRestored);
-  };
-
-  previewApp = app;
-  return app;
-}
-
 function cleanupPreview(): void {
-  cleanupPreviewListeners?.();
-  cleanupPreviewListeners = null;
-  if (previewVisual) {
-    destroyCreatureVisual(previewVisual);
-    previewVisual = null;
-  }
-  if (previewApp) {
-    previewApp.stage.removeChildren();
-    previewApp.destroy(false);
-    previewApp = null;
+  if (previewHandle) {
+    previewHandle.destroy();
+    previewHandle = null;
   }
 }
 
@@ -283,7 +206,6 @@ export async function showCreaturePanel(creature: Creature, opts: CreaturePanelO
 
   // Clean previous preview
   cleanupPreview();
-  currentCreature = creature;
 
   const rareInfo = getRareInfo(creature.rare);
   const production = calculateProduction(creature);
@@ -292,8 +214,8 @@ export async function showCreaturePanel(creature: Creature, opts: CreaturePanelO
   // Build HTML
   let html = `
     <div class="panel-header">
-      <span style="color:#dadaff; font-size:11px;">${creature.name}</span>
-      <button class="panel-close" id="panel-close-btn">\u2715</button>
+      <span style="color:var(--name); font-family:var(--font-display); font-size:11px;">${creature.name}</span>
+      <button class="btn btn-ghost panel-close" id="panel-close-btn">\u2715</button>
     </div>
     <div class="panel-body">
       <div class="preview-wrap" id="preview-container"></div>
@@ -339,14 +261,14 @@ export async function showCreaturePanel(creature: Creature, opts: CreaturePanelO
     const nacreYield = calculateNacreYield(creature);
     if (nacreYield > 0) {
       html += `
-        <button class="release-btn" id="release-btn">
-          ⚬ Rilascia per ${nacreYield} Nacre
+        <button class="btn btn-danger" id="release-btn">
+          ⚬ Release for ${nacreYield} Nacre
         </button>
       `;
     } else {
       html += `
-        <button class="release-btn disabled">
-          ⚬ 0 Nacre accumulato
+        <button class="btn btn-danger disabled">
+          ⚬ 0 Nacre earned
         </button>
       `;
     }
@@ -372,46 +294,7 @@ export async function showCreaturePanel(creature: Creature, opts: CreaturePanelO
 
   // Setup PixiJS preview with creature visual (sprite + shader filters)
   const container = document.getElementById('preview-container')!;
-  const app = await createPreviewApp(container);
-
-  previewVisual = createCreatureVisual(creature, true /* own filters — not shared with game view */);
-  // Scale children to fill the preview area
-  previewVisual.mainSprite.width = PREVIEW_SIZE;
-  previewVisual.mainSprite.height = PREVIEW_SIZE;
-  if (previewVisual.glowSprite) {
-    previewVisual.glowSprite.width = PREVIEW_SIZE;
-    previewVisual.glowSprite.height = PREVIEW_SIZE;
-  }
-  // Special pivot setup for movement-based rare effects
-  const needsCenterPivot = creature.rare === 'rotating' || creature.rare === 'pulse' || creature.rare === 'tiny';
-  if (needsCenterPivot) {
-    const half = PREVIEW_SIZE / 2;
-    previewVisual.sprite.pivot.set(half, half);
-    previewVisual.sprite.x = half;
-    previewVisual.sprite.y = half;
-  } else if (creature.rare === 'upside-down') {
-    const half = PREVIEW_SIZE / 2;
-    previewVisual.sprite.pivot.set(half, 0);
-    previewVisual.sprite.scale.y = -1;
-    previewVisual.sprite.x = half;
-    previewVisual.sprite.y = PREVIEW_SIZE;
-  } else {
-    previewVisual.sprite.x = 0;
-    previewVisual.sprite.y = 0;
-  }
-  app.stage.addChild(previewVisual.sprite);
-
-  // Animate the preview creature via the preview app's ticker
-  const tickerFn = (tick: { deltaTime: number }) => {
-    if (!previewVisual || !currentCreature) {
-      app.ticker.remove(tickerFn);
-      return;
-    }
-    const deltaSec = tick.deltaTime / 60;
-    const elapsed = performance.now() / 1000;
-    updateCreatureVisual(previewVisual, deltaSec, elapsed);
-  };
-  app.ticker.add(tickerFn);
+  previewHandle = await createCreaturePreviewApp(creature, container, PREVIEW_SIZE);
 
   // Open with animation
   requestAnimationFrame(() => {
@@ -428,12 +311,12 @@ function showReleaseConfirm(creature: Creature, onRelease: (creature: Creature) 
   confirmOverlay.id = 'release-confirm-overlay';
   confirmOverlay.innerHTML = `
     <div id="release-confirm-dialog">
-      <div class="confirm-title">Rilasciare ${creature.name}?</div>
-      <div class="confirm-text">Tornerà nell'oceano per sempre.</div>
+      <div class="confirm-title">Release ${creature.name}?</div>
+      <div class="confirm-text">It will return to the ocean forever.</div>
       <div class="confirm-nacre">⚬ ${nacreYield} Nacre</div>
       <div class="confirm-actions">
-        <button class="confirm-cancel" id="confirm-cancel">Annulla</button>
-        <button class="confirm-release" id="confirm-release">Rilascia ⚬${nacreYield}</button>
+        <button class="btn btn-secondary" id="confirm-cancel">Cancel</button>
+        <button class="btn btn-danger" id="confirm-release">Release ⚬${nacreYield}</button>
       </div>
     </div>
   `;
@@ -458,7 +341,6 @@ export function hideCreaturePanel(): void {
   if (!panelOpen) return;
 
   cleanupPreview();
-  currentCreature = null;
 
   if (overlayEl) overlayEl.classList.remove('open');
   if (panelEl) panelEl.classList.remove('open');

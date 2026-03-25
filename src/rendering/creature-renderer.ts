@@ -19,38 +19,6 @@ const TYPE_RENDERERS: Record<CreatureType, TypeRenderer> = {
   [CreatureType.Nucleid]: renderNucleid,
 };
 
-/** A lightweight animated creature preview (plain canvas, no PixiJS). */
-export interface CanvasPreview {
-  canvas: HTMLCanvasElement;
-  /** Call each frame with elapsed seconds to animate. */
-  update: (time: number) => void;
-}
-
-/**
- * Create an animated creature preview on a plain HTML canvas (no PixiJS, no shaders).
- * Call `update(time)` every frame to animate the creature.
- */
-export function createCreaturePreview(creature: Creature): CanvasPreview {
-  const canvas = document.createElement('canvas');
-  canvas.width = CANVAS_PX;
-  canvas.height = CANVAS_PX;
-  const ctx = canvas.getContext('2d')!;
-  const renderer = TYPE_RENDERERS[creature.type];
-
-  // Render initial frame
-  const grid = renderer(creature.genes, 0, creature.seed);
-  renderGridToCanvas(grid, ctx);
-
-  return {
-    canvas,
-    update(time: number) {
-      ctx.clearRect(0, 0, CANVAS_PX, CANVAS_PX);
-      const g = renderer(creature.genes, time, creature.seed);
-      renderGridToCanvas(g, ctx);
-    },
-  };
-}
-
 export interface CreatureVisual {
   /** The root container (holds glowSprite behind + main sprite on top) */
   sprite: Container;

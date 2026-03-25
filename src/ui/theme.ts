@@ -20,9 +20,14 @@ export function injectTheme(): void {
       --accent-hi:  #7eeee4;
       --name:       #dadaff;
       --warn:       #8b3a5a;
+      --danger-bg:  #1a2a2f;
+      --danger-border: #3a5a5f;
+      --danger-text: #e8d0c0;
 
-      /* Font */
-      --font: 'Press Start 2P', monospace;
+      /* Fonts */
+      --font-display: 'Press Start 2P', monospace;
+      --font-body: 'Chakra Petch', monospace;
+      --font: var(--font-display); /* backwards compat */
 
       /* Zone heights */
       --top-bar-h: 44px;
@@ -41,7 +46,7 @@ export function injectTheme(): void {
       padding: 0 12px;
       background: var(--bg-panel);
       border-bottom: 1px solid var(--border);
-      font-family: var(--font);
+      font-family: var(--font-body);
       color: var(--text);
       z-index: 10;
       pointer-events: auto;
@@ -70,7 +75,7 @@ export function injectTheme(): void {
       padding: 0 12px;
       background: var(--bg-panel);
       border-top: 1px solid var(--border);
-      font-family: var(--font);
+      font-family: var(--font-body);
       color: var(--text);
       z-index: 10;
       pointer-events: auto;
@@ -82,7 +87,7 @@ export function injectTheme(): void {
     .resource-list {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 14px;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
       scrollbar-width: none;
@@ -97,29 +102,15 @@ export function injectTheme(): void {
       flex-shrink: 0;
     }
     .resource-item .res-value {
-      font-size: 10px;
+      font-family: var(--font-body);
+      font-size: 14px;
+      font-weight: 500;
       color: var(--accent-hi);
       white-space: nowrap;
     }
     .resource-item .res-rate {
-      font-size: 7px;
-      color: var(--accent);
-    }
-
-    .tide-status {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 1px;
-      flex-shrink: 0;
-    }
-    .tide-status .tide-label {
-      font-size: 7px;
-      color: var(--text-dim);
-      text-transform: uppercase;
-    }
-    .tide-status .tide-value {
-      font-size: 8px;
+      font-family: var(--font-body);
+      font-size: 11px;
       color: var(--accent);
     }
 
@@ -130,6 +121,78 @@ export function injectTheme(): void {
       flex-shrink: 0;
     }
 
+    /* ── Shared button styles ────────────────── */
+
+    .btn {
+      font-family: var(--font-body);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s, color 0.15s, opacity 0.15s;
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    /* Primary: accent-bordered, bright text */
+    .btn-primary {
+      background: var(--bg-slot);
+      border: 1px solid var(--accent);
+      color: var(--accent-hi);
+      font-size: 13px;
+      font-weight: 500;
+      padding: 10px 16px;
+    }
+    .btn-primary:hover:not(.disabled) {
+      background: var(--accent);
+      color: var(--bg-deep);
+    }
+
+    /* Secondary: subtle border, normal text */
+    .btn-secondary {
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 12px;
+      padding: 8px 12px;
+    }
+    .btn-secondary:hover:not(.disabled):not(.unaffordable) {
+      border-color: var(--accent);
+      color: var(--accent-hi);
+    }
+
+    /* Danger: warm tones for destructive actions */
+    .btn-danger {
+      background: var(--danger-bg);
+      border: 1px solid var(--danger-border);
+      color: var(--danger-text);
+      font-size: 13px;
+      font-weight: 500;
+      padding: 10px 16px;
+    }
+    .btn-danger:hover:not(.disabled) {
+      background: #2a3a3f;
+      border-color: var(--danger-text);
+    }
+
+    /* Ghost: borderless, dim text */
+    .btn-ghost {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      font-size: 14px;
+      padding: 4px 8px;
+    }
+    .btn-ghost:hover { color: var(--accent-hi); }
+
+    /* Disabled state (any button variant) */
+    .btn.disabled, .btn.unaffordable {
+      opacity: 0.35;
+      pointer-events: none;
+    }
+    .btn.disabled {
+      border-color: var(--border);
+      color: var(--text-dim);
+    }
+
     /* ── Mobile adjustments ──────────────────── */
 
     @media (max-width: 640px) {
@@ -137,8 +200,11 @@ export function injectTheme(): void {
         --top-bar-h: 40px;
         --bottom-bar-h: 44px;
       }
-
-      .resource-item .res-value { font-size: 9px; }
+      .resource-item .res-value { font-size: 12px; }
+      .resource-item .res-rate { font-size: 10px; }
+      .btn-primary { font-size: 12px; padding: 8px 12px; }
+      .btn-secondary { font-size: 11px; padding: 6px 10px; }
+      .btn-danger { font-size: 12px; padding: 8px 12px; }
     }
   `;
 

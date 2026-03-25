@@ -1,4 +1,4 @@
-import type { ResourceBundle } from '../core/game-state';
+import type { ResourceBundle, SeabedPool } from '../core/game-state';
 import { SeededRng } from '../util/prng';
 import {
   COLLECTIBLE_SPAWN_INTERVAL,
@@ -150,14 +150,47 @@ function spawnDriftCollectible(mgr: CollectibleManager, worldW: number, worldH: 
   };
 }
 
-/** Spawn a stationary coral collectible on the seabed floor. */
-function spawnCoralCollectible(mgr: CollectibleManager, worldW: number, worldH: number): Collectible {
+/**
+ * Approximate the upper terrain profile (layer 1) at a given x.
+ * This mirrors the formula in seabed-bg.ts without depending on the render module.
+ * Returns a y value: corals should spawn at or below this line.
+ */
+function getTerrainY(x: number, w: number, h: number): number {
+  const t = x / w;
+  const leftP = Math.max(0, 1 - t / 0.3);
+  const rightP = Math.max(0, (t - 0.7) / 0.3);
+  const plateau = Math.max(leftP * leftP * (3 - 2 * leftP), rightP * rightP * (3 - 2 * rightP));
+  const baseY = 0.80 - plateau * 0.25;
+  return Math.floor(h * baseY);
+}
+
+/** Check if a position is too close to any slot (within exclusion radius). */
+function overlapsSlot(x: number, y: number, pool: SeabedPool): boolean {
+  const SLOT_EXCLUSION = 70; // slightly less than slot visual size (80px)
+  for (const slot of Object.values(pool.slots)) {
+    const dx = x - slot.x;
+    const dy = y - slot.y;
+    if (dx * dx + dy * dy < SLOT_EXCLUSION * SLOT_EXCLUSION) return true;
+  }
+  return false;
+}
+
+/** Spawn a stationary coral collectible on the seabed terrain. */
+function spawnCoralCollectible(mgr: CollectibleManager, worldW: number, worldH: number, pool?: SeabedPool): Collectible {
   const config = COLLECTIBLE_TYPES.coral;
   const amount = Math.max(1, Math.round(config.baseAmount + mgr.rng.float(-config.amountJitter, config.amountJitter)));
-  // Place along the bottom of the seabed with some horizontal spread
-  const margin = 120;
-  const x = mgr.rng.float(margin, worldW - margin);
-  const y = worldH - mgr.rng.float(20, 60); // near the bottom
+
+  // Try up to 10 positions to find one that doesn't overlap a slot
+  const margin = 100;
+  let x = 0;
+  let y = 0;
+  for (let attempt = 0; attempt < 10; attempt++) {
+    x = mgr.rng.float(margin, worldW - margin);
+    const terrainTop = getTerrainY(x, worldW, worldH);
+    // Spawn anywhere from terrain surface down to near bottom
+    y = mgr.rng.float(terrainTop + 10, worldH - 15);
+    if (!pool || !overlapsSlot(x, y, pool)) break;
+  }
 
   return {
     id: mgr.idCounter++,
@@ -214,6 +247,7 @@ export function updateCollectibles(
   mouseX: number,
   mouseY: number,
   collectRadius: number,
+  pool?: SeabedPool,
 ): CollectedResources {
   const collected: CollectedResources = { plankton: 0, minerite: 0, lux: 0, nacre: 0, coral: 0, events: [] };
   const magnetSnapDist = 5;
@@ -231,7 +265,7 @@ export function updateCollectibles(
   mgr.coralSpawnTimer += dt;
   const coralCount = mgr.items.filter(c => c.typeKey === 'coral').length;
   if (mgr.coralSpawnTimer >= mgr.coralNextSpawnAt && coralCount < CORAL_MAX_ACTIVE) {
-    mgr.items.push(spawnCoralCollectible(mgr, worldW, worldH));
+    mgr.items.push(spawnCoralCollectible(mgr, worldW, worldH, pool));
     mgr.coralSpawnTimer = 0;
     mgr.coralNextSpawnAt = CORAL_SPAWN_INTERVAL + mgr.rng.float(-CORAL_SPAWN_JITTER, CORAL_SPAWN_JITTER);
   }
@@ -299,6 +333,11 @@ export function updateCollectibles(
   }
 
   return collected;
+}
+
+/** Force-spawn a coral collectible (debug). */
+export function forceSpawnCoral(mgr: CollectibleManager, worldW: number, worldH: number, pool?: SeabedPool): void {
+  mgr.items.push(spawnCoralCollectible(mgr, worldW, worldH, pool));
 }
 
 /**

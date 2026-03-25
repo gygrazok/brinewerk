@@ -5,12 +5,18 @@ import { forceTide } from '../systems/tides';
 import { createCreature, RARE_EFFECTS, type RareEffect } from '../creatures/creature';
 import { CreatureType } from '../creatures/types';
 
+export interface DebugMenuOptions {
+  onStateChange: () => void;
+  onReset: () => void;
+  onSpawnCoral?: () => void;
+}
+
 /** Inject a floating debug menu (dev only). Returns cleanup function. */
 export function initDebugMenu(
   state: GameState,
-  onStateChange: () => void,
-  onReset: () => void,
+  opts: DebugMenuOptions,
 ): () => void {
+  const { onStateChange, onReset, onSpawnCoral } = opts;
   const panel = document.createElement('div');
   panel.id = 'debug-menu';
   panel.innerHTML = `
@@ -18,24 +24,24 @@ export function initDebugMenu(
       #debug-menu {
         position: fixed; top: 50px; right: 8px; z-index: 50;
         background: #0a1a20ee; border: 1px solid #1a3a3f; border-radius: 6px;
-        padding: 8px 10px; font-family: 'Press Start 2P', monospace; font-size: 8px;
+        padding: 8px 10px; font-family: var(--font-body); font-size: 11px;
         color: #3aada8; display: flex; flex-direction: column; gap: 6px;
         max-width: 200px;
       }
       #debug-menu summary {
-        cursor: pointer; font-size: 9px; color: #7eeee4; user-select: none;
+        cursor: pointer; font-size: 12px; font-weight: 600; color: #7eeee4; user-select: none;
       }
       #debug-menu button {
         background: #0d2228; border: 1px solid #1a3a3f; border-radius: 3px;
-        color: #3aada8; font-family: inherit; font-size: 7px; padding: 4px 6px;
+        color: #3aada8; font-family: inherit; font-size: 10px; padding: 4px 6px;
         cursor: pointer; text-align: left;
       }
       #debug-menu button:hover { border-color: #3aada8; color: #7eeee4; }
       #debug-menu .debug-row { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
-      #debug-menu .debug-section { margin-top: 4px; color: #1a3a3f; font-size: 7px; }
+      #debug-menu .debug-section { margin-top: 4px; color: #1a3a3f; font-size: 9px; text-transform: uppercase; }
       #debug-menu select {
         background: #0d2228; border: 1px solid #1a3a3f; border-radius: 3px;
-        color: #3aada8; font-family: inherit; font-size: 7px; padding: 3px 4px;
+        color: #3aada8; font-family: inherit; font-size: 10px; padding: 3px 4px;
         cursor: pointer; flex: 1; min-width: 0;
       }
       #debug-menu select:hover { border-color: #3aada8; }
@@ -44,18 +50,22 @@ export function initDebugMenu(
       <summary>DEBUG</summary>
       <div class="debug-section">Resources</div>
       <div class="debug-row">
-        <button data-action="add-plankton">+1000 🟢</button>
-        <button data-action="add-minerite">+100 🔵</button>
-        <button data-action="add-lux">+50 ✨</button>
+        <button data-action="add-plankton">+1k Plankton 🟢</button>
+        <button data-action="add-minerite">+100 Minerite 🔵</button>
       </div>
       <div class="debug-row">
-        <button data-action="max-resources">Max All</button>
+        <button data-action="add-lux">+50 Lux ✨</button>
+        <button data-action="add-coral">+50 Coral 🪸</button>
       </div>
-      <div class="debug-section">Tide</div>
+      <div class="debug-row">
+        <button data-action="max-resources">Max All Resources</button>
+      </div>
+      <div class="debug-section">Tide &amp; Collectibles</div>
       <div class="debug-row">
         <button data-action="force-tide">Force Tide</button>
+        <button data-action="spawn-coral">Spawn Coral</button>
       </div>
-      <div class="debug-section">Spawn</div>
+      <div class="debug-section">Spawn Creature</div>
       <div class="debug-row">
         <select id="dbg-type">
           <option value="">Random</option>
@@ -107,10 +117,17 @@ export function initDebugMenu(
       case 'add-lux':
         state.resources.lux += 50;
         break;
+      case 'add-coral':
+        state.resources.coral += 50;
+        break;
       case 'max-resources':
         state.resources.plankton += 999999;
         state.resources.minerite += 99999;
         state.resources.lux += 9999;
+        state.resources.coral += 9999;
+        break;
+      case 'spawn-coral':
+        onSpawnCoral?.();
         break;
       case 'force-tide':
         forceTide(state);

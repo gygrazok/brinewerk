@@ -3,7 +3,7 @@ import type { Creature } from '../creatures/creature';
 import { getRareInfo } from '../creatures/creature';
 import { CREATURE_NAMES, CREATURE_ICONS } from '../creatures/types';
 import { getDisplayTraits, TRAIT_COLORS } from '../genetics/traits';
-import { createCreaturePreview, type CanvasPreview } from '../rendering/creature-renderer';
+import { createCreaturePreviewApp, type CreaturePreviewApp } from '../rendering/creature-preview';
 import { findEmptySlot } from '../systems/pool';
 import {
   SHORE_REFRESH_COST, SHORE_RARE_REFRESH_COST,
@@ -24,29 +24,11 @@ let stateRef: GameState | null = null;
 let mounted = false;
 /** Track last known tide timestamp to detect new tide arrivals */
 let lastKnownTideTimestamp = 0;
-/** Active animated previews and their animation frame */
-let activePreviews: CanvasPreview[] = [];
-let previewAnimId: number | null = null;
+/** Active PixiJS creature previews */
+let activePreviews: CreaturePreviewApp[] = [];
 
-// ---------------------------------------------------------------------------
-// Preview animation loop
-// ---------------------------------------------------------------------------
-
-function startPreviewAnimation(): void {
-  if (previewAnimId !== null) return;
-  function loop() {
-    const time = performance.now() / 1000;
-    for (const p of activePreviews) p.update(time);
-    previewAnimId = requestAnimationFrame(loop);
-  }
-  previewAnimId = requestAnimationFrame(loop);
-}
-
-function stopPreviewAnimation(): void {
-  if (previewAnimId !== null) {
-    cancelAnimationFrame(previewAnimId);
-    previewAnimId = null;
-  }
+function destroyPreviews(): void {
+  for (const p of activePreviews) p.destroy();
   activePreviews = [];
 }
 
@@ -65,6 +47,7 @@ export function isShoreModalOpen(): boolean {
 /** Update the always-visible shore button at the bottom of the screen. */
 export function renderShoreButton(state: GameState): void {
   stateRef = state;
+  injectStyles();
   const bar = document.getElementById('bottom-bar');
   if (!bar) return;
 
@@ -113,7 +96,7 @@ export function updateShoreModal(state: GameState): void {
 
 /** Destroy all modal DOM for HMR cleanup. */
 export function destroyShoreModal(): void {
-  stopPreviewAnimation();
+  destroyPreviews();
   closeShoreModal();
   const styles = document.getElementById('shore-modal-styles');
   if (styles) styles.remove();
@@ -157,7 +140,7 @@ export function closeShoreModal(): void {
   if (!modalOpen) return;
   modalOpen = false;
   selectedIndex = null;
-  stopPreviewAnimation();
+  destroyPreviews();
 
   const overlay = document.getElementById('shore-overlay');
   const modal = document.getElementById('shore-modal');
@@ -182,17 +165,17 @@ function renderModalContent(state: GameState): void {
   modal.innerHTML = `
     <div class="shore-header">
       <span class="shore-title">🌊 Shore</span>
-      <button class="shore-close" id="shore-close-btn">✕</button>
+      <button class="btn btn-ghost shore-close" id="shore-close-btn">✕</button>
     </div>
     <div class="shore-timer" id="shore-timer"></div>
     <div class="shore-actions" id="shore-actions">
-      <button class="shore-action-btn" id="shore-refresh">Refresh<br><span class="action-cost">${SHORE_REFRESH_COST} 🟢</span></button>
-      <button class="shore-action-btn rare" id="shore-rare-refresh">Rare Refresh<br><span class="action-cost">${SHORE_RARE_REFRESH_COST} 🪸</span></button>
+      <button class="btn btn-secondary shore-action-btn" id="shore-refresh">Refresh<br><span class="action-cost">${SHORE_REFRESH_COST} 🟢</span></button>
+      <button class="btn btn-secondary shore-action-btn rare" id="shore-rare-refresh">Rare Refresh<br><span class="action-cost">${SHORE_RARE_REFRESH_COST} 🪸</span></button>
     </div>
     <div class="shore-creatures" id="shore-creatures"></div>
     <div class="shore-stats" id="shore-stats"></div>
     <div class="shore-take-area" id="shore-take-area">
-      <button class="shore-take-btn disabled" id="shore-take-btn">Select a creature</button>
+      <button class="btn btn-primary shore-take-btn disabled" id="shore-take-btn">Select a creature</button>
     </div>
   `;
 
@@ -249,55 +232,74 @@ function renderCreatureCards(state: GameState): void {
     return;
   }
 
-  let html = '';
-  for (let i = 0; i < state.shore.length; i++) {
-    const c = state.shore[i];
-    const selected = i === selectedIndex;
-    const rareInfo = c.rare ? getRareInfo(c.rare) : null;
-    const rareBadge = rareInfo
-      ? `<span class="shore-card-rare" style="color:${rareInfo.color}; border-color:${rareInfo.color}40; background:${rareInfo.color}15;">${rareInfo.icon} ${rareInfo.label}</span>`
-      : '';
-    const borderStyle = rareInfo && selected
-      ? `border-color:${rareInfo.color};`
-      : selected ? 'border-color:var(--accent);' : '';
+  // Only rebuild DOM + previews if cards haven't been created yet
+  const needsBuild = container.childElementCount === 0
+    || container.querySelector('.shore-empty-msg') !== null;
 
-    html += `
-      <div class="shore-creature-card ${selected ? 'selected' : ''}" data-index="${i}" style="${borderStyle}">
-        <div class="shore-card-preview" id="shore-preview-${i}"></div>
-        <div class="shore-card-info">
-          <div class="shore-card-name">${c.name}</div>
-          <div class="shore-card-type">${CREATURE_ICONS[c.type]} ${CREATURE_NAMES[c.type]}</div>
-          ${rareBadge}
+  if (needsBuild) {
+    let html = '';
+    for (let i = 0; i < state.shore.length; i++) {
+      const c = state.shore[i];
+      const rareInfo = c.rare ? getRareInfo(c.rare) : null;
+      const rareBadge = rareInfo
+        ? `<span class="shore-card-rare" style="color:${rareInfo.color}; border-color:${rareInfo.color}40; background:${rareInfo.color}15;">${rareInfo.icon} ${rareInfo.label}</span>`
+        : '';
+
+      html += `
+        <div class="shore-creature-card" data-index="${i}">
+          <div class="shore-card-preview" id="shore-preview-${i}"></div>
+          <div class="shore-card-info">
+            <div class="shore-card-name">${c.name}</div>
+            <div class="shore-card-type">${CREATURE_ICONS[c.type]} ${CREATURE_NAMES[c.type]}</div>
+            ${rareBadge}
+          </div>
         </div>
-      </div>
-    `;
-  }
-  container.innerHTML = html;
-
-  // Render animated pixel art previews into each card
-  stopPreviewAnimation();
-  for (let i = 0; i < state.shore.length; i++) {
-    const previewEl = document.getElementById(`shore-preview-${i}`);
-    if (previewEl) {
-      const preview = createCreaturePreview(state.shore[i]);
-      preview.canvas.classList.add('shore-preview-canvas');
-      previewEl.appendChild(preview.canvas);
-      activePreviews.push(preview);
+      `;
     }
-  }
-  if (activePreviews.length > 0) startPreviewAnimation();
+    container.innerHTML = html;
 
-  // Click handlers
-  container.querySelectorAll('.shore-creature-card').forEach((card) => {
-    card.addEventListener('click', () => {
-      const idx = parseInt((card as HTMLElement).dataset.index!, 10);
-      selectedIndex = idx;
-      // Re-render cards for selection highlight
-      renderCreatureCards(state);
+    // Create PixiJS creature previews (with rare shader effects)
+    destroyPreviews();
+    const PREVIEW_SIZE = 120;
+    for (let i = 0; i < state.shore.length; i++) {
+      const previewEl = document.getElementById(`shore-preview-${i}`);
+      if (previewEl) {
+        createCreaturePreviewApp(state.shore[i], previewEl, PREVIEW_SIZE).then((preview) => {
+          activePreviews.push(preview);
+        });
+      }
+    }
+
+    // Click handlers
+    container.querySelectorAll('.shore-creature-card').forEach((card) => {
+      card.addEventListener('click', () => {
+        const idx = parseInt((card as HTMLElement).dataset.index!, 10);
+        selectedIndex = idx;
+        updateSelection(state);
+      });
     });
-  });
+  }
 
-  // Show stats for selected creature
+  updateSelection(state);
+}
+
+/** Update selection highlight, stats, and take button without rebuilding cards. */
+function updateSelection(state: GameState): void {
+  const container = document.getElementById('shore-creatures');
+  if (container) {
+    container.querySelectorAll('.shore-creature-card').forEach((card) => {
+      const idx = parseInt((card as HTMLElement).dataset.index!, 10);
+      const selected = idx === selectedIndex;
+      const c = state.shore[idx];
+      const rareInfo = c?.rare ? getRareInfo(c.rare) : null;
+
+      card.classList.toggle('selected', selected);
+      (card as HTMLElement).style.borderColor = selected
+        ? (rareInfo ? rareInfo.color : 'var(--accent)')
+        : '';
+    });
+  }
+
   renderStats(selectedIndex !== null ? state.shore[selectedIndex] : null);
   updateTakeButton(state);
 }
@@ -371,7 +373,7 @@ function updateTimer(state: GameState): void {
   const tideReady = isTideReady(state);
 
   if (tideReady && !state.shoreTaken && state.shore.length > 0) {
-    timerEl.innerHTML = '<button class="tide-flush-btn" id="tide-flush-btn">🌊 New Tide!</button>';
+    timerEl.innerHTML = '<button class="btn btn-primary" id="tide-flush-btn">🌊 New Tide!</button>';
     document.getElementById('tide-flush-btn')!.addEventListener('click', () => {
       if (!stateRef) return;
       flushTide(stateRef);
@@ -418,8 +420,9 @@ function injectStyles(): void {
       border: 1px solid var(--border);
       border-radius: 6px;
       color: var(--text-dim);
-      font-family: var(--font);
-      font-size: 9px;
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 500;
       padding: 8px 20px;
       cursor: pointer;
       transition: border-color 0.15s, color 0.15s;
@@ -452,7 +455,7 @@ function injectStyles(): void {
       position: fixed; z-index: 101;
       background: var(--bg-panel);
       border: 1px solid var(--border);
-      font-family: var(--font);
+      font-family: var(--font-body);
       color: var(--text);
       display: flex; flex-direction: column;
       overflow-y: auto;
@@ -462,7 +465,7 @@ function injectStyles(): void {
         top: 50%; left: 50%;
         transform: translate(-50%, -50%) scale(0.95);
         opacity: 0;
-        width: 400px;
+        width: 420px;
         max-height: 85vh;
         border-radius: 10px;
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
@@ -487,86 +490,78 @@ function injectStyles(): void {
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
     }
-    .shore-title { font-size: 11px; color: var(--name); }
-    .shore-close {
-      background: none; border: none; color: var(--text-dim);
-      font-family: var(--font); font-size: 12px;
-      cursor: pointer; padding: 4px 8px;
-      transition: color 0.15s;
-    }
-    .shore-close:hover { color: var(--accent-hi); }
+    .shore-title { font-family: var(--font-display); font-size: 11px; color: var(--name); }
+    .shore-close { font-family: var(--font-body); }
 
     /* Timer */
-    .shore-timer { text-align: center; padding: 10px 16px; font-size: 9px; color: var(--text-dim); }
-    .timer-value { color: var(--accent); margin-left: 6px; }
-    .tide-flush-btn {
-      background: var(--bg-deep); border: 1px solid var(--accent); border-radius: 4px;
-      color: var(--accent-hi); font-family: var(--font); font-size: 9px;
-      padding: 6px 16px; cursor: pointer; transition: background 0.15s;
-    }
-    .tide-flush-btn:hover { background: var(--bg-slot); }
+    .shore-timer { text-align: center; padding: 10px 16px; font-size: 13px; color: var(--text-dim); }
+    .timer-value { color: var(--accent); margin-left: 6px; font-family: var(--font-body); }
 
     /* Refresh actions */
     .shore-actions { display: flex; gap: 8px; padding: 0 16px 10px; justify-content: center; }
     .shore-action-btn {
-      flex: 1; background: var(--bg-deep); border: 1px solid var(--border); border-radius: 4px;
-      color: var(--text); font-family: var(--font); font-size: 8px;
-      padding: 8px 6px; cursor: pointer; text-align: center; line-height: 1.6;
-      transition: border-color 0.15s, opacity 0.15s;
+      flex: 1;
     }
-    .shore-action-btn:hover:not(.unaffordable) { border-color: var(--accent); }
     .shore-action-btn.rare { border-color: #8b225260; }
-    .shore-action-btn.rare:hover:not(.unaffordable) { border-color: #c44488; }
-    .shore-action-btn.unaffordable { opacity: 0.35; pointer-events: none; }
-    .action-cost { font-size: 7px; color: var(--text-dim); }
+    .shore-action-btn.rare:hover:not(.unaffordable):not(.disabled) { border-color: #c44488; color: #e066aa; }
+    .action-cost { font-size: 10px; color: var(--text-dim); }
 
     /* Creature cards */
     .shore-creatures { padding: 0 16px 10px; display: flex; gap: 8px; }
-    .shore-empty-msg { text-align: center; color: var(--text-dim); font-size: 8px; padding: 20px 0; width: 100%; }
+    .shore-empty-msg {
+      text-align: center; color: var(--text-dim); font-size: 12px;
+      padding: 24px 0; width: 100%; font-style: italic;
+    }
     .shore-creature-card {
       flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px;
       background: var(--bg-deep); border: 2px solid var(--border); border-radius: 6px;
-      padding: 10px; cursor: pointer;
+      padding: 12px; cursor: pointer;
       transition: border-color 0.15s, background 0.15s;
     }
     .shore-creature-card:hover { border-color: var(--accent); background: var(--bg-slot); }
     .shore-creature-card.selected { background: var(--bg-slot); }
 
     .shore-card-preview {
-      width: 80px; height: 80px;
+      width: 128px; height: 128px;
       display: flex; align-items: center; justify-content: center;
       background: var(--bg-panel); border-radius: 4px;
+      overflow: hidden;
     }
-    .shore-preview-canvas {
-      width: 72px !important; height: 72px !important;
+    .shore-card-preview canvas {
       image-rendering: pixelated;
     }
     .shore-card-info { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-    .shore-card-name { font-size: 8px; color: var(--name); text-align: center; }
-    .shore-card-type { font-size: 7px; color: var(--accent); }
+    .shore-card-name { font-family: var(--font-display); font-size: 8px; color: var(--name); text-align: center; }
+    .shore-card-type { font-size: 11px; color: var(--accent); }
     .shore-card-rare {
-      display: inline-block; font-size: 7px; padding: 2px 6px;
+      display: inline-block; font-size: 10px; padding: 2px 8px;
       border: 1px solid; border-radius: 3px; margin-top: 2px;
     }
 
     /* Stats panel */
     .shore-stats { padding: 0 16px; }
-    .shore-stats-inner { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; }
+    .shore-stats-inner { display: flex; flex-direction: column; gap: 5px; padding: 10px 0; }
     .shore-trait-row { display: flex; align-items: center; gap: 6px; }
-    .shore-trait-label { width: 54px; text-align: right; font-size: 7px; color: var(--text-dim); flex-shrink: 0; }
-    .shore-trait-bar-bg { flex: 1; height: 6px; background: var(--bg-deep); border-radius: 2px; overflow: hidden; }
+    .shore-trait-label { width: 56px; text-align: right; font-size: 10px; color: var(--text-dim); flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.5px; }
+    .shore-trait-bar-bg { flex: 1; height: 8px; background: var(--bg-deep); border-radius: 2px; overflow: hidden; }
     .shore-trait-bar-fill { height: 100%; border-radius: 2px; transition: width 0.3s ease; }
-    .shore-trait-val { width: 28px; text-align: right; font-size: 7px; color: var(--text-dim); flex-shrink: 0; }
+    .shore-trait-val { width: 30px; text-align: right; font-size: 10px; color: var(--text-dim); flex-shrink: 0; }
 
     /* Take button */
     .shore-take-area { padding: 8px 16px 16px; }
-    .shore-take-btn {
-      width: 100%; background: var(--bg-slot); border: 1px solid var(--accent); border-radius: 4px;
-      color: var(--accent-hi); font-family: var(--font); font-size: 9px;
-      padding: 10px; cursor: pointer; transition: background 0.15s, opacity 0.15s;
+
+    @media (max-width: 640px) {
+      .shore-btn { font-size: 11px; }
+      .shore-timer { font-size: 11px; }
+      .shore-card-preview { width: 96px; height: 96px; }
+      .shore-card-type { font-size: 10px; }
+      .shore-card-rare { font-size: 9px; }
+      .shore-trait-label { font-size: 9px; width: 46px; }
+      .shore-trait-val { font-size: 9px; }
+      .shore-trait-bar-bg { height: 6px; }
+      .shore-empty-msg { font-size: 11px; }
+      .action-cost { font-size: 9px; }
     }
-    .shore-take-btn:hover:not(.disabled) { background: var(--accent); color: var(--bg-deep); }
-    .shore-take-btn.disabled { opacity: 0.35; pointer-events: none; border-color: var(--border); color: var(--text-dim); }
   `;
   document.head.appendChild(style);
 }
