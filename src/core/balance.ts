@@ -49,13 +49,23 @@ export const COLLECTIBLE_SPRITE_SIZE = 10;             // pixel grid resolution
 export const COLLECTIBLE_DISPLAY_SIZE = 48;            // on-screen world px
 export const COLLECTIBLE_FADE_IN_DIST = 50;            // px from spawn edge to full alpha
 
+/** Coral collectibles (click-to-collect, seabed-stationary) */
+export const CORAL_SPAWN_INTERVAL = 300;                 // seconds between spawns (~5 min)
+export const CORAL_SPAWN_JITTER = 60;                    // random ± jitter (so 4–6 min range)
+export const CORAL_BASE_AMOUNT = 2;                      // base coral per pickup
+export const CORAL_AMOUNT_JITTER = 1;                    // random ± (so 1–3 range)
+export const CORAL_MAX_ACTIVE = 3;                       // max simultaneous coral on seabed
+export const CORAL_SPRITE_SIZE = 14;                     // pixel grid resolution (slightly bigger than plankton)
+export const CORAL_DISPLAY_SIZE = 56;                    // on-screen world px
+export const CORAL_CLICK_RADIUS = 40;                    // click hit-test radius in world px
+
 /**
  * Slot unlock cost by tier (position-based).
  * Cost is in Nacre only, growing exponentially: 2^(tier-1).
  * Tier 0 slots are free (starter, unlocked by default).
  */
 export function getSlotUnlockCost(tier: number): import('./game-state').ResourceBundle {
-  if (tier <= 0) return { plankton: 0, minerite: 0, lux: 0, nacre: 0 };
+  if (tier <= 0) return { plankton: 0, minerite: 0, lux: 0, nacre: 0, coral: 0 };
   const nacre = Math.pow(2, tier - 1); // 1, 2, 4, 8, ...
-  return { plankton: 0, minerite: 0, lux: 0, nacre };
+  return { plankton: 0, minerite: 0, lux: 0, nacre, coral: 0 };
 }

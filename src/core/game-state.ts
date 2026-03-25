@@ -3,7 +3,7 @@ import { SEABED_SLOTS } from '../systems/seabed-layout';
 import { DEFAULT_RARE_CHANCE, DEFAULT_UNLOCKED_RARE_IDS } from './balance';
 
 const SAVE_KEY = 'brinewerk_save';
-const CURRENT_SAVE_VERSION = 6;
+const CURRENT_SAVE_VERSION = 7;
 
 // --- Seabed pool (v3+) ---
 
@@ -25,7 +25,7 @@ export interface SeabedPool {
   worldHeight: number;
 }
 
-export type ResourceBundle = { plankton: number; minerite: number; lux: number; nacre: number };
+export type ResourceBundle = { plankton: number; minerite: number; lux: number; nacre: number; coral: number };
 
 export interface GameState {
   saveVersion: number;
@@ -56,7 +56,7 @@ export function createDefaultState(): GameState {
     seabedSeed: Math.floor(Math.random() * 2_147_483_647),
     creatures: [],
     pool,
-    resources: { plankton: 0, minerite: 0, lux: 0, nacre: 0 },
+    resources: { plankton: 0, minerite: 0, lux: 0, nacre: 0, coral: 0 },
     shore: [],
     lastSaveTimestamp: Date.now(),
     lastTideTimestamp: Date.now(),
@@ -195,6 +195,13 @@ function migrateState(data: Record<string, unknown>): GameState {
     const d = data as Record<string, unknown>;
     if (d.rareChance === undefined) d.rareChance = DEFAULT_RARE_CHANCE;
     if (d.unlockedRares === undefined) d.unlockedRares = [...DEFAULT_UNLOCKED_RARE_IDS];
+    data.saveVersion = 6;
+  }
+
+  // V6 → V7: add coral resource
+  if ((data.saveVersion as number) < 7) {
+    const resources = data.resources as Record<string, number>;
+    if (resources.coral === undefined) resources.coral = 0;
     data.saveVersion = CURRENT_SAVE_VERSION;
   }
 

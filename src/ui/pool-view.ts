@@ -55,6 +55,8 @@ export interface PoolView {
   onSlotClick: ((slotId: string) => void) | null;
   onExpansionClick: ((slotId: string) => void) | null;
   onCreatureDrop: ((fromSlotId: string, toSlotId: string) => void) | null;
+  /** Fires when user taps on empty world space (no slot hit). worldX/worldY in world coords. */
+  onWorldTap: ((worldX: number, worldY: number) => void) | null;
   zoom: number;
   _dragged: boolean;
   _stateRef: GameState | null;
@@ -144,6 +146,7 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
     onSlotClick: null,
     onExpansionClick: null,
     onCreatureDrop: null,
+    onWorldTap: null,
     zoom: 1.0,
     _dragged: false,
     _stateRef: null,
@@ -366,6 +369,14 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
       return;
     }
 
+    if (!poolView._dragged) {
+      // Tap on empty space — fire world tap for collectible click detection
+      const rect = canvas.getBoundingClientRect();
+      const sx = e.clientX - rect.left;
+      const sy = e.clientY - rect.top;
+      const [wx, wy] = screenToWorld(poolView, sx, sy);
+      poolView.onWorldTap?.(wx, wy);
+    }
     isPanning = false;
   };
 
@@ -469,14 +480,14 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
       gfx.cursor = 'pointer';
 
       gfx.on('pointerenter', () => {
-        const res = poolView._stateRef?.resources ?? { plankton: 0, minerite: 0, lux: 0, nacre: 0 };
+        const res = poolView._stateRef?.resources ?? { plankton: 0, minerite: 0, lux: 0, nacre: 0, coral: 0 };
         const canBuy = !slot.unlocked && canAffordSlot(res, slot.tier);
         gfx.clear();
         drawSlotHighlight(gfx, slot, canBuy);
       });
 
       gfx.on('pointerleave', () => {
-        const res = poolView._stateRef?.resources ?? { plankton: 0, minerite: 0, lux: 0, nacre: 0 };
+        const res = poolView._stateRef?.resources ?? { plankton: 0, minerite: 0, lux: 0, nacre: 0, coral: 0 };
         const canBuy = !slot.unlocked && canAffordSlot(res, slot.tier);
         gfx.clear();
         drawSlot(gfx, slot, canBuy);

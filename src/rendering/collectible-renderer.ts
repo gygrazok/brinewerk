@@ -6,6 +6,8 @@ import {
   COLLECTIBLE_SPRITE_SIZE,
   COLLECTIBLE_DISPLAY_SIZE,
   COLLECTIBLE_FADE_IN_DIST,
+  CORAL_SPRITE_SIZE,
+  CORAL_DISPLAY_SIZE,
 } from '../core/balance';
 
 // ---------------------------------------------------------------------------
@@ -20,6 +22,9 @@ const PLANKTON_COLORS = [
   '#b8b44a', // yellow-green
 ];
 
+const CORAL_BRANCH_COLORS = ['#8b2252', '#a0336a', '#c44488', '#6b1a42'];
+const CORAL_TIP_COLOR = '#e066aa';
+
 // ---------------------------------------------------------------------------
 // Sprite generation (per-type, extensible)
 // ---------------------------------------------------------------------------
@@ -28,6 +33,7 @@ type SpriteGenerator = (rng: SeededRng) => HTMLCanvasElement;
 
 const SPRITE_GENERATORS: Record<string, SpriteGenerator> = {
   plankton: generatePlanktonSprite,
+  coral: generateCoralSprite,
 };
 
 function generatePlanktonSprite(rng: SeededRng): HTMLCanvasElement {
@@ -73,6 +79,47 @@ function generatePlanktonSprite(rng: SeededRng): HTMLCanvasElement {
   return canvas;
 }
 
+function generateCoralSprite(rng: SeededRng): HTMLCanvasElement {
+  const size = CORAL_SPRITE_SIZE;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+
+  const cx = Math.floor(size / 2);
+  const base = size - 2;
+
+  // Trunk
+  const trunkH = Math.floor(size * 0.4);
+  for (let y = base; y > base - trunkH; y--) {
+    const ci = rng.int(0, CORAL_BRANCH_COLORS.length - 1);
+    ctx.fillStyle = CORAL_BRANCH_COLORS[ci];
+    ctx.fillRect(cx, y, 1, 1);
+    if (rng.float(0, 1) > 0.5) ctx.fillRect(cx - 1, y, 1, 1);
+  }
+
+  // Branches
+  const branches = 2 + rng.int(0, 2);
+  for (let b = 0; b < branches; b++) {
+    const startY = base - Math.floor(trunkH * (0.3 + rng.float(0, 0.6)));
+    const dir = rng.float(0, 1) > 0.5 ? 1 : -1;
+    const len = 2 + rng.int(0, Math.floor(size * 0.3));
+    let bx = cx;
+    let by = startY;
+    for (let i = 0; i < len; i++) {
+      bx += dir;
+      if (rng.float(0, 1) > 0.4) by--;
+      const ci = rng.int(0, CORAL_BRANCH_COLORS.length - 1);
+      ctx.fillStyle = i === len - 1 ? CORAL_TIP_COLOR : CORAL_BRANCH_COLORS[ci];
+      if (bx >= 0 && bx < size && by >= 0 && by < size) {
+        ctx.fillRect(bx, by, 1, 1);
+      }
+    }
+  }
+
+  return canvas;
+}
+
 // ---------------------------------------------------------------------------
 // Collectible layer (manages Pixi sprites)
 // ---------------------------------------------------------------------------
@@ -113,7 +160,11 @@ export function syncCollectibleVisuals(layer: CollectibleLayer, mgr: Collectible
     sprite.y = c.y;
 
     // State-based visual feedback
-    if (c.state === 'magnetized') {
+    if (c.config.collectMode === 'click') {
+      // Click-mode collectibles (coral): always full alpha, no magnetize scaling
+      sprite.scale.set(1);
+      sprite.alpha = 1;
+    } else if (c.state === 'magnetized') {
       sprite.scale.set(1.2);
       sprite.alpha = 1;
     } else {
@@ -145,10 +196,12 @@ function createSpriteForCollectible(c: Collectible, layer: CollectibleLayer): Sp
   const texture = Texture.from(canvas);
   texture.source.scaleMode = 'nearest';
 
+  const isCoral = c.typeKey === 'coral';
+  const displaySize = isCoral ? CORAL_DISPLAY_SIZE : COLLECTIBLE_DISPLAY_SIZE;
   const sprite = new Sprite(texture);
-  sprite.anchor.set(0.5);
-  sprite.width = COLLECTIBLE_DISPLAY_SIZE;
-  sprite.height = COLLECTIBLE_DISPLAY_SIZE;
+  sprite.anchor.set(0.5, isCoral ? 1 : 0.5); // coral anchored at bottom-center
+  sprite.width = displaySize;
+  sprite.height = displaySize;
 
   layer.sprites.set(c.id, sprite);
   layer.textures.set(c.id, texture);
@@ -164,6 +217,7 @@ const RESOURCE_ICONS: Record<keyof ResourceBundle, string> = {
   minerite: '🔵',
   lux: '✨',
   nacre: '⚬',
+  coral: '🪸',
 };
 
 const POPUP_STYLE = new TextStyle({

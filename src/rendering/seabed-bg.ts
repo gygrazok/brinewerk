@@ -303,21 +303,18 @@ interface PlacementRule {
 /** Cliff-side rules (rocky edges, x < 500 or x > 1420) */
 const CLIFF_RULES_L1: PlacementRule[] = [
   { type: 'rock',   count: 4, sizeMin: 24, sizeMax: 34, yOffsetMin: 0,  yOffsetMax: 40 },
-  { type: 'coral',  count: 5, sizeMin: 14, sizeMax: 24, yOffsetMin: -10, yOffsetMax: 50 },
   { type: 'algae',  count: 6, sizeMin: 40, sizeMax: 60, yOffsetMin: -10, yOffsetMax: 60 },
   { type: 'sponge', count: 3, sizeMin: 16, sizeMax: 20, yOffsetMin: 10, yOffsetMax: 50 },
 ];
 
 const CLIFF_RULES_L2: PlacementRule[] = [
   { type: 'rock',   count: 3, sizeMin: 20, sizeMax: 26, yOffsetMin: 0,  yOffsetMax: 30 },
-  { type: 'coral',  count: 3, sizeMin: 14, sizeMax: 20, yOffsetMin: -5, yOffsetMax: 40 },
   { type: 'algae',  count: 4, sizeMin: 36, sizeMax: 50, yOffsetMin: -10, yOffsetMax: 50 },
   { type: 'sponge', count: 2, sizeMin: 14, sizeMax: 16, yOffsetMin: 10, yOffsetMax: 40 },
 ];
 
 const CLIFF_RULES_L3: PlacementRule[] = [
   { type: 'rock',   count: 2, sizeMin: 18, sizeMax: 24, yOffsetMin: 0,  yOffsetMax: 20 },
-  { type: 'coral',  count: 2, sizeMin: 12, sizeMax: 18, yOffsetMin: -5, yOffsetMax: 30 },
   { type: 'algae',  count: 3, sizeMin: 30, sizeMax: 42, yOffsetMin: -10, yOffsetMax: 40 },
   { type: 'sponge', count: 1, sizeMin: 12, sizeMax: 14, yOffsetMin: 5,  yOffsetMax: 25 },
 ];
@@ -327,7 +324,6 @@ const FLOOR_RULES_L1: PlacementRule[] = [
   { type: 'rock',    count: 3, sizeMin: 18, sizeMax: 22, yOffsetMin: -10, yOffsetMax: 20 },
   { type: 'pebbles', count: 5, sizeMin: 10, sizeMax: 14, yOffsetMin: 0,  yOffsetMax: 30 },
   { type: 'shell',   count: 4, sizeMin: 10, sizeMax: 12, yOffsetMin: 0,  yOffsetMax: 30 },
-  { type: 'coral',   count: 2, sizeMin: 14, sizeMax: 18, yOffsetMin: -10, yOffsetMax: 15 },
   { type: 'algae',   count: 3, sizeMin: 24, sizeMax: 30, yOffsetMin: -10, yOffsetMax: 15 },
   { type: 'sponge',  count: 1, sizeMin: 10, sizeMax: 12, yOffsetMin: 0,  yOffsetMax: 15 },
 ];
@@ -336,14 +332,12 @@ const FLOOR_RULES_L2: PlacementRule[] = [
   { type: 'rock',    count: 2, sizeMin: 16, sizeMax: 20, yOffsetMin: -5, yOffsetMax: 15 },
   { type: 'pebbles', count: 3, sizeMin: 10, sizeMax: 12, yOffsetMin: 0,  yOffsetMax: 20 },
   { type: 'shell',   count: 2, sizeMin: 10, sizeMax: 10, yOffsetMin: 0,  yOffsetMax: 20 },
-  { type: 'coral',   count: 2, sizeMin: 12, sizeMax: 16, yOffsetMin: -5, yOffsetMax: 10 },
   { type: 'algae',   count: 2, sizeMin: 22, sizeMax: 28, yOffsetMin: -5, yOffsetMax: 10 },
   { type: 'sponge',  count: 1, sizeMin: 10, sizeMax: 12, yOffsetMin: 0,  yOffsetMax: 10 },
 ];
 
 const FLOOR_RULES_L3: PlacementRule[] = [
   { type: 'rock',    count: 2, sizeMin: 14, sizeMax: 18, yOffsetMin: -5, yOffsetMax: 10 },
-  { type: 'coral',   count: 1, sizeMin: 10, sizeMax: 14, yOffsetMin: -5, yOffsetMax: 8 },
   { type: 'algae',   count: 2, sizeMin: 18, sizeMax: 24, yOffsetMin: -5, yOffsetMax: 8 },
   { type: 'sponge',  count: 1, sizeMin: 8,  sizeMax: 10, yOffsetMin: 0,  yOffsetMax: 8 },
 ];

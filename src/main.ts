@@ -13,7 +13,7 @@ import { initDebugMenu } from './ui/debug-menu';
 import { injectTheme } from './ui/theme';
 import { loadRenderSettings } from './rendering/render-settings';
 import { destroyRareFilterCache } from './rendering/shader-loader';
-import { createCollectibleManager, updateCollectibles, clearCollectibles, type CollectibleManager } from './systems/collectibles';
+import { createCollectibleManager, updateCollectibles, clearCollectibles, clickCollect, type CollectibleManager } from './systems/collectibles';
 import {
   createCollectibleLayer, syncCollectibleVisuals, destroyCollectibleLayer, type CollectibleLayer,
   createPopupLayer, spawnPickupPopups, updatePopups, destroyPopupLayer, type PopupLayer,
@@ -183,6 +183,17 @@ async function init() {
     }
   };
 
+  // Handle world taps for click-to-collect coral
+  poolView.onWorldTap = (worldX: number, worldY: number) => {
+    if (!collectibleMgr || !popupLayer) return;
+    const event = clickCollect(collectibleMgr, worldX, worldY);
+    if (event) {
+      state.resources[event.resource] += event.amount;
+      spawnPickupPopups(popupLayer, [event]);
+      updateHud(state);
+    }
+  };
+
   // Shore: pick up creature → auto-place or hold
   setOnPickUp((creature) => {
     const emptySlotId = findEmptySlot(state);
@@ -236,6 +247,7 @@ async function init() {
       if (collected.minerite > 0) state.resources.minerite += collected.minerite;
       if (collected.lux > 0) state.resources.lux += collected.lux;
       if (collected.nacre > 0) state.resources.nacre += collected.nacre;
+      if (collected.coral > 0) state.resources.coral += collected.coral;
 
       // Spawn floating "+N 🟢" popups and animate existing ones
       if (popupLayer) {

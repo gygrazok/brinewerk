@@ -12,6 +12,12 @@ import {
   COLLECTIBLE_PLANKTON_BASE,
   COLLECTIBLE_PLANKTON_JITTER,
   COLLECTIBLE_MAX_ACTIVE,
+  CORAL_SPAWN_INTERVAL,
+  CORAL_SPAWN_JITTER,
+  CORAL_BASE_AMOUNT,
+  CORAL_AMOUNT_JITTER,
+  CORAL_MAX_ACTIVE,
+  CORAL_CLICK_RADIUS,
 } from '../core/balance';
 
 // ---------------------------------------------------------------------------
@@ -28,6 +34,8 @@ export interface CollectibleTypeConfig {
   amountJitter: number;
   /** Spawn weight relative to other types (higher = more frequent) */
   spawnWeight: number;
+  /** How this collectible is gathered: 'magnet' = proximity auto-collect, 'click' = deliberate tap */
+  collectMode: 'magnet' | 'click';
 }
 
 /** Runtime state of a single floating collectible. */
@@ -54,6 +62,9 @@ export interface CollectibleManager {
   items: Collectible[];
   spawnTimer: number;
   nextSpawnAt: number;
+  /** Separate spawn timer for coral (much longer interval) */
+  coralSpawnTimer: number;
+  coralNextSpawnAt: number;
   idCounter: number;
   rng: SeededRng;
 }
@@ -68,6 +79,14 @@ export const COLLECTIBLE_TYPES: Record<string, CollectibleTypeConfig> = {
     baseAmount: COLLECTIBLE_PLANKTON_BASE,
     amountJitter: COLLECTIBLE_PLANKTON_JITTER,
     spawnWeight: 1,
+    collectMode: 'magnet',
+  },
+  coral: {
+    resource: 'coral',
+    baseAmount: CORAL_BASE_AMOUNT,
+    amountJitter: CORAL_AMOUNT_JITTER,
+    spawnWeight: 0, // not in the drift-spawner pool — uses its own timer
+    collectMode: 'click',
   },
 };
 
@@ -81,6 +100,9 @@ export function createCollectibleManager(seed: number): CollectibleManager {
     items: [],
     spawnTimer: 0,
     nextSpawnAt: COLLECTIBLE_SPAWN_INTERVAL + rng.float(-COLLECTIBLE_SPAWN_JITTER, COLLECTIBLE_SPAWN_JITTER),
+    coralSpawnTimer: 0,
+    // First coral spawns sooner (30-60s) so player sees one early
+    coralNextSpawnAt: 30 + rng.float(0, 30),
     idCounter: 0,
     rng,
   };
@@ -105,7 +127,7 @@ function pickType(rng: SeededRng): [string, CollectibleTypeConfig] {
 // Spawn
 // ---------------------------------------------------------------------------
 
-function spawnCollectible(mgr: CollectibleManager, worldW: number, worldH: number): Collectible {
+function spawnDriftCollectible(mgr: CollectibleManager, worldW: number, worldH: number): Collectible {
   const [typeKey, config] = pickType(mgr.rng);
   const amount = Math.max(1, Math.round(config.baseAmount + mgr.rng.float(-config.amountJitter, config.amountJitter)));
   const margin = 80;
@@ -128,6 +150,31 @@ function spawnCollectible(mgr: CollectibleManager, worldW: number, worldH: numbe
   };
 }
 
+/** Spawn a stationary coral collectible on the seabed floor. */
+function spawnCoralCollectible(mgr: CollectibleManager, worldW: number, worldH: number): Collectible {
+  const config = COLLECTIBLE_TYPES.coral;
+  const amount = Math.max(1, Math.round(config.baseAmount + mgr.rng.float(-config.amountJitter, config.amountJitter)));
+  // Place along the bottom of the seabed with some horizontal spread
+  const margin = 120;
+  const x = mgr.rng.float(margin, worldW - margin);
+  const y = worldH - mgr.rng.float(20, 60); // near the bottom
+
+  return {
+    id: mgr.idCounter++,
+    typeKey: 'coral',
+    config,
+    x,
+    y,
+    baseY: y,
+    vx: 0, // stationary
+    amount,
+    age: 0,
+    seed: mgr.rng.int(0, 2_147_483_647),
+    state: 'drifting', // 'drifting' but vx=0, just sitting there
+    magnetTime: 0,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Update
 // ---------------------------------------------------------------------------
@@ -146,6 +193,7 @@ export interface CollectedResources {
   minerite: number;
   lux: number;
   nacre: number;
+  coral: number;
   /** Individual collection events this frame (for visual feedback) */
   events: CollectionEvent[];
 }
@@ -167,16 +215,25 @@ export function updateCollectibles(
   mouseY: number,
   collectRadius: number,
 ): CollectedResources {
-  const collected: CollectedResources = { plankton: 0, minerite: 0, lux: 0, nacre: 0, events: [] };
+  const collected: CollectedResources = { plankton: 0, minerite: 0, lux: 0, nacre: 0, coral: 0, events: [] };
   const magnetSnapDist = 5;
   const hasValidMouse = !isNaN(mouseX) && !isNaN(mouseY);
 
-  // --- Spawn ---
+  // --- Spawn drifting collectibles (plankton etc.) ---
   mgr.spawnTimer += dt;
   if (mgr.spawnTimer >= mgr.nextSpawnAt && mgr.items.length < COLLECTIBLE_MAX_ACTIVE) {
-    mgr.items.push(spawnCollectible(mgr, worldW, worldH));
+    mgr.items.push(spawnDriftCollectible(mgr, worldW, worldH));
     mgr.spawnTimer = 0;
     mgr.nextSpawnAt = COLLECTIBLE_SPAWN_INTERVAL + mgr.rng.float(-COLLECTIBLE_SPAWN_JITTER, COLLECTIBLE_SPAWN_JITTER);
+  }
+
+  // --- Spawn coral collectibles (separate timer) ---
+  mgr.coralSpawnTimer += dt;
+  const coralCount = mgr.items.filter(c => c.typeKey === 'coral').length;
+  if (mgr.coralSpawnTimer >= mgr.coralNextSpawnAt && coralCount < CORAL_MAX_ACTIVE) {
+    mgr.items.push(spawnCoralCollectible(mgr, worldW, worldH));
+    mgr.coralSpawnTimer = 0;
+    mgr.coralNextSpawnAt = CORAL_SPAWN_INTERVAL + mgr.rng.float(-CORAL_SPAWN_JITTER, CORAL_SPAWN_JITTER);
   }
 
   // --- Update each collectible ---
@@ -191,13 +248,14 @@ export function updateCollectibles(
     }
 
     if (c.state === 'drifting') {
-      // Horizontal drift
+      // Horizontal drift + vertical wobble (magnet-mode only; click-mode stays stationary)
       c.x += c.vx * dt;
-      // Vertical wobble (sine wave around baseY)
-      c.y = c.baseY + Math.sin(c.age * COLLECTIBLE_WOBBLE_FREQ * Math.PI * 2 + c.seed) * COLLECTIBLE_WOBBLE_AMP;
+      if (c.config.collectMode === 'magnet') {
+        c.y = c.baseY + Math.sin(c.age * COLLECTIBLE_WOBBLE_FREQ * Math.PI * 2 + c.seed) * COLLECTIBLE_WOBBLE_AMP;
+      }
 
-      // Check mouse proximity
-      if (hasValidMouse) {
+      // Check mouse proximity (magnet-mode collectibles only)
+      if (c.config.collectMode === 'magnet' && hasValidMouse) {
         const dx = c.x - mouseX;
         const dy = c.y - mouseY;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -234,13 +292,30 @@ export function updateCollectibles(
       }
     }
 
-    // Remove if off-screen left or too old
-    if (c.x < -40 || c.age > COLLECTIBLE_MAX_AGE) {
+    // Remove if off-screen left or too old (click-mode collectibles don't expire)
+    if (c.x < -40 || (c.config.collectMode === 'magnet' && c.age > COLLECTIBLE_MAX_AGE)) {
       mgr.items.splice(i, 1);
     }
   }
 
   return collected;
+}
+
+/**
+ * Try to collect a click-mode collectible at the given world position.
+ * Returns the collection event if something was collected, null otherwise.
+ */
+export function clickCollect(mgr: CollectibleManager, worldX: number, worldY: number): CollectionEvent | null {
+  for (const c of mgr.items) {
+    if (c.config.collectMode !== 'click' || c.state === 'collected') continue;
+    const dx = c.x - worldX;
+    const dy = c.y - worldY;
+    if (dx * dx + dy * dy < CORAL_CLICK_RADIUS * CORAL_CLICK_RADIUS) {
+      c.state = 'collected';
+      return { x: c.x, y: c.y, resource: c.config.resource, amount: c.amount };
+    }
+  }
+  return null;
 }
 
 /** Destroy all collectibles (for HMR or context loss). */
