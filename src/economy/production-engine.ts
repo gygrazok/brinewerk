@@ -3,17 +3,17 @@ import { calculateProduction } from '../creatures/production';
 import { unlockedSlots } from '../systems/coords';
 import { getUpgradeLevel, getUpgradeEffect } from '../systems/upgrades';
 
-/** Cached creature-id lookup map — invalidated each tick */
+/** Cached creature-id lookup map — invalidated when creatures array is mutated */
 let cachedMap: Map<string, GameState['creatures'][0]> | null = null;
-let cachedCreatures: GameState['creatures'] | null = null;
+let cachedLen = -1;
 
 /** Build a fast creature-id lookup map, reusing cache if creatures array hasn't changed */
 function getCreatureMap(state: GameState): Map<string, GameState['creatures'][0]> {
-  if (cachedMap && cachedCreatures === state.creatures) return cachedMap;
+  if (cachedMap && cachedLen === state.creatures.length) return cachedMap;
   const map = new Map<string, GameState['creatures'][0]>();
   for (const c of state.creatures) map.set(c.id, c);
   cachedMap = map;
-  cachedCreatures = state.creatures;
+  cachedLen = state.creatures.length;
   return map;
 }
 
