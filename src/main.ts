@@ -1,5 +1,5 @@
 import { Application } from 'pixi.js';
-import { initGameLoop, getState, getClock, onTide, onReleaseUnlock } from './core/game-loop';
+import { initGameLoop, getState, getClock, onTide, onAchievement } from './core/game-loop';
 import { initRenderer } from './rendering/renderer';
 import { createPoolView, destroyPoolView, syncPoolVisuals, updatePoolVisuals, panToWorldPos } from './ui/pool-view';
 import { destroyCreatureVisual } from './rendering/creature-renderer';
@@ -18,6 +18,8 @@ import { loadRenderSettings } from './rendering/render-settings';
 import { destroyRareFilterCache } from './rendering/shader-loader';
 import { getUpgradeLevel, getUpgradeEffect } from './systems/upgrades';
 import { isUpgradeModalOpen, updateUpgradeModal, setOnUpgradePurchase, destroyUpgradeModal } from './ui/upgrade-modal';
+import { isAchievementModalOpen, updateAchievementModal, destroyAchievementModal } from './ui/achievement-modal';
+import { showAchievementToast } from './ui/achievement-toast';
 import { createCollectibleManager, updateCollectibles, clearCollectibles, clickCollect, forceSpawnCoral, type CollectibleManager } from './systems/collectibles';
 import {
   createCollectibleLayer, syncCollectibleVisuals, destroyCollectibleLayer, type CollectibleLayer,
@@ -229,10 +231,14 @@ async function init() {
     if (isShoreModalOpen()) updateShoreModal(state);
   });
 
-  // Release unlock notification
-  onReleaseUnlock(() => {
+  // Achievement completion
+  onAchievement((defs) => {
+    for (const def of defs) {
+      showAchievementToast(def);
+    }
     updateHud(state);
-    console.log('Creature release unlocked — pool is full');
+    syncPoolVisuals(poolView, state);
+    renderShoreButton(state);
   });
 
   // Initial render
@@ -297,6 +303,7 @@ async function init() {
       renderShoreButton(state);
       if (isShoreModalOpen()) updateShoreModal(state);
       if (isUpgradeModalOpen()) updateUpgradeModal(state);
+      if (isAchievementModalOpen()) updateAchievementModal(state);
     }
   });
 
@@ -348,6 +355,7 @@ function cleanup(): void {
   destroyRareFilterCache();
   destroyShoreModal();
   destroyUpgradeModal();
+  destroyAchievementModal();
   hideCreaturePanel();
 }
 

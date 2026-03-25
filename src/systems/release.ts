@@ -3,7 +3,6 @@ import type { Creature } from '../creatures/creature';
 import { getRareInfo } from '../creatures/creature';
 import { NACRE_CONVERSION_RATE, NACRE_RARE_COMMON_MUL, NACRE_RARE_UNCOMMON_MUL, NACRE_RARE_RARE_MUL } from '../core/balance';
 import { findCreatureSlot, removeCreature } from './pool';
-import { unlockedSlots } from './coords';
 import { getUpgradeLevel, getUpgradeEffect } from './upgrades';
 
 /** Calculate nacre yield for releasing a creature */
@@ -39,18 +38,4 @@ export function releaseCreature(state: GameState, creatureId: string): number {
 
   state.resources.nacre += nacre;
   return nacre;
-}
-
-/** Check if all tier-0 slots are filled (unlock condition for release) */
-export function checkReleaseUnlock(state: GameState): boolean {
-  if (state.releaseUnlocked) return false; // already unlocked
-
-  const tier0Slots = unlockedSlots(state.pool).filter(s => s.tier === 0);
-  const allFilled = tier0Slots.length > 0 && tier0Slots.every(s => s.creatureId !== null);
-
-  if (allFilled) {
-    state.releaseUnlocked = true;
-    return true; // just unlocked
-  }
-  return false;
 }

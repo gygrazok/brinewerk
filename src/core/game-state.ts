@@ -3,7 +3,7 @@ import { SEABED_SLOTS } from '../systems/seabed-layout';
 import { DEFAULT_RARE_CHANCE, DEFAULT_UNLOCKED_RARE_IDS } from './balance';
 
 const SAVE_KEY = 'brinewerk_save';
-const CURRENT_SAVE_VERSION = 9;
+const CURRENT_SAVE_VERSION = 10;
 
 // --- Seabed pool (v3+) ---
 
@@ -47,6 +47,8 @@ export interface GameState {
   shoreTaken: boolean;
   /** Upgrade levels: upgradeId → current level (0 = not purchased) */
   upgrades: Record<string, number>;
+  /** Completed achievements: achievementId → true */
+  achievements: Record<string, boolean>;
 }
 
 export function createDefaultState(): GameState {
@@ -70,6 +72,7 @@ export function createDefaultState(): GameState {
     unlockedRares: [...DEFAULT_UNLOCKED_RARE_IDS],
     shoreTaken: false,
     upgrades: {},
+    achievements: {},
   };
 }
 
@@ -223,6 +226,16 @@ function migrateState(data: Record<string, unknown>): GameState {
     const d = data as Record<string, unknown>;
     if (d.upgrades === undefined) d.upgrades = {};
     data.saveVersion = 9;
+  }
+
+  // V9 → V10: add achievements record, migrate releaseUnlocked to achievement
+  if ((data.saveVersion as number) < 10) {
+    const d = data as Record<string, unknown>;
+    if (d.achievements === undefined) d.achievements = {};
+    if (d.releaseUnlocked === true) {
+      (d.achievements as Record<string, boolean>)['tide_pool_keeper'] = true;
+    }
+    data.saveVersion = 10;
   }
 
   // Validate critical fields exist after migration

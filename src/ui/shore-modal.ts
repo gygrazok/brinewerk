@@ -13,6 +13,8 @@ import {
   getTideTimeRemaining, isTideReady,
 } from '../systems/tides';
 import { openUpgradeModal } from './upgrade-modal';
+import { openAchievementModal } from './achievement-modal';
+import { getCompletedCount, getTotalCount } from '../systems/achievements';
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -58,12 +60,16 @@ export function renderShoreButton(state: GameState): void {
     bar.innerHTML = `
       <button id="shore-btn" class="btn btn-secondary"></button>
       <button id="upgrades-btn" class="btn btn-secondary">⬆ Upgrades</button>
+      <button id="achievements-btn" class="btn btn-secondary">🏆</button>
     `;
     document.getElementById('shore-btn')!.addEventListener('click', () => {
       if (stateRef) openShoreModal(stateRef);
     });
     document.getElementById('upgrades-btn')!.addEventListener('click', () => {
       if (stateRef) openUpgradeModal(stateRef);
+    });
+    document.getElementById('achievements-btn')!.addEventListener('click', () => {
+      if (stateRef) openAchievementModal(stateRef);
     });
     mounted = true;
   }
@@ -81,6 +87,14 @@ export function renderShoreButton(state: GameState): void {
     const timeStr = `${min}:${sec.toString().padStart(2, '0')}`;
     btn.innerHTML = `<span class="shore-btn-icon">🌊</span> ${remaining <= 0 ? 'Tide ready!' : timeStr}`;
     btn.classList.remove('btn-pulse');
+  }
+
+  // Update achievements badge
+  const achBtn = document.getElementById('achievements-btn');
+  if (achBtn) {
+    const done = getCompletedCount(state);
+    const total = getTotalCount();
+    achBtn.textContent = `🏆 ${done}/${total}`;
   }
 }
 

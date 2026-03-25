@@ -3,7 +3,7 @@ import { type Clock, createClock, tickClock, calculateOfflineElapsed } from './c
 import { type GameState, createDefaultState, loadState, saveState } from './game-state';
 import { tickProduction } from '../economy/production-engine';
 import { checkTide } from '../systems/tides';
-import { checkReleaseUnlock } from '../systems/release';
+import { checkAchievements, type AchievementDefinition } from '../systems/achievements';
 
 const AUTO_SAVE_INTERVAL = 30; // seconds
 
@@ -13,16 +13,17 @@ let state: GameState;
 let clock: Clock;
 let saveTimer = 0;
 let productionTimer = 0;
+let achievementTimer = 0;
 let savingEnabled = true;
 const onTideCallbacks: (() => void)[] = [];
-const onReleaseUnlockCallbacks: (() => void)[] = [];
+const onAchievementCallbacks: ((defs: AchievementDefinition[]) => void)[] = [];
 
 export function onTide(cb: () => void): void {
   onTideCallbacks.push(cb);
 }
 
-export function onReleaseUnlock(cb: () => void): void {
-  onReleaseUnlockCallbacks.push(cb);
+export function onAchievement(cb: (defs: AchievementDefinition[]) => void): void {
+  onAchievementCallbacks.push(cb);
 }
 
 export function getState(): GameState {
@@ -61,8 +62,13 @@ export function initGameLoop(ticker: Ticker): void {
     if (checkTide(state, Date.now())) {
       onTideCallbacks.forEach((cb) => cb());
     }
-    if (checkReleaseUnlock(state)) {
-      onReleaseUnlockCallbacks.forEach((cb) => cb());
+    achievementTimer += deltaSec;
+    if (achievementTimer >= 1) {
+      achievementTimer = 0;
+      const newAchievements = checkAchievements(state);
+      if (newAchievements.length > 0) {
+        onAchievementCallbacks.forEach((cb) => cb(newAchievements));
+      }
     }
 
     // Auto-save
