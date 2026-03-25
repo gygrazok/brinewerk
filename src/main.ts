@@ -9,7 +9,7 @@ import { releaseCreature } from './systems/release';
 import { forceInitialTide } from './systems/tides';
 import {
   setOnTakeCreature, renderShoreButton, updateShoreModal,
-  isShoreModalOpen, destroyShoreModal,
+  isShoreModalOpen, destroyShoreModal, openShoreModal,
 } from './ui/shore-modal';
 import { updateHud } from './ui/hud';
 import { initDebugMenu } from './ui/debug-menu';
@@ -137,6 +137,7 @@ async function init() {
 
   // Handle slot clicks
   let heldCreature: import('./creatures/creature').Creature | null = null;
+  let targetSlotId: string | null = null;
 
   poolView.onSlotClick = (slotId: string) => {
     // Place held creature
@@ -164,7 +165,10 @@ async function init() {
       };
       showCreaturePanel(creature, panelOpts);
     } else {
+      // Empty slot: open shore modal and target this slot for placement
       hideCreaturePanel();
+      targetSlotId = slotId;
+      openShoreModal(state);
     }
   };
 
@@ -200,18 +204,20 @@ async function init() {
     }
   };
 
-  // Shore: take creature → auto-place and pan camera, or hold for manual placement
+  // Shore: take creature → place in target slot (if set) or first empty, or hold for manual
   setOnTakeCreature((creature) => {
-    const emptySlotId = findEmptySlot(state);
-    if (emptySlotId) {
-      placeCreature(state, creature, emptySlotId);
+    // Use the targeted slot if one was set (clicked on empty slot to open modal)
+    const slotId = targetSlotId ?? findEmptySlot(state);
+    targetSlotId = null;
+
+    if (slotId && placeCreature(state, creature, slotId)) {
       syncPoolVisuals(poolView, state);
       updateHud(state);
       renderShoreButton(state);
-      // Pan camera to the placed creature's slot
-      const slot = state.pool.slots[emptySlotId];
+      const slot = state.pool.slots[slotId];
       if (slot) panToWorldPos(poolView, slot.x, slot.y);
     } else {
+      // Target slot was occupied or no empty slots — hold for manual placement
       heldCreature = creature;
       renderShoreButton(state);
     }
@@ -233,6 +239,11 @@ async function init() {
   syncPoolVisuals(poolView, state);
   renderShoreButton(state);
   updateHud(state);
+
+  // Clear target slot when shore is opened via the bottom-bar button (not from a slot click)
+  document.getElementById('shore-btn')?.addEventListener('click', () => {
+    targetSlotId = null;
+  });
 
   // Per-frame updates
   let hudTimer = 0;

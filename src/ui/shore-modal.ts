@@ -118,7 +118,7 @@ export function destroyShoreModal(): void {
 // Modal open / close
 // ---------------------------------------------------------------------------
 
-function openShoreModal(state: GameState): void {
+export function openShoreModal(state: GameState): void {
   if (modalOpen) return;
   stateRef = state;
   selectedIndex = null;
