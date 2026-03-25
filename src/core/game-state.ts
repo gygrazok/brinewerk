@@ -3,7 +3,7 @@ import { SEABED_SLOTS } from '../systems/seabed-layout';
 import { DEFAULT_RARE_CHANCE, DEFAULT_UNLOCKED_RARE_IDS } from './balance';
 
 const SAVE_KEY = 'brinewerk_save';
-const CURRENT_SAVE_VERSION = 7;
+const CURRENT_SAVE_VERSION = 8;
 
 // --- Seabed pool (v3+) ---
 
@@ -43,6 +43,8 @@ export interface GameState {
   rareChance: number;
   /** Set of rare effect IDs currently in the spawn pool */
   unlockedRares: string[];
+  /** Whether the player already took a creature this tide (limits to 1 per tide) */
+  shoreTaken: boolean;
 }
 
 export function createDefaultState(): GameState {
@@ -64,6 +66,7 @@ export function createDefaultState(): GameState {
     releaseUnlocked: false,
     rareChance: DEFAULT_RARE_CHANCE,
     unlockedRares: [...DEFAULT_UNLOCKED_RARE_IDS],
+    shoreTaken: false,
   };
 }
 
@@ -202,6 +205,13 @@ function migrateState(data: Record<string, unknown>): GameState {
   if ((data.saveVersion as number) < 7) {
     const resources = data.resources as Record<string, number>;
     if (resources.coral === undefined) resources.coral = 0;
+    data.saveVersion = 7;
+  }
+
+  // V7 → V8: add shoreTaken flag for 1-per-tide pickup limit
+  if ((data.saveVersion as number) < 8) {
+    const d = data as Record<string, unknown>;
+    if (d.shoreTaken === undefined) d.shoreTaken = false;
     data.saveVersion = CURRENT_SAVE_VERSION;
   }
 

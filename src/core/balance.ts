@@ -5,6 +5,11 @@ export const DEFAULT_RARE_CHANCE = 0.01; // 1% base chance of any rare
 /** Rare effect IDs unlocked at game start (tier 1) */
 export const DEFAULT_UNLOCKED_RARE_IDS: readonly string[] = ['metallic', 'shiny'];
 
+/** Shore mechanics */
+export const SHORE_CREATURE_COUNT = 2;                     // creatures per tide
+export const SHORE_REFRESH_COST = 100;                     // plankton cost to refresh shore
+export const SHORE_RARE_REFRESH_COST = 100;                // coral cost for rare-guaranteed refresh
+
 /** Tide timing (seconds) */
 export const TIDE_INTERVAL_MIN = 180; // 3 min
 export const TIDE_INTERVAL_MAX = 300; // 5 min

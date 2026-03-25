@@ -1,13 +1,16 @@
 import { Application } from 'pixi.js';
 import { initGameLoop, getState, getClock, onTide, onReleaseUnlock } from './core/game-loop';
 import { initRenderer } from './rendering/renderer';
-import { createPoolView, destroyPoolView, syncPoolVisuals, updatePoolVisuals } from './ui/pool-view';
+import { createPoolView, destroyPoolView, syncPoolVisuals, updatePoolVisuals, panToWorldPos } from './ui/pool-view';
 import { destroyCreatureVisual } from './rendering/creature-renderer';
 import { showCreaturePanel, hideCreaturePanel, type CreaturePanelOptions } from './ui/creature-panel';
 import { getCreatureAt, placeCreature, removeCreature, findEmptySlot, expandPool } from './systems/pool';
 import { releaseCreature } from './systems/release';
 import { forceInitialTide } from './systems/tides';
-import { renderShore, setOnPickUp } from './ui/tide-shore';
+import {
+  setOnTakeCreature, renderShoreButton, updateShoreModal,
+  isShoreModalOpen, destroyShoreModal,
+} from './ui/shore-modal';
 import { updateHud } from './ui/hud';
 import { initDebugMenu } from './ui/debug-menu';
 import { injectTheme } from './ui/theme';
@@ -139,7 +142,7 @@ async function init() {
       if (placeCreature(state, heldCreature, slotId)) {
         heldCreature = null;
         syncPoolVisuals(poolView, state);
-        renderShore(state);
+        renderShoreButton(state);
         updateHud(state);
       }
       return;
@@ -153,7 +156,7 @@ async function init() {
           releaseCreature(state, c.id);
           syncPoolVisuals(poolView, state);
           updateHud(state);
-          renderShore(state);
+          renderShoreButton(state);
         },
       };
       showCreaturePanel(creature, panelOpts);
@@ -179,7 +182,7 @@ async function init() {
     if (expandPool(state, slotId)) {
       syncPoolVisuals(poolView, state);
       updateHud(state);
-      renderShore(state);
+      renderShoreButton(state);
     }
   };
 
@@ -194,21 +197,27 @@ async function init() {
     }
   };
 
-  // Shore: pick up creature → auto-place or hold
-  setOnPickUp((creature) => {
+  // Shore: take creature → auto-place and pan camera, or hold for manual placement
+  setOnTakeCreature((creature) => {
     const emptySlotId = findEmptySlot(state);
     if (emptySlotId) {
       placeCreature(state, creature, emptySlotId);
       syncPoolVisuals(poolView, state);
       updateHud(state);
+      renderShoreButton(state);
+      // Pan camera to the placed creature's slot
+      const slot = state.pool.slots[emptySlotId];
+      if (slot) panToWorldPos(poolView, slot.x, slot.y);
     } else {
       heldCreature = creature;
+      renderShoreButton(state);
     }
   });
 
   // Tide callback
   onTide(() => {
-    renderShore(state);
+    renderShoreButton(state);
+    if (isShoreModalOpen()) updateShoreModal(state);
   });
 
   // Release unlock notification
@@ -219,7 +228,7 @@ async function init() {
 
   // Initial render
   syncPoolVisuals(poolView, state);
-  renderShore(state);
+  renderShoreButton(state);
   updateHud(state);
 
   // Per-frame updates
@@ -260,7 +269,8 @@ async function init() {
     if (hudTimer >= 1) {
       hudTimer = 0;
       updateHud(state);
-      renderShore(state);
+      renderShoreButton(state);
+      if (isShoreModalOpen()) updateShoreModal(state);
     }
   });
 
@@ -270,7 +280,7 @@ async function init() {
       state,
       () => {
         syncPoolVisuals(poolView, state);
-        renderShore(state);
+        renderShoreButton(state);
         updateHud(state);
       },
       () => window.location.reload(),
@@ -302,6 +312,7 @@ function cleanup(): void {
     currentPoolView = null;
   }
   destroyRareFilterCache();
+  destroyShoreModal();
   hideCreaturePanel();
 }
 

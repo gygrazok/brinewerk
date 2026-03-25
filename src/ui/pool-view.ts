@@ -458,6 +458,43 @@ function centerViewport(poolView: PoolView, _app: Application): void {
   clampViewport(poolView);
 }
 
+// --- Camera pan animation ---
+
+let panAnimId: number | null = null;
+
+/** Smoothly pan the camera to center on a world position over `durationMs` (default 500ms). */
+export function panToWorldPos(poolView: PoolView, worldX: number, worldY: number, durationMs = 500): void {
+  // Cancel any in-progress pan
+  if (panAnimId !== null) cancelAnimationFrame(panAnimId);
+
+  const screenW = poolView._app.screen.width;
+  const screenH = poolView._app.screen.height;
+  const targetX = Math.round(screenW / 2 - worldX * poolView.zoom);
+  const targetY = Math.round(screenH / 2 - worldY * poolView.zoom);
+  const startX = poolView.viewport.x;
+  const startY = poolView.viewport.y;
+  const startTime = performance.now();
+
+  function step() {
+    const elapsed = performance.now() - startTime;
+    const t = Math.min(1, elapsed / durationMs);
+    // Ease-out cubic
+    const ease = 1 - Math.pow(1 - t, 3);
+
+    poolView.viewport.x = startX + (targetX - startX) * ease;
+    poolView.viewport.y = startY + (targetY - startY) * ease;
+    clampViewport(poolView);
+
+    if (t < 1) {
+      panAnimId = requestAnimationFrame(step);
+    } else {
+      panAnimId = null;
+    }
+  }
+
+  panAnimId = requestAnimationFrame(step);
+}
+
 /** Sync creature visuals and slot graphics with game state */
 export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
   poolView._stateRef = state;
