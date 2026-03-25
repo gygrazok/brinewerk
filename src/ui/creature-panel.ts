@@ -97,29 +97,29 @@ function injectStyles(): void {
     #creature-detail .type-badge {
       display: inline-block;
       font-family: var(--font-body);
-      font-size: 11px; padding: 3px 10px;
+      font-size: 13px; padding: 3px 10px;
       background: var(--border); border-radius: 3px;
       color: var(--accent-hi);
     }
     #creature-detail .rare-badge {
       display: inline-block;
       font-family: var(--font-body);
-      font-size: 11px; padding: 3px 10px;
+      font-size: 13px; padding: 3px 10px;
       border-radius: 3px;
     }
     #creature-detail .production {
-      font-size: 13px; color: var(--accent);
+      font-size: 15px; color: var(--accent);
     }
 
     #creature-detail .traits { display: flex; flex-direction: column; gap: 5px; }
     #creature-detail .trait-row { display: flex; align-items: center; gap: 6px; }
     #creature-detail .trait-label {
-      width: 56px; text-align: right;
-      font-size: 10px; color: var(--text-dim); flex-shrink: 0;
+      width: 60px; text-align: right;
+      font-size: 12px; color: var(--text-dim); flex-shrink: 0;
       text-transform: uppercase; letter-spacing: 0.5px;
     }
     #creature-detail .trait-bar-bg {
-      flex: 1; height: 8px;
+      flex: 1; height: 10px;
       background: var(--bg-slot); border-radius: 2px;
       overflow: hidden;
     }
@@ -128,8 +128,8 @@ function injectStyles(): void {
       transition: width 0.3s ease;
     }
     #creature-detail .trait-val {
-      width: 32px; text-align: right;
-      font-size: 10px; color: var(--text-dim); flex-shrink: 0;
+      width: 34px; text-align: right;
+      font-size: 12px; color: var(--text-dim); flex-shrink: 0;
     }
 
     #release-confirm-overlay {
@@ -146,26 +146,26 @@ function injectStyles(): void {
     }
     #release-confirm-dialog .confirm-title {
       font-family: var(--font-display);
-      font-size: 10px; color: var(--accent); margin-bottom: 12px;
+      font-size: 12px; color: var(--accent); margin-bottom: 12px;
     }
     #release-confirm-dialog .confirm-text {
-      font-size: 12px; line-height: 1.5; margin-bottom: 16px; color: var(--text-dim);
+      font-size: 14px; line-height: 1.5; margin-bottom: 16px; color: var(--text-dim);
     }
     #release-confirm-dialog .confirm-nacre {
-      font-size: 16px; color: var(--accent); margin-bottom: 16px;
+      font-size: 18px; color: var(--accent); margin-bottom: 16px;
     }
     #release-confirm-dialog .confirm-actions {
       display: flex; gap: 12px; justify-content: center;
     }
 
     @media (max-width: 640px) {
-      #creature-detail .type-badge { font-size: 10px; }
-      #creature-detail .rare-badge { font-size: 10px; }
-      #creature-detail .production { font-size: 11px; }
-      #creature-detail .trait-label { font-size: 9px; width: 46px; }
-      #creature-detail .trait-val { font-size: 9px; }
-      #release-confirm-dialog .confirm-text { font-size: 11px; }
-      #release-confirm-dialog .confirm-nacre { font-size: 14px; }
+      #creature-detail .type-badge { font-size: 12px; }
+      #creature-detail .rare-badge { font-size: 12px; }
+      #creature-detail .production { font-size: 13px; }
+      #creature-detail .trait-label { font-size: 11px; width: 50px; }
+      #creature-detail .trait-val { font-size: 11px; }
+      #release-confirm-dialog .confirm-text { font-size: 13px; }
+      #release-confirm-dialog .confirm-nacre { font-size: 16px; }
     }
   `;
   document.head.appendChild(style);
@@ -218,7 +218,7 @@ export async function showCreaturePanel(creature: Creature, opts: CreaturePanelO
   // Build HTML
   let html = `
     <div class="panel-header">
-      <span style="color:var(--name); font-family:var(--font-display); font-size:11px;">${creature.name}</span>
+      <span style="color:var(--name); font-family:var(--font-display); font-size:13px;">${creature.name}</span>
       <button class="btn btn-ghost panel-close" id="panel-close-btn">\u2715</button>
     </div>
     <div class="panel-body">

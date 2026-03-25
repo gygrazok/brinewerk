@@ -103,14 +103,14 @@ export function injectTheme(): void {
     }
     .resource-item .res-value {
       font-family: var(--font-body);
-      font-size: 14px;
+      font-size: 16px;
       font-weight: 500;
       color: var(--accent-hi);
       white-space: nowrap;
     }
     .resource-item .res-rate {
       font-family: var(--font-body);
-      font-size: 11px;
+      font-size: 13px;
       color: var(--accent);
     }
 
@@ -137,7 +137,7 @@ export function injectTheme(): void {
       background: var(--bg-slot);
       border: 1px solid var(--accent);
       color: var(--accent-hi);
-      font-size: 13px;
+      font-size: 15px;
       font-weight: 500;
       padding: 10px 16px;
     }
@@ -151,7 +151,7 @@ export function injectTheme(): void {
       background: var(--bg-deep);
       border: 1px solid var(--border);
       color: var(--text);
-      font-size: 12px;
+      font-size: 14px;
       padding: 8px 12px;
     }
     .btn-secondary:hover:not(.disabled):not(.unaffordable) {
@@ -164,7 +164,7 @@ export function injectTheme(): void {
       background: var(--danger-bg);
       border: 1px solid var(--danger-border);
       color: var(--danger-text);
-      font-size: 13px;
+      font-size: 15px;
       font-weight: 500;
       padding: 10px 16px;
     }
@@ -178,7 +178,7 @@ export function injectTheme(): void {
       background: none;
       border: none;
       color: var(--text-dim);
-      font-size: 14px;
+      font-size: 16px;
       padding: 4px 8px;
     }
     .btn-ghost:hover { color: var(--accent-hi); }
@@ -188,10 +188,10 @@ export function injectTheme(): void {
     .btn-rare:hover:not(.unaffordable):not(.disabled) { border-color: #c44488; color: #e066aa; }
 
     /* Small size modifier */
-    .btn-sm { font-size: 12px; padding: 5px 14px; }
+    .btn-sm { font-size: 13px; padding: 5px 14px; }
 
     /* Inline cost label inside buttons */
-    .btn-cost { font-size: 10px; color: var(--text-dim); }
+    .btn-cost { font-size: 12px; color: var(--text-dim); }
 
     /* Pulse animation for attention states */
     .btn-pulse {
@@ -221,13 +221,13 @@ export function injectTheme(): void {
         --top-bar-h: 40px;
         --bottom-bar-h: 44px;
       }
-      .resource-item .res-value { font-size: 12px; }
-      .resource-item .res-rate { font-size: 10px; }
-      .btn-primary { font-size: 12px; padding: 8px 12px; }
-      .btn-secondary { font-size: 11px; padding: 6px 10px; }
-      .btn-danger { font-size: 12px; padding: 8px 12px; }
-      .btn-sm { font-size: 11px; padding: 4px 12px; }
-      .btn-cost { font-size: 9px; }
+      .resource-item .res-value { font-size: 14px; }
+      .resource-item .res-rate { font-size: 11px; }
+      .btn-primary { font-size: 13px; padding: 8px 12px; }
+      .btn-secondary { font-size: 13px; padding: 6px 10px; }
+      .btn-danger { font-size: 13px; padding: 8px 12px; }
+      .btn-sm { font-size: 12px; padding: 4px 12px; }
+      .btn-cost { font-size: 11px; }
     }
   `;
 

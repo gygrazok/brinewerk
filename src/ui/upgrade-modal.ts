@@ -222,7 +222,7 @@ function injectStyles(): void {
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
     }
-    .upgrade-title { font-family: var(--font-display); font-size: 11px; color: var(--name); }
+    .upgrade-title { font-family: var(--font-display); font-size: 13px; color: var(--name); }
 
     .upgrade-list {
       padding: 12px 16px;
@@ -247,18 +247,18 @@ function injectStyles(): void {
     .upgrade-icon { font-size: 20px; flex-shrink: 0; line-height: 1; }
 
     .upgrade-info { flex: 1; min-width: 0; }
-    .upgrade-name { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
-    .upgrade-desc { font-size: 11px; color: var(--text-dim); }
+    .upgrade-name { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+    .upgrade-desc { font-size: 13px; color: var(--text-dim); }
 
     .upgrade-level {
-      font-size: 10px; color: var(--text-dim);
+      font-size: 12px; color: var(--text-dim);
       flex-shrink: 0; text-align: right;
       white-space: nowrap;
     }
     .upgrade-max {
       color: var(--accent);
       font-weight: 700;
-      font-size: 10px;
+      font-size: 12px;
       letter-spacing: 1px;
     }
 
@@ -268,15 +268,15 @@ function injectStyles(): void {
     }
 
     .upgrade-purchased {
-      font-size: 11px;
+      font-size: 13px;
       color: var(--accent);
       font-style: italic;
     }
 
     @media (max-width: 640px) {
       .upgrade-icon { font-size: 18px; }
-      .upgrade-name { font-size: 12px; }
-      .upgrade-desc { font-size: 10px; }
+      .upgrade-name { font-size: 14px; }
+      .upgrade-desc { font-size: 12px; }
     }
   `;
   document.head.appendChild(style);

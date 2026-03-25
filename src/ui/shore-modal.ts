@@ -483,9 +483,9 @@ function injectStyles(): void {
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
     }
-    .shore-title { font-family: var(--font-display); font-size: 11px; color: var(--name); }
+    .shore-title { font-family: var(--font-display); font-size: 13px; color: var(--name); }
     /* Timer */
-    .shore-timer { text-align: center; padding: 10px 16px; font-size: 13px; color: var(--text-dim); flex-shrink: 0; }
+    .shore-timer { text-align: center; padding: 10px 16px; font-size: 15px; color: var(--text-dim); flex-shrink: 0; }
     .timer-value { color: var(--accent); margin-left: 6px; font-family: var(--font-body); }
 
     /* Refresh actions */
@@ -502,7 +502,7 @@ function injectStyles(): void {
     .shore-creatures::-webkit-scrollbar-track { background: transparent; }
     .shore-creatures::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
     .shore-empty-msg {
-      text-align: center; color: var(--text-dim); font-size: 12px;
+      text-align: center; color: var(--text-dim); font-size: 14px;
       padding: 24px 0; width: 100%; font-style: italic;
     }
     .shore-creature-card {
@@ -524,10 +524,10 @@ function injectStyles(): void {
       image-rendering: pixelated;
     }
     .shore-card-info { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-    .shore-card-name { font-family: var(--font-display); font-size: 8px; color: var(--name); text-align: center; }
-    .shore-card-type { font-size: 11px; color: var(--accent); }
+    .shore-card-name { font-family: var(--font-display); font-size: 9px; color: var(--name); text-align: center; }
+    .shore-card-type { font-size: 13px; color: var(--accent); }
     .shore-card-rare {
-      display: inline-block; font-size: 10px; padding: 2px 8px;
+      display: inline-block; font-size: 12px; padding: 2px 8px;
       border: 1px solid; border-radius: 3px; margin-top: 2px;
     }
 
@@ -535,23 +535,23 @@ function injectStyles(): void {
     .shore-stats { padding: 0 16px; flex-shrink: 0; }
     .shore-stats-inner { display: flex; flex-direction: column; gap: 5px; padding: 10px 0; }
     .shore-trait-row { display: flex; align-items: center; gap: 6px; }
-    .shore-trait-label { width: 56px; text-align: right; font-size: 10px; color: var(--text-dim); flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.5px; }
-    .shore-trait-bar-bg { flex: 1; height: 8px; background: var(--bg-deep); border-radius: 2px; overflow: hidden; }
+    .shore-trait-label { width: 60px; text-align: right; font-size: 12px; color: var(--text-dim); flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.5px; }
+    .shore-trait-bar-bg { flex: 1; height: 10px; background: var(--bg-deep); border-radius: 2px; overflow: hidden; }
     .shore-trait-bar-fill { height: 100%; border-radius: 2px; transition: width 0.3s ease; }
-    .shore-trait-val { width: 30px; text-align: right; font-size: 10px; color: var(--text-dim); flex-shrink: 0; }
+    .shore-trait-val { width: 34px; text-align: right; font-size: 12px; color: var(--text-dim); flex-shrink: 0; }
 
     /* Take button */
     .shore-take-area { padding: 8px 16px 16px; flex-shrink: 0; }
 
     @media (max-width: 640px) {
-      .shore-timer { font-size: 11px; }
+      .shore-timer { font-size: 13px; }
       .shore-card-preview { width: 96px; height: 96px; }
-      .shore-card-type { font-size: 10px; }
-      .shore-card-rare { font-size: 9px; }
-      .shore-trait-label { font-size: 9px; width: 46px; }
-      .shore-trait-val { font-size: 9px; }
-      .shore-trait-bar-bg { height: 6px; }
-      .shore-empty-msg { font-size: 11px; }
+      .shore-card-type { font-size: 12px; }
+      .shore-card-rare { font-size: 11px; }
+      .shore-trait-label { font-size: 11px; width: 50px; }
+      .shore-trait-val { font-size: 11px; }
+      .shore-trait-bar-bg { height: 8px; }
+      .shore-empty-msg { font-size: 13px; }
     }
   `;
   document.head.appendChild(style);
