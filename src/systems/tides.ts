@@ -3,10 +3,11 @@ import { type Creature, spawnCreature } from '../creatures/creature';
 import { CreatureType } from '../creatures/types';
 import {
   TIDE_INTERVAL_MIN, TIDE_INTERVAL_MAX,
-  SHORE_CREATURE_COUNT, SHORE_REFRESH_COST, SHORE_RARE_REFRESH_COST,
+  SHORE_REFRESH_COST, SHORE_RARE_REFRESH_COST,
 } from '../core/balance';
 import { allSlots } from './coords';
 import { mulberry32 } from '../util/prng';
+import { getUpgradeLevel, getUpgradeEffect } from './upgrades';
 
 /** Creature types available from tides */
 const TIDE_TYPES = [CreatureType.Stellarid, CreatureType.Blobid, CreatureType.Corallid, CreatureType.Nucleid];
@@ -15,7 +16,8 @@ const TIDE_TYPES = [CreatureType.Stellarid, CreatureType.Blobid, CreatureType.Co
 function generateShoreCreatures(state: GameState, forceRareOnFirst = false): Creature[] {
   const rng = mulberry32(Date.now());
   const creatures: Creature[] = [];
-  for (let i = 0; i < SHORE_CREATURE_COUNT; i++) {
+  const shoreCount = getUpgradeEffect('bountiful_shore', getUpgradeLevel(state, 'bountiful_shore'));
+  for (let i = 0; i < shoreCount; i++) {
     const type = TIDE_TYPES[Math.floor(rng() * TIDE_TYPES.length)];
     if (forceRareOnFirst && i === 0) {
       creatures.push(spawnCreature({ rareChance: 1.0, unlockedRares: state.unlockedRares }, { type }));
@@ -30,7 +32,8 @@ function generateShoreCreatures(state: GameState, forceRareOnFirst = false): Cre
 export function checkTide(state: GameState, now: number): boolean {
   const elapsed = (now - state.lastTideTimestamp) / 1000;
   const rng = mulberry32(state.lastTideTimestamp);
-  const interval = TIDE_INTERVAL_MIN + rng() * (TIDE_INTERVAL_MAX - TIDE_INTERVAL_MIN);
+  const swiftMul = getUpgradeEffect('swift_tides', getUpgradeLevel(state, 'swift_tides'));
+  const interval = (TIDE_INTERVAL_MIN + rng() * (TIDE_INTERVAL_MAX - TIDE_INTERVAL_MIN)) * swiftMul;
 
   if (elapsed < interval) return false;
 
@@ -43,14 +46,16 @@ export function checkTide(state: GameState, now: number): boolean {
 /** Returns seconds remaining until next tide (approximate, uses interval midpoint) */
 export function getTideTimeRemaining(state: GameState): number {
   const elapsed = (Date.now() - state.lastTideTimestamp) / 1000;
-  const midInterval = (TIDE_INTERVAL_MIN + TIDE_INTERVAL_MAX) / 2;
+  const swiftMul = getUpgradeEffect('swift_tides', getUpgradeLevel(state, 'swift_tides'));
+  const midInterval = ((TIDE_INTERVAL_MIN + TIDE_INTERVAL_MAX) / 2) * swiftMul;
   return Math.max(0, midInterval - elapsed);
 }
 
 /** Returns true if the tide interval has elapsed (tide is ready) */
 export function isTideReady(state: GameState): boolean {
   const elapsed = (Date.now() - state.lastTideTimestamp) / 1000;
-  return elapsed >= TIDE_INTERVAL_MIN;
+  const swiftMul = getUpgradeEffect('swift_tides', getUpgradeLevel(state, 'swift_tides'));
+  return elapsed >= TIDE_INTERVAL_MIN * swiftMul;
 }
 
 /** Pick up a creature from shore (free, limited to 1 per tide) */

@@ -20,9 +20,9 @@ export function injectTheme(): void {
       --accent-hi:  #7eeee4;
       --name:       #dadaff;
       --warn:       #8b3a5a;
-      --danger-bg:  #1a2a2f;
-      --danger-border: #3a5a5f;
-      --danger-text: #e8d0c0;
+      --danger-bg:  #1c1418;
+      --danger-border: #5a2a3a;
+      --danger-text: #e07070;
 
       /* Fonts */
       --font-display: 'Press Start 2P', monospace;
@@ -169,7 +169,7 @@ export function injectTheme(): void {
       padding: 10px 16px;
     }
     .btn-danger:hover:not(.disabled) {
-      background: #2a3a3f;
+      background: #2a1a22;
       border-color: var(--danger-text);
     }
 
@@ -182,6 +182,27 @@ export function injectTheme(): void {
       padding: 4px 8px;
     }
     .btn-ghost:hover { color: var(--accent-hi); }
+
+    /* Rare variant: magenta tones (combine with btn-secondary) */
+    .btn-rare { border-color: #8b225260; }
+    .btn-rare:hover:not(.unaffordable):not(.disabled) { border-color: #c44488; color: #e066aa; }
+
+    /* Small size modifier */
+    .btn-sm { font-size: 12px; padding: 5px 14px; }
+
+    /* Inline cost label inside buttons */
+    .btn-cost { font-size: 10px; color: var(--text-dim); }
+
+    /* Pulse animation for attention states */
+    .btn-pulse {
+      border-color: var(--accent);
+      color: var(--accent-hi);
+      animation: btn-pulse-anim 2s ease-in-out infinite;
+    }
+    @keyframes btn-pulse-anim {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(58, 173, 168, 0); }
+      50% { box-shadow: 0 0 8px 2px rgba(58, 173, 168, 0.3); }
+    }
 
     /* Disabled state (any button variant) */
     .btn.disabled, .btn.unaffordable {
@@ -205,6 +226,8 @@ export function injectTheme(): void {
       .btn-primary { font-size: 12px; padding: 8px 12px; }
       .btn-secondary { font-size: 11px; padding: 6px 10px; }
       .btn-danger { font-size: 12px; padding: 8px 12px; }
+      .btn-sm { font-size: 11px; padding: 4px 12px; }
+      .btn-cost { font-size: 9px; }
     }
   `;
 

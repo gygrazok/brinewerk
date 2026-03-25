@@ -1,6 +1,7 @@
 import type { GameState } from '../core/game-state';
 import { calculateProduction } from '../creatures/production';
 import { unlockedSlots } from '../systems/coords';
+import { getUpgradeLevel, getUpgradeEffect } from '../systems/upgrades';
 
 /** Cached creature-id lookup map — invalidated each tick */
 let cachedMap: Map<string, GameState['creatures'][0]> | null = null;
@@ -20,6 +21,7 @@ function getCreatureMap(state: GameState): Map<string, GameState['creatures'][0]
 export function tickProduction(state: GameState, deltaSec: number): void {
   let totalPlanktonPerSec = 0;
   const creatureMap = getCreatureMap(state);
+  const fertileMultiplier = getUpgradeEffect('fertile_waters', getUpgradeLevel(state, 'fertile_waters'));
 
   for (const slot of unlockedSlots(state.pool)) {
     if (!slot.creatureId) continue;
@@ -28,10 +30,10 @@ export function tickProduction(state: GameState, deltaSec: number): void {
 
     const prod = calculateProduction(creature);
     totalPlanktonPerSec += prod;
-    creature.lifetimePlankton += prod * deltaSec;
+    creature.lifetimePlankton += prod * deltaSec * fertileMultiplier;
   }
 
-  state.resources.plankton += totalPlanktonPerSec * deltaSec;
+  state.resources.plankton += totalPlanktonPerSec * deltaSec * fertileMultiplier;
 }
 
 /** Get current total plankton/s rate */
@@ -44,5 +46,6 @@ export function getTotalProductionRate(state: GameState): number {
     if (!creature) continue;
     total += calculateProduction(creature);
   }
-  return total;
+  const fertileMultiplier = getUpgradeEffect('fertile_waters', getUpgradeLevel(state, 'fertile_waters'));
+  return total * fertileMultiplier;
 }

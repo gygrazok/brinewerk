@@ -12,6 +12,7 @@ import {
   pickUpCreature, refreshShore, rareRefreshShore, flushTide,
   getTideTimeRemaining, isTideReady,
 } from '../systems/tides';
+import { openUpgradeModal } from './upgrade-modal';
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -54,9 +55,15 @@ export function renderShoreButton(state: GameState): void {
   if (!bar) return;
 
   if (!mounted) {
-    bar.innerHTML = '<button id="shore-btn" class="shore-btn"></button>';
+    bar.innerHTML = `
+      <button id="shore-btn" class="btn btn-secondary"></button>
+      <button id="upgrades-btn" class="btn btn-secondary">⬆ Upgrades</button>
+    `;
     document.getElementById('shore-btn')!.addEventListener('click', () => {
       if (stateRef) openShoreModal(stateRef);
+    });
+    document.getElementById('upgrades-btn')!.addEventListener('click', () => {
+      if (stateRef) openUpgradeModal(stateRef);
     });
     mounted = true;
   }
@@ -66,14 +73,14 @@ export function renderShoreButton(state: GameState): void {
 
   if (!state.shoreTaken && state.shore.length > 0) {
     btn.innerHTML = `<span class="shore-btn-icon">🌊</span> Shore (${state.shore.length})`;
-    btn.classList.add('has-creatures');
+    btn.classList.add('btn-pulse');
   } else {
     const remaining = getTideTimeRemaining(state);
     const min = Math.floor(remaining / 60);
     const sec = Math.floor(remaining % 60);
     const timeStr = `${min}:${sec.toString().padStart(2, '0')}`;
     btn.innerHTML = `<span class="shore-btn-icon">🌊</span> ${remaining <= 0 ? 'Tide ready!' : timeStr}`;
-    btn.classList.remove('has-creatures');
+    btn.classList.remove('btn-pulse');
   }
 }
 
@@ -178,8 +185,8 @@ function renderModalContent(state: GameState): void {
     </div>
     <div class="shore-timer" id="shore-timer"></div>
     <div class="shore-actions" id="shore-actions">
-      <button class="btn btn-secondary shore-action-btn" id="shore-refresh">Refresh<br><span class="action-cost">${SHORE_REFRESH_COST} 🟢</span></button>
-      <button class="btn btn-secondary shore-action-btn rare" id="shore-rare-refresh">Rare Refresh<br><span class="action-cost">${SHORE_RARE_REFRESH_COST} 🪸</span></button>
+      <button class="btn btn-secondary shore-action-btn" id="shore-refresh">Refresh<br><span class="btn-cost">${SHORE_REFRESH_COST} 🟢</span></button>
+      <button class="btn btn-secondary btn-rare shore-action-btn" id="shore-rare-refresh">Rare Refresh<br><span class="btn-cost">${SHORE_RARE_REFRESH_COST} 🪸</span></button>
     </div>
     <div class="shore-creatures" id="shore-creatures"></div>
     <div class="shore-stats" id="shore-stats"></div>
@@ -426,32 +433,6 @@ function injectStyles(): void {
   const style = document.createElement('style');
   style.id = 'shore-modal-styles';
   style.textContent = `
-    /* Shore button */
-    .shore-btn {
-      background: var(--bg-deep);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      color: var(--text-dim);
-      font-family: var(--font-body);
-      font-size: 13px;
-      font-weight: 500;
-      padding: 8px 20px;
-      cursor: pointer;
-      transition: border-color 0.15s, color 0.15s;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .shore-btn:hover { border-color: var(--accent); color: var(--text); }
-    .shore-btn.has-creatures {
-      border-color: var(--accent);
-      color: var(--accent-hi);
-      animation: shore-pulse 2s ease-in-out infinite;
-    }
-    @keyframes shore-pulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(58, 173, 168, 0); }
-      50% { box-shadow: 0 0 8px 2px rgba(58, 173, 168, 0.3); }
-    }
 
     /* Overlay */
     #shore-overlay {
@@ -470,14 +451,14 @@ function injectStyles(): void {
       font-family: var(--font-body);
       color: var(--text);
       display: flex; flex-direction: column;
-      overflow-y: auto;
+      overflow: hidden;
     }
     @media (min-width: 641px) {
       #shore-modal {
         top: 50%; left: 50%;
         transform: translate(-50%, -50%) scale(0.95);
         opacity: 0;
-        width: 420px;
+        width: min(90vw, 800px);
         max-height: 85vh;
         border-radius: 10px;
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
@@ -503,29 +484,29 @@ function injectStyles(): void {
       flex-shrink: 0;
     }
     .shore-title { font-family: var(--font-display); font-size: 11px; color: var(--name); }
-    .shore-close { font-family: var(--font-body); }
-
     /* Timer */
-    .shore-timer { text-align: center; padding: 10px 16px; font-size: 13px; color: var(--text-dim); }
+    .shore-timer { text-align: center; padding: 10px 16px; font-size: 13px; color: var(--text-dim); flex-shrink: 0; }
     .timer-value { color: var(--accent); margin-left: 6px; font-family: var(--font-body); }
 
     /* Refresh actions */
-    .shore-actions { display: flex; gap: 8px; padding: 0 16px 10px; justify-content: center; }
-    .shore-action-btn {
-      flex: 1;
-    }
-    .shore-action-btn.rare { border-color: #8b225260; }
-    .shore-action-btn.rare:hover:not(.unaffordable):not(.disabled) { border-color: #c44488; color: #e066aa; }
-    .action-cost { font-size: 10px; color: var(--text-dim); }
+    .shore-actions { display: flex; gap: 8px; padding: 0 16px 10px; justify-content: center; flex-shrink: 0; }
+    .shore-action-btn { flex: 1; }
 
     /* Creature cards */
-    .shore-creatures { padding: 0 16px 10px; display: flex; gap: 8px; }
+    .shore-creatures {
+      padding: 0 16px 10px; display: flex; gap: 8px;
+      overflow-x: auto; flex-shrink: 1; min-height: 0;
+      -webkit-overflow-scrolling: touch;
+    }
+    .shore-creatures::-webkit-scrollbar { height: 4px; }
+    .shore-creatures::-webkit-scrollbar-track { background: transparent; }
+    .shore-creatures::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
     .shore-empty-msg {
       text-align: center; color: var(--text-dim); font-size: 12px;
       padding: 24px 0; width: 100%; font-style: italic;
     }
     .shore-creature-card {
-      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px;
+      flex: 1 0 auto; display: flex; flex-direction: column; align-items: center; gap: 8px;
       background: var(--bg-deep); border: 2px solid var(--border); border-radius: 6px;
       padding: 12px; cursor: pointer;
       transition: border-color 0.15s, background 0.15s;
@@ -551,7 +532,7 @@ function injectStyles(): void {
     }
 
     /* Stats panel */
-    .shore-stats { padding: 0 16px; }
+    .shore-stats { padding: 0 16px; flex-shrink: 0; }
     .shore-stats-inner { display: flex; flex-direction: column; gap: 5px; padding: 10px 0; }
     .shore-trait-row { display: flex; align-items: center; gap: 6px; }
     .shore-trait-label { width: 56px; text-align: right; font-size: 10px; color: var(--text-dim); flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -560,10 +541,9 @@ function injectStyles(): void {
     .shore-trait-val { width: 30px; text-align: right; font-size: 10px; color: var(--text-dim); flex-shrink: 0; }
 
     /* Take button */
-    .shore-take-area { padding: 8px 16px 16px; }
+    .shore-take-area { padding: 8px 16px 16px; flex-shrink: 0; }
 
     @media (max-width: 640px) {
-      .shore-btn { font-size: 11px; }
       .shore-timer { font-size: 11px; }
       .shore-card-preview { width: 96px; height: 96px; }
       .shore-card-type { font-size: 10px; }
@@ -572,7 +552,6 @@ function injectStyles(): void {
       .shore-trait-val { font-size: 9px; }
       .shore-trait-bar-bg { height: 6px; }
       .shore-empty-msg { font-size: 11px; }
-      .action-cost { font-size: 9px; }
     }
   `;
   document.head.appendChild(style);

@@ -16,6 +16,8 @@ import { initDebugMenu } from './ui/debug-menu';
 import { injectTheme } from './ui/theme';
 import { loadRenderSettings } from './rendering/render-settings';
 import { destroyRareFilterCache } from './rendering/shader-loader';
+import { getUpgradeLevel, getUpgradeEffect } from './systems/upgrades';
+import { isUpgradeModalOpen, updateUpgradeModal, setOnUpgradePurchase, destroyUpgradeModal } from './ui/upgrade-modal';
 import { createCollectibleManager, updateCollectibles, clearCollectibles, clickCollect, forceSpawnCoral, type CollectibleManager } from './systems/collectibles';
 import {
   createCollectibleLayer, syncCollectibleVisuals, destroyCollectibleLayer, type CollectibleLayer,
@@ -152,6 +154,7 @@ async function init() {
     if (creature) {
       const panelOpts: CreaturePanelOptions = {
         releaseUnlocked: state.releaseUnlocked,
+        state,
         onRelease: (c) => {
           releaseCreature(state, c.id);
           syncPoolVisuals(poolView, state);
@@ -240,6 +243,8 @@ async function init() {
 
     // Update floating collectibles
     if (collectibleMgr && collectibleLayer) {
+      const magnetMul = getUpgradeEffect('magnetic_current', getUpgradeLevel(state, 'magnetic_current'));
+      const coralMul = getUpgradeEffect('coral_growth', getUpgradeLevel(state, 'coral_growth'));
       const collected = updateCollectibles(
         collectibleMgr,
         deltaSec,
@@ -247,13 +252,21 @@ async function init() {
         state.pool.worldHeight,
         poolView.mouseWorldX,
         poolView.mouseWorldY,
-        COLLECTIBLE_COLLECT_RADIUS / poolView.zoom,
+        COLLECTIBLE_COLLECT_RADIUS * magnetMul / poolView.zoom,
         state.pool,
+        coralMul,
       );
       syncCollectibleVisuals(collectibleLayer, collectibleMgr, state.pool.worldWidth);
 
-      // Apply collected resources
-      if (collected.plankton > 0) state.resources.plankton += collected.plankton;
+      // Apply plankton surge upgrade to collectible plankton
+      const surgeMul = getUpgradeEffect('plankton_surge', getUpgradeLevel(state, 'plankton_surge'));
+      if (collected.plankton > 0) {
+        state.resources.plankton += collected.plankton * surgeMul;
+        // Update event amounts for popups
+        for (const ev of collected.events) {
+          if (ev.resource === 'plankton') ev.amount = Math.round(ev.amount * surgeMul);
+        }
+      }
       if (collected.minerite > 0) state.resources.minerite += collected.minerite;
       if (collected.lux > 0) state.resources.lux += collected.lux;
       if (collected.nacre > 0) state.resources.nacre += collected.nacre;
@@ -272,7 +285,14 @@ async function init() {
       updateHud(state);
       renderShoreButton(state);
       if (isShoreModalOpen()) updateShoreModal(state);
+      if (isUpgradeModalOpen()) updateUpgradeModal(state);
     }
+  });
+
+  // Upgrade purchase callback
+  setOnUpgradePurchase(() => {
+    updateHud(state);
+    renderShoreButton(state);
   });
 
   // Debug menu (dev only)
@@ -316,6 +336,7 @@ function cleanup(): void {
   }
   destroyRareFilterCache();
   destroyShoreModal();
+  destroyUpgradeModal();
   hideCreaturePanel();
 }
 

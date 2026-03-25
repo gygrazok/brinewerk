@@ -248,6 +248,7 @@ export function updateCollectibles(
   mouseY: number,
   collectRadius: number,
   pool?: SeabedPool,
+  coralSpawnMul?: number,
 ): CollectedResources {
   const collected: CollectedResources = { plankton: 0, minerite: 0, lux: 0, nacre: 0, coral: 0, events: [] };
   const magnetSnapDist = 5;
@@ -267,7 +268,7 @@ export function updateCollectibles(
   if (mgr.coralSpawnTimer >= mgr.coralNextSpawnAt && coralCount < CORAL_MAX_ACTIVE) {
     mgr.items.push(spawnCoralCollectible(mgr, worldW, worldH, pool));
     mgr.coralSpawnTimer = 0;
-    mgr.coralNextSpawnAt = CORAL_SPAWN_INTERVAL + mgr.rng.float(-CORAL_SPAWN_JITTER, CORAL_SPAWN_JITTER);
+    mgr.coralNextSpawnAt = (CORAL_SPAWN_INTERVAL + mgr.rng.float(-CORAL_SPAWN_JITTER, CORAL_SPAWN_JITTER)) * (coralSpawnMul ?? 1);
   }
 
   // --- Update each collectible ---

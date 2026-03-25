@@ -3,7 +3,7 @@ import { SEABED_SLOTS } from '../systems/seabed-layout';
 import { DEFAULT_RARE_CHANCE, DEFAULT_UNLOCKED_RARE_IDS } from './balance';
 
 const SAVE_KEY = 'brinewerk_save';
-const CURRENT_SAVE_VERSION = 8;
+const CURRENT_SAVE_VERSION = 9;
 
 // --- Seabed pool (v3+) ---
 
@@ -45,6 +45,8 @@ export interface GameState {
   unlockedRares: string[];
   /** Whether the player already took a creature this tide (limits to 1 per tide) */
   shoreTaken: boolean;
+  /** Upgrade levels: upgradeId → current level (0 = not purchased) */
+  upgrades: Record<string, number>;
 }
 
 export function createDefaultState(): GameState {
@@ -67,6 +69,7 @@ export function createDefaultState(): GameState {
     rareChance: DEFAULT_RARE_CHANCE,
     unlockedRares: [...DEFAULT_UNLOCKED_RARE_IDS],
     shoreTaken: false,
+    upgrades: {},
   };
 }
 
@@ -212,7 +215,14 @@ function migrateState(data: Record<string, unknown>): GameState {
   if ((data.saveVersion as number) < 8) {
     const d = data as Record<string, unknown>;
     if (d.shoreTaken === undefined) d.shoreTaken = false;
-    data.saveVersion = CURRENT_SAVE_VERSION;
+    data.saveVersion = 8;
+  }
+
+  // V8 → V9: add upgrades record for the upgrade system
+  if ((data.saveVersion as number) < 9) {
+    const d = data as Record<string, unknown>;
+    if (d.upgrades === undefined) d.upgrades = {};
+    data.saveVersion = 9;
   }
 
   // Validate critical fields exist after migration

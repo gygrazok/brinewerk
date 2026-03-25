@@ -1,4 +1,5 @@
 import type { Creature } from '../creatures/creature';
+import type { GameState } from '../core/game-state';
 import { getRareInfo } from '../creatures/creature';
 import { CREATURE_NAMES, CREATURE_ICONS } from '../creatures/types';
 import { calculateProduction } from '../creatures/production';
@@ -72,10 +73,6 @@ function injectStyles(): void {
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
     }
-    #creature-detail .panel-close {
-      font-family: var(--font-body);
-    }
-
     #creature-detail .panel-body {
       padding: 16px;
       display: flex; flex-direction: column; gap: 16px;
@@ -141,7 +138,7 @@ function injectStyles(): void {
       display: flex; align-items: center; justify-content: center;
     }
     #release-confirm-dialog {
-      background: var(--bg-panel); border: 1px solid var(--danger-border);
+      background: var(--bg-panel); border: 1px solid var(--border);
       border-radius: 8px; padding: 24px;
       font-family: var(--font-body);
       color: var(--text); max-width: 320px;
@@ -149,13 +146,13 @@ function injectStyles(): void {
     }
     #release-confirm-dialog .confirm-title {
       font-family: var(--font-display);
-      font-size: 10px; color: var(--danger-text); margin-bottom: 12px;
+      font-size: 10px; color: var(--accent); margin-bottom: 12px;
     }
     #release-confirm-dialog .confirm-text {
       font-size: 12px; line-height: 1.5; margin-bottom: 16px; color: var(--text-dim);
     }
     #release-confirm-dialog .confirm-nacre {
-      font-size: 16px; color: var(--danger-text); margin-bottom: 16px;
+      font-size: 16px; color: var(--accent); margin-bottom: 16px;
     }
     #release-confirm-dialog .confirm-actions {
       display: flex; gap: 12px; justify-content: center;
@@ -184,11 +181,12 @@ function ensurePanel(): { overlay: HTMLDivElement; panel: HTMLDivElement } {
 
   overlayEl = document.createElement('div');
   overlayEl.id = 'creature-overlay';
-  overlayEl.addEventListener('click', () => hideCreaturePanel(), { signal: panelAbort.signal });
+  overlayEl.addEventListener('click', () => hideCreaturePanel());
   document.body.appendChild(overlayEl);
 
   panelEl = document.createElement('div');
   panelEl.id = 'creature-detail';
+  panelEl.addEventListener('click', (e) => e.stopPropagation());
   document.body.appendChild(panelEl);
 
   return { overlay: overlayEl, panel: panelEl };
@@ -204,6 +202,7 @@ function cleanupPreview(): void {
 export interface CreaturePanelOptions {
   releaseUnlocked?: boolean;
   onRelease?: (creature: Creature) => void;
+  state?: GameState;
 }
 
 export async function showCreaturePanel(creature: Creature, opts: CreaturePanelOptions = {}): Promise<void> {
@@ -263,16 +262,16 @@ export async function showCreaturePanel(creature: Creature, opts: CreaturePanelO
 
   // Release button (only if feature is unlocked)
   if (opts.releaseUnlocked) {
-    const nacreYield = calculateNacreYield(creature);
+    const nacreYield = calculateNacreYield(creature, opts.state);
     if (nacreYield > 0) {
       html += `
-        <button class="btn btn-danger" id="release-btn">
+        <button class="btn btn-secondary" id="release-btn">
           ⚬ Release for ${nacreYield} Nacre
         </button>
       `;
     } else {
       html += `
-        <button class="btn btn-danger disabled">
+        <button class="btn btn-secondary disabled">
           ⚬ 0 Nacre earned
         </button>
       `;
@@ -295,7 +294,7 @@ export async function showCreaturePanel(creature: Creature, opts: CreaturePanelO
   if (releaseBtn && opts.onRelease) {
     const onRelease = opts.onRelease;
     releaseBtn.addEventListener('click', () => {
-      showReleaseConfirm(creature, onRelease);
+      showReleaseConfirm(creature, onRelease, opts.state);
     }, { signal });
   }
 
@@ -311,8 +310,8 @@ export async function showCreaturePanel(creature: Creature, opts: CreaturePanelO
   panelOpen = true;
 }
 
-function showReleaseConfirm(creature: Creature, onRelease: (creature: Creature) => void): void {
-  const nacreYield = calculateNacreYield(creature);
+function showReleaseConfirm(creature: Creature, onRelease: (creature: Creature) => void, state?: GameState): void {
+  const nacreYield = calculateNacreYield(creature, state);
 
   const confirmOverlay = document.createElement('div');
   confirmOverlay.id = 'release-confirm-overlay';
@@ -323,7 +322,7 @@ function showReleaseConfirm(creature: Creature, onRelease: (creature: Creature) 
       <div class="confirm-nacre">⚬ ${nacreYield} Nacre</div>
       <div class="confirm-actions">
         <button class="btn btn-secondary" id="confirm-cancel">Cancel</button>
-        <button class="btn btn-danger" id="confirm-release">Release ⚬${nacreYield}</button>
+        <button class="btn btn-primary" id="confirm-release">Release ⚬${nacreYield}</button>
       </div>
     </div>
   `;
