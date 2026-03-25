@@ -77,12 +77,12 @@ void main() {
   float sweep = sin(uTime * 0.8 + cellId * 6.28) * 0.5 + 0.5;
   float lightMod = 0.7 + 0.3 * sweep;
 
-  // Mix: flat glass color (modulated by light) with dark lead border
-  vec3 result = glass * lightMod;
-  // Blend with original color slightly so creature shape reads through
-  result = mix(col.rgb * 0.3, result, 0.7);
-  // Darken borders
-  result *= (1.0 - border * 0.8);
+  // Multiply blend: glass tints the original texture, preserving all detail
+  vec3 tinted = col.rgb * glass * lightMod * 2.0;
+  // Mix a little flat glass back in so borders between cells still read
+  vec3 result = mix(tinted, glass * lightMod * 0.6, 0.15);
+  // Darken lead borders
+  result *= (1.0 - border * 0.85);
 
   gl_FragColor = vec4(result, col.a);
 }
