@@ -26,6 +26,8 @@ let mounted = false;
 let lastKnownTideTimestamp = 0;
 /** Active PixiJS creature previews */
 let activePreviews: CreaturePreviewApp[] = [];
+/** AbortController for modal event listeners — aborted on close/destroy */
+let modalAbort: AbortController | null = null;
 
 function destroyPreviews(): void {
   for (const p of activePreviews) p.destroy();
@@ -116,16 +118,21 @@ function openShoreModal(state: GameState): void {
   modalOpen = true;
   lastKnownTideTimestamp = state.lastTideTimestamp;
 
+  // Abort any previous listeners
+  modalAbort?.abort();
+  modalAbort = new AbortController();
+  const { signal } = modalAbort;
+
   injectStyles();
 
   const overlay = document.createElement('div');
   overlay.id = 'shore-overlay';
-  overlay.addEventListener('click', () => closeShoreModal());
+  overlay.addEventListener('click', () => closeShoreModal(), { signal });
   document.body.appendChild(overlay);
 
   const modal = document.createElement('div');
   modal.id = 'shore-modal';
-  modal.addEventListener('click', (e) => e.stopPropagation());
+  modal.addEventListener('click', (e) => e.stopPropagation(), { signal });
   document.body.appendChild(modal);
 
   renderModalContent(state);
@@ -140,6 +147,8 @@ export function closeShoreModal(): void {
   if (!modalOpen) return;
   modalOpen = false;
   selectedIndex = null;
+  modalAbort?.abort();
+  modalAbort = null;
   destroyPreviews();
 
   const overlay = document.getElementById('shore-overlay');
@@ -179,8 +188,10 @@ function renderModalContent(state: GameState): void {
     </div>
   `;
 
+  const signal = modalAbort?.signal;
+
   // Close button
-  document.getElementById('shore-close-btn')!.addEventListener('click', () => closeShoreModal());
+  document.getElementById('shore-close-btn')!.addEventListener('click', () => closeShoreModal(), { signal });
 
   // Refresh buttons
   document.getElementById('shore-refresh')!.addEventListener('click', () => {
@@ -190,7 +201,7 @@ function renderModalContent(state: GameState): void {
       renderModalContent(stateRef);
       renderShoreButton(stateRef);
     }
-  });
+  }, { signal });
   document.getElementById('shore-rare-refresh')!.addEventListener('click', () => {
     if (!stateRef) return;
     if (rareRefreshShore(stateRef)) {
@@ -198,7 +209,7 @@ function renderModalContent(state: GameState): void {
       renderModalContent(stateRef);
       renderShoreButton(stateRef);
     }
-  });
+  }, { signal });
 
   // Take button
   document.getElementById('shore-take-btn')!.addEventListener('click', () => {
@@ -209,7 +220,7 @@ function renderModalContent(state: GameState): void {
       renderShoreButton(stateRef);
       onTakeCreatureCb?.(creature);
     }
-  });
+  }, { signal });
 
   renderCreatureCards(state);
   updateTimer(state);
@@ -270,13 +281,14 @@ function renderCreatureCards(state: GameState): void {
       }
     }
 
-    // Click handlers
+    // Click handlers (use modal AbortController for cleanup)
+    const signal = modalAbort?.signal;
     container.querySelectorAll('.shore-creature-card').forEach((card) => {
       card.addEventListener('click', () => {
         const idx = parseInt((card as HTMLElement).dataset.index!, 10);
         selectedIndex = idx;
         updateSelection(state);
-      });
+      }, { signal });
     });
   }
 
@@ -381,7 +393,7 @@ function updateTimer(state: GameState): void {
       selectedIndex = null;
       renderModalContent(stateRef);
       renderShoreButton(stateRef);
-    });
+    }, { signal: modalAbort?.signal });
   } else {
     const remaining = getTideTimeRemaining(state);
     if (remaining <= 0) {
@@ -564,4 +576,11 @@ function injectStyles(): void {
     }
   `;
   document.head.appendChild(style);
+}
+
+// HMR cleanup
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    destroyShoreModal();
+  });
 }

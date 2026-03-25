@@ -6,27 +6,18 @@ import {
   SHORE_CREATURE_COUNT, SHORE_REFRESH_COST, SHORE_RARE_REFRESH_COST,
 } from '../core/balance';
 import { allSlots } from './coords';
+import { mulberry32 } from '../util/prng';
 
 /** Creature types available from tides */
 const TIDE_TYPES = [CreatureType.Stellarid, CreatureType.Blobid, CreatureType.Corallid, CreatureType.Nucleid];
 
-/** Generate exactly SHORE_CREATURE_COUNT random tide creatures */
-function generateTideCreatures(state: GameState): Creature[] {
+/** Generate shore creatures. If forceRareOnFirst is true, the first creature is guaranteed rare. */
+function generateShoreCreatures(state: GameState, forceRareOnFirst = false): Creature[] {
+  const rng = mulberry32(Date.now());
   const creatures: Creature[] = [];
   for (let i = 0; i < SHORE_CREATURE_COUNT; i++) {
-    const type = TIDE_TYPES[Math.floor(Math.random() * TIDE_TYPES.length)];
-    creatures.push(spawnCreature(state, { type }));
-  }
-  return creatures;
-}
-
-/** Generate creatures with at least 1 guaranteed rare */
-function generateRareCreatures(state: GameState): Creature[] {
-  const creatures: Creature[] = [];
-  for (let i = 0; i < SHORE_CREATURE_COUNT; i++) {
-    const type = TIDE_TYPES[Math.floor(Math.random() * TIDE_TYPES.length)];
-    if (i === 0) {
-      // Force rare on first creature
+    const type = TIDE_TYPES[Math.floor(rng() * TIDE_TYPES.length)];
+    if (forceRareOnFirst && i === 0) {
       creatures.push(spawnCreature({ rareChance: 1.0, unlockedRares: state.unlockedRares }, { type }));
     } else {
       creatures.push(spawnCreature(state, { type }));
@@ -38,11 +29,12 @@ function generateRareCreatures(state: GameState): Creature[] {
 /** Check if a new tide should arrive */
 export function checkTide(state: GameState, now: number): boolean {
   const elapsed = (now - state.lastTideTimestamp) / 1000;
-  const interval = TIDE_INTERVAL_MIN + Math.random() * (TIDE_INTERVAL_MAX - TIDE_INTERVAL_MIN);
+  const rng = mulberry32(state.lastTideTimestamp);
+  const interval = TIDE_INTERVAL_MIN + rng() * (TIDE_INTERVAL_MAX - TIDE_INTERVAL_MIN);
 
   if (elapsed < interval) return false;
 
-  state.shore = generateTideCreatures(state);
+  state.shore = generateShoreCreatures(state);
   state.lastTideTimestamp = now;
   state.shoreTaken = false;
   return true;
@@ -76,7 +68,7 @@ export function pickUpCreature(state: GameState, shoreIndex: number): Creature |
 export function refreshShore(state: GameState): boolean {
   if (state.resources.plankton < SHORE_REFRESH_COST) return false;
   state.resources.plankton -= SHORE_REFRESH_COST;
-  state.shore = generateTideCreatures(state);
+  state.shore = generateShoreCreatures(state);
   state.shoreTaken = false;
   return true;
 }
@@ -85,14 +77,14 @@ export function refreshShore(state: GameState): boolean {
 export function rareRefreshShore(state: GameState): boolean {
   if (state.resources.coral < SHORE_RARE_REFRESH_COST) return false;
   state.resources.coral -= SHORE_RARE_REFRESH_COST;
-  state.shore = generateRareCreatures(state);
+  state.shore = generateShoreCreatures(state, true);
   state.shoreTaken = false;
   return true;
 }
 
 /** Flush current shore and trigger a new tide immediately */
 export function flushTide(state: GameState): void {
-  state.shore = generateTideCreatures(state);
+  state.shore = generateShoreCreatures(state);
   state.lastTideTimestamp = Date.now();
   state.shoreTaken = false;
 }

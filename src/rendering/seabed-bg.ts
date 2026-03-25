@@ -731,16 +731,19 @@ export function createAmbientParticles(worldW: number, worldH: number): AmbientP
   return { particles, gfx, worldW, worldH };
 }
 
+/** Module-level RNG for ambient particles (visual-only, seeded from timestamp) */
+let particleRng = new SeededRng(Date.now() | 0);
+
 function spawnParticle(worldW: number, worldH: number, randomY: boolean): Particle {
   return {
-    x: Math.random() * worldW,
-    y: randomY ? Math.random() * worldH : worldH + Math.random() * 40,
-    vx: (Math.random() - 0.5) * 12,
-    vy: -(8 + Math.random() * 18),
-    size: 2 + Math.random() * 3,
-    alpha: 0.3 + Math.random() * 0.35,
+    x: particleRng.float(0, worldW),
+    y: randomY ? particleRng.float(0, worldH) : worldH + particleRng.float(0, 40),
+    vx: (particleRng.next() - 0.5) * 12,
+    vy: -(8 + particleRng.next() * 18),
+    size: 2 + particleRng.next() * 3,
+    alpha: 0.3 + particleRng.next() * 0.35,
     life: 0,
-    maxLife: 8 + Math.random() * 15,
+    maxLife: 8 + particleRng.next() * 15,
   };
 }
 

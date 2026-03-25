@@ -10,6 +10,8 @@ let overlayEl: HTMLDivElement | null = null;
 let panelEl: HTMLDivElement | null = null;
 let previewHandle: CreaturePreviewApp | null = null;
 let panelOpen = false;
+/** AbortController for panel event listeners */
+let panelAbort: AbortController | null = null;
 
 /** Size of the preview PixiJS canvas in actual pixels */
 const PREVIEW_SIZE = 200;
@@ -177,9 +179,12 @@ function ensurePanel(): { overlay: HTMLDivElement; panel: HTMLDivElement } {
 
   injectStyles();
 
+  panelAbort?.abort();
+  panelAbort = new AbortController();
+
   overlayEl = document.createElement('div');
   overlayEl.id = 'creature-overlay';
-  overlayEl.addEventListener('click', () => hideCreaturePanel());
+  overlayEl.addEventListener('click', () => hideCreaturePanel(), { signal: panelAbort.signal });
   document.body.appendChild(overlayEl);
 
   panelEl = document.createElement('div');
@@ -280,8 +285,10 @@ export async function showCreaturePanel(creature: Creature, opts: CreaturePanelO
 
   panel.innerHTML = html;
 
+  const signal = panelAbort?.signal;
+
   // Close button
-  document.getElementById('panel-close-btn')!.addEventListener('click', () => hideCreaturePanel());
+  document.getElementById('panel-close-btn')!.addEventListener('click', () => hideCreaturePanel(), { signal });
 
   // Release button
   const releaseBtn = document.getElementById('release-btn');
@@ -289,7 +296,7 @@ export async function showCreaturePanel(creature: Creature, opts: CreaturePanelO
     const onRelease = opts.onRelease;
     releaseBtn.addEventListener('click', () => {
       showReleaseConfirm(creature, onRelease);
-    });
+    }, { signal });
   }
 
   // Setup PixiJS preview with creature visual (sprite + shader filters)
@@ -323,26 +330,46 @@ function showReleaseConfirm(creature: Creature, onRelease: (creature: Creature) 
 
   document.body.appendChild(confirmOverlay);
 
-  document.getElementById('confirm-cancel')!.addEventListener('click', () => {
+  // Use a local AbortController so all dialog listeners are cleaned up together
+  const dialogAbort = new AbortController();
+  const { signal: dialogSignal } = dialogAbort;
+
+  const dismissDialog = () => {
+    dialogAbort.abort();
     confirmOverlay.remove();
-  });
+  };
+
+  document.getElementById('confirm-cancel')!.addEventListener('click', dismissDialog, { signal: dialogSignal });
   confirmOverlay.addEventListener('click', (e) => {
-    if (e.target === confirmOverlay) confirmOverlay.remove();
-  });
+    if (e.target === confirmOverlay) dismissDialog();
+  }, { signal: dialogSignal });
 
   document.getElementById('confirm-release')!.addEventListener('click', () => {
-    confirmOverlay.remove();
+    dismissDialog();
     hideCreaturePanel();
     onRelease(creature);
-  });
+  }, { signal: dialogSignal });
 }
 
 export function hideCreaturePanel(): void {
   if (!panelOpen) return;
 
+  panelAbort?.abort();
+  panelAbort = null;
   cleanupPreview();
 
   if (overlayEl) overlayEl.classList.remove('open');
   if (panelEl) panelEl.classList.remove('open');
   panelOpen = false;
+}
+
+// HMR cleanup
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    hideCreaturePanel();
+    if (overlayEl) { overlayEl.remove(); overlayEl = null; }
+    if (panelEl) { panelEl.remove(); panelEl = null; }
+    const styles = document.getElementById('creature-panel-styles');
+    if (styles) styles.remove();
+  });
 }

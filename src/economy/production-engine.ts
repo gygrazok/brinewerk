@@ -2,17 +2,24 @@ import type { GameState } from '../core/game-state';
 import { calculateProduction } from '../creatures/production';
 import { unlockedSlots } from '../systems/coords';
 
-/** Build a fast creature-id lookup map */
-function buildCreatureMap(state: GameState): Map<string, typeof state.creatures[0]> {
-  const map = new Map<string, typeof state.creatures[0]>();
+/** Cached creature-id lookup map — invalidated each tick */
+let cachedMap: Map<string, GameState['creatures'][0]> | null = null;
+let cachedCreatures: GameState['creatures'] | null = null;
+
+/** Build a fast creature-id lookup map, reusing cache if creatures array hasn't changed */
+function getCreatureMap(state: GameState): Map<string, GameState['creatures'][0]> {
+  if (cachedMap && cachedCreatures === state.creatures) return cachedMap;
+  const map = new Map<string, GameState['creatures'][0]>();
   for (const c of state.creatures) map.set(c.id, c);
+  cachedMap = map;
+  cachedCreatures = state.creatures;
   return map;
 }
 
 /** Advance resource production for one tick */
 export function tickProduction(state: GameState, deltaSec: number): void {
   let totalPlanktonPerSec = 0;
-  const creatureMap = buildCreatureMap(state);
+  const creatureMap = getCreatureMap(state);
 
   for (const slot of unlockedSlots(state.pool)) {
     if (!slot.creatureId) continue;
@@ -30,7 +37,7 @@ export function tickProduction(state: GameState, deltaSec: number): void {
 /** Get current total plankton/s rate */
 export function getTotalProductionRate(state: GameState): number {
   let total = 0;
-  const creatureMap = buildCreatureMap(state);
+  const creatureMap = getCreatureMap(state);
   for (const slot of unlockedSlots(state.pool)) {
     if (!slot.creatureId) continue;
     const creature = creatureMap.get(slot.creatureId);

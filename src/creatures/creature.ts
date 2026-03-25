@@ -192,9 +192,10 @@ export function createCreature(
     opts = { type: typeOrOpts, seed, forceRare };
   }
 
-  const finalSeed = opts.seed ?? Math.floor(Math.random() * 2147483647);
+  const finalSeed = opts.seed ?? ((Date.now() + _nextId * 7919) & 0x7fffffff);
   const types = Object.values(CreatureType);
-  const finalType = opts.type ?? types[Math.floor(Math.random() * types.length)];
+  const typeRng = mulberry32(finalSeed ^ 0xbeef);
+  const finalType = opts.type ?? types[Math.floor(typeRng() * types.length)];
 
   const rng = mulberry32(finalSeed);
   const genes = randomGenotype(rng);

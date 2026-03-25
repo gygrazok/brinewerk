@@ -55,7 +55,7 @@ export function createDefaultState(): GameState {
 
   return {
     saveVersion: CURRENT_SAVE_VERSION,
-    seabedSeed: Math.floor(Math.random() * 2_147_483_647),
+    seabedSeed: (Date.now() * 2654435761) & 0x7fffffff,
     creatures: [],
     pool,
     resources: { plankton: 0, minerite: 0, lux: 0, nacre: 0, coral: 0 },
@@ -168,7 +168,7 @@ function migrateState(data: Record<string, unknown>): GameState {
 
   // V3 → V4: add seabedSeed for procedural decoration generation
   if ((data.saveVersion as number) < 4) {
-    data.seabedSeed = Math.floor(Math.random() * 2_147_483_647);
+    data.seabedSeed = (Date.now() * 2654435761) & 0x7fffffff;
     data.saveVersion = 4;
   }
 
@@ -215,5 +215,15 @@ function migrateState(data: Record<string, unknown>): GameState {
     data.saveVersion = CURRENT_SAVE_VERSION;
   }
 
+  // Validate critical fields exist after migration
+  const gs = data as Record<string, unknown>;
+  if (
+    typeof gs.saveVersion !== 'number' ||
+    !Array.isArray(gs.creatures) ||
+    typeof gs.pool !== 'object' || gs.pool === null ||
+    typeof gs.resources !== 'object' || gs.resources === null
+  ) {
+    throw new Error('Corrupted save: missing required GameState fields');
+  }
   return data as unknown as GameState;
 }

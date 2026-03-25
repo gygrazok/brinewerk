@@ -21,8 +21,6 @@ import crtFrag from './shaders/crt.glsl';
 import causticFrag from './shaders/caustic.glsl';
 import stainedFrag from './shaders/stained.glsl';
 import liquifyFrag from './shaders/liquify.glsl';
-import outlineFrag from './shaders/outline.glsl';
-import glowFrag from './shaders/glow.glsl';
 
 const RARE_FRAG: Partial<Record<RareEffect, string>> = {
   metallic: metallicFrag,
@@ -139,43 +137,6 @@ export function getRareFilter(rare: RareEffect): Filter | null {
   const filter = createRareFilter(rare);
   if (filter) rareFilterCache.set(rare, filter);
   return filter;
-}
-
-export function createOutlineFilter(
-  color: [number, number, number, number] = [1, 1, 1, 1],
-  width: number = 1,
-  texelSize: [number, number] = [1 / 120, 1 / 120],
-): Filter {
-  return new Filter({
-    glProgram: new GlProgram({ vertex: defaultVertex, fragment: outlineFrag }),
-    padding: 2,
-    resources: {
-      outlineUniforms: {
-        uOutlineColor: { value: new Float32Array(color), type: 'vec4<f32>' },
-        uOutlineWidth: { value: width, type: 'f32' },
-        uTexelSize: { value: new Float32Array(texelSize), type: 'vec2<f32>' },
-      },
-    },
-  });
-}
-
-export function createGlowFilter(
-  color: [number, number, number, number] = [0.5, 0.9, 0.9, 0.8],
-  strength: number = 1.0,
-  texelSize: [number, number] = [1 / 120, 1 / 120],
-): Filter {
-  return new Filter({
-    glProgram: new GlProgram({ vertex: defaultVertex, fragment: glowFrag }),
-    padding: 16,
-    resources: {
-      glowUniforms: {
-        uGlowColor: { value: new Float32Array(color), type: 'vec4<f32>' },
-        uGlowStrength: { value: strength, type: 'f32' },
-        uTime: { value: 0, type: 'f32' },
-        uTexelSize: { value: new Float32Array(texelSize), type: 'vec2<f32>' },
-      },
-    },
-  });
 }
 
 /** Update uTime on all shared rare filters */
