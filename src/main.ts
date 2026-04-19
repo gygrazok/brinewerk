@@ -19,6 +19,7 @@ import { destroyRareFilterCache } from './rendering/shader-loader';
 import { getUpgradeLevel, getUpgradeEffect } from './systems/upgrades';
 import { isUpgradeModalOpen, updateUpgradeModal, setOnUpgradePurchase, destroyUpgradeModal } from './ui/upgrade-modal';
 import { isAchievementModalOpen, updateAchievementModal, destroyAchievementModal } from './ui/achievement-modal';
+import { isReleaseUnlocked } from './systems/achievements';
 import { showAchievementToast } from './ui/achievement-toast';
 import { createCollectibleManager, updateCollectibles, clearCollectibles, clickCollect, forceSpawnCoral, type CollectibleManager } from './systems/collectibles';
 import {
@@ -156,7 +157,7 @@ async function init() {
     const creature = getCreatureAt(state, slotId);
     if (creature) {
       const panelOpts: CreaturePanelOptions = {
-        releaseUnlocked: state.releaseUnlocked,
+        releaseUnlocked: isReleaseUnlocked(state),
         state,
         onRelease: (c) => {
           releaseCreature(state, c.id);

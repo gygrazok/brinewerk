@@ -3,7 +3,7 @@ import { SEABED_SLOTS } from '../systems/seabed-layout';
 import { DEFAULT_RARE_CHANCE, DEFAULT_UNLOCKED_RARE_IDS } from './balance';
 
 const SAVE_KEY = 'brinewerk_save';
-const CURRENT_SAVE_VERSION = 11;
+const CURRENT_SAVE_VERSION = 12;
 
 // --- Seabed pool (v3+) ---
 
@@ -37,8 +37,6 @@ export interface GameState {
   lastSaveTimestamp: number;
   lastTideTimestamp: number;
   totalPlaytime: number; // seconds
-  /** True once all tier-0 slots have been filled (unlocks creature release) */
-  releaseUnlocked: boolean;
   /** Current chance of spawning any rare creature (upgradeable, default 1%) */
   rareChance: number;
   /** Set of rare effect IDs currently in the spawn pool */
@@ -67,7 +65,6 @@ export function createDefaultState(): GameState {
     lastSaveTimestamp: Date.now(),
     lastTideTimestamp: Date.now(),
     totalPlaytime: 0,
-    releaseUnlocked: false,
     rareChance: DEFAULT_RARE_CHANCE,
     unlockedRares: [...DEFAULT_UNLOCKED_RARE_IDS],
     shoreTaken: false,
@@ -257,6 +254,13 @@ function migrateState(data: Record<string, unknown>): GameState {
       }
     }
     data.saveVersion = 11;
+  }
+
+  // V11 → V12: drop releaseUnlocked field — now derived from achievements.
+  // V9→V10 already mirrored a true value into achievements.tide_pool_keeper.
+  if ((data.saveVersion as number) < 12) {
+    delete (data as Record<string, unknown>).releaseUnlocked;
+    data.saveVersion = 12;
   }
 
   // Validate critical fields exist after migration

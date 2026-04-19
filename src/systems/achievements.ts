@@ -25,9 +25,12 @@ export interface AchievementDefinition {
 // Definitions
 // ---------------------------------------------------------------------------
 
+/** Achievement whose completion unlocks creature release + nacre visibility. */
+export const RELEASE_UNLOCK_ACHIEVEMENT_ID = 'tide_pool_keeper';
+
 export const ACHIEVEMENTS: AchievementDefinition[] = [
   {
-    id: 'tide_pool_keeper',
+    id: RELEASE_UNLOCK_ACHIEVEMENT_ID,
     name: 'Tide Pool Keeper',
     description: 'Place 4 creatures in the tide pool',
     icon: '🐚',
@@ -36,9 +39,6 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
       return placed >= 4;
     },
     reward: { type: 'feature-unlock', label: 'Unlocks Nacre & Creature Release' },
-    onComplete: (state) => {
-      state.releaseUnlocked = true;
-    },
   },
 ];
 
@@ -70,4 +70,9 @@ export function getCompletedCount(state: GameState): number {
 
 export function getTotalCount(): number {
   return ACHIEVEMENTS.length;
+}
+
+/** True when the tide_pool_keeper achievement is complete — gates release/nacre. */
+export function isReleaseUnlocked(state: GameState): boolean {
+  return state.achievements[RELEASE_UNLOCK_ACHIEVEMENT_ID] === true;
 }

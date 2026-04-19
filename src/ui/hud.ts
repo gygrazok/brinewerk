@@ -1,6 +1,7 @@
 import type { GameState } from '../core/game-state';
 import { getProductionRates } from '../economy/production-engine';
 import { getUpgradeLevel } from '../systems/upgrades';
+import { isReleaseUnlocked } from '../systems/achievements';
 
 /** Resource definitions — easy to extend with new resources */
 interface ResourceDef {
@@ -15,7 +16,7 @@ const RESOURCES: ResourceDef[] = [
   { key: 'plankton', icon: '🟢', showRate: true },
   { key: 'minerite', icon: '🔵', showRate: true, visible: (s) => getUpgradeLevel(s, 'deep_drilling') > 0 },
   { key: 'lux',      icon: '✨', showRate: true, visible: (s) => getUpgradeLevel(s, 'bioluminescence') > 0 },
-  { key: 'nacre',    icon: '⚬', visible: (s) => s.releaseUnlocked },
+  { key: 'nacre',    icon: '⚬', visible: (s) => isReleaseUnlocked(s) },
   { key: 'coral',    icon: '🪸', visible: (s) => s.resources.coral > 0 },
 ];
 
