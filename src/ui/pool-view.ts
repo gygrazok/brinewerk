@@ -3,6 +3,7 @@ import type { Application } from 'pixi.js';
 import type { GameState, SeabedSlot } from '../core/game-state';
 import type { ResourceBundle } from '../core/game-state';
 import { getCreatureAt } from '../systems/pool';
+import { getRareInfo } from '../creatures/creature';
 import { getSlotUnlockCost } from '../core/balance';
 import { allSlots, worldToSlot, getSlotDepth } from '../systems/coords';
 import {
@@ -581,13 +582,13 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
         visual.glowSprite.height = CREATURE_DISPLAY;
       }
       // Special pivot setup for movement-based rare effects
-      const needsCenterPivot = creature.rare === 'rotating' || creature.rare === 'pulse' || creature.rare === 'tiny';
-      if (needsCenterPivot) {
+      const pivotMode = creature.rare ? getRareInfo(creature.rare).pivotMode : undefined;
+      if (pivotMode === 'center') {
         const half = CREATURE_DISPLAY / 2;
         visual.sprite.pivot.set(half, half);
         visual.sprite.x = cx + half;
         visual.sprite.y = cy + half;
-      } else if (creature.rare === 'upside-down') {
+      } else if (pivotMode === 'inverted') {
         const half = CREATURE_DISPLAY / 2;
         visual.sprite.pivot.set(half, 0);
         visual.sprite.scale.y = -1;
@@ -601,12 +602,12 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
       poolView.visuals.set(creature.id, visual);
     } else {
       const visual = poolView.visuals.get(creature.id)!;
-      const needsCenterPivot = creature.rare === 'rotating' || creature.rare === 'pulse' || creature.rare === 'tiny';
-      if (needsCenterPivot) {
+      const pivotMode = creature.rare ? getRareInfo(creature.rare).pivotMode : undefined;
+      if (pivotMode === 'center') {
         const half = CREATURE_DISPLAY / 2;
         visual.sprite.x = cx + half;
         visual.sprite.y = cy + half;
-      } else if (creature.rare === 'upside-down') {
+      } else if (pivotMode === 'inverted') {
         const half = CREATURE_DISPLAY / 2;
         visual.sprite.x = cx + half;
         visual.sprite.y = cy + CREATURE_DISPLAY;

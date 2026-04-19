@@ -1,5 +1,6 @@
 import { Application } from 'pixi.js';
 import type { Creature } from '../creatures/creature';
+import { getRareInfo } from '../creatures/creature';
 import {
   createCreatureVisual, updateCreatureVisual, destroyCreatureVisual,
   type CreatureVisual,
@@ -55,13 +56,13 @@ export async function createCreaturePreviewApp(
   }
 
   // Pivot setup for movement-based rare effects
-  const needsCenterPivot = creature.rare === 'rotating' || creature.rare === 'pulse' || creature.rare === 'tiny';
-  if (needsCenterPivot) {
+  const pivotMode = creature.rare ? getRareInfo(creature.rare).pivotMode : undefined;
+  if (pivotMode === 'center') {
     const half = size / 2;
     visual.sprite.pivot.set(half, half);
     visual.sprite.x = half;
     visual.sprite.y = half;
-  } else if (creature.rare === 'upside-down') {
+  } else if (pivotMode === 'inverted') {
     const half = size / 2;
     visual.sprite.pivot.set(half, 0);
     visual.sprite.scale.y = -1;

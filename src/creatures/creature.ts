@@ -52,6 +52,14 @@ export type RareEffect =
   | 'stained'
   | 'liquify';
 
+/**
+ * How the creature sprite should be positioned when this rare is present.
+ * - `'center'`: pivot at sprite center — needed for rotation or scale-from-center effects.
+ * - `'inverted'`: pivot at bottom-center, scale.y = -1 — upside-down rendering.
+ * - absent: top-left pivot (default).
+ */
+export type PivotMode = 'center' | 'inverted';
+
 export interface RareInfo {
   id: string;
   label: string;
@@ -63,6 +71,8 @@ export interface RareInfo {
   tier: 1 | 2 | 3;
   /** If set, this effect can only appear on these creature types */
   types?: CreatureType[];
+  /** Sprite pivot setup required by movement-style effects. */
+  pivotMode?: PivotMode;
 }
 
 export const RARE_EFFECTS: RareInfo[] = [
@@ -77,18 +87,18 @@ export const RARE_EFFECTS: RareInfo[] = [
   { id: 'nebula', label: 'Nebula', icon: '\u2605', weight: 6, tier: 2, color: '#c0a0ff' },
   { id: 'toxic', label: 'Toxic', icon: '\u2623', weight: 6, tier: 2, color: '#80ff40' },
   { id: 'phantom', label: 'Phantom', icon: '\uD83D\uDC7B', weight: 6, tier: 2, color: '#a080c0' },
-  { id: 'rotating', label: 'Rotating', icon: '\uD83C\uDF00', weight: 8, tier: 2, color: '#60c0e0', types: [CreatureType.Stellarid, CreatureType.Nucleid] },
-  { id: 'upside-down', label: 'Upside Down', icon: '\uD83D\uDD03', weight: 8, tier: 2, color: '#e0a060', types: [CreatureType.Blobid, CreatureType.Corallid] },
+  { id: 'rotating', label: 'Rotating', icon: '\uD83C\uDF00', weight: 8, tier: 2, color: '#60c0e0', types: [CreatureType.Stellarid, CreatureType.Nucleid], pivotMode: 'center' },
+  { id: 'upside-down', label: 'Upside Down', icon: '\uD83D\uDD03', weight: 8, tier: 2, color: '#e0a060', types: [CreatureType.Blobid, CreatureType.Corallid], pivotMode: 'inverted' },
   { id: 'wave', label: 'Wave', icon: '\u223F', weight: 8, tier: 2, color: '#40c0ff' },
   { id: 'rainbow', label: 'Rainbow', icon: '\uD83C\uDF08', weight: 6, tier: 2, color: '#ff80c0' },
   { id: 'electric', label: 'Electric', icon: '\u26A1', weight: 6, tier: 2, color: '#80d0ff' },
-  { id: 'pulse', label: 'Pulse', icon: '\u2665', weight: 6, tier: 2, color: '#ff6080' },
+  { id: 'pulse', label: 'Pulse', icon: '\u2665', weight: 6, tier: 2, color: '#ff6080', pivotMode: 'center' },
 
   // --- Tier 3: legendary rares (late-game unlocks) ---
   { id: 'hologram', label: 'Hologram', icon: '\u25C7', weight: 5, tier: 3, color: '#60a0ff' },
   { id: 'negative', label: 'Negative', icon: '\u25D1', weight: 5, tier: 3, color: '#e0e0e0' },
   { id: 'shadow', label: 'Shadow', icon: '\u2592', weight: 5, tier: 3, color: '#404060' },
-  { id: 'tiny', label: 'Tiny', icon: '\u2022', weight: 5, tier: 3, color: '#a0e060' },
+  { id: 'tiny', label: 'Tiny', icon: '\u2022', weight: 5, tier: 3, color: '#a0e060', pivotMode: 'center' },
   { id: 'holy', label: 'Holy', icon: '\u2742', weight: 4, tier: 3, color: '#fff8e0' },
   { id: 'xray', label: 'X-Ray', icon: '\u2622', weight: 4, tier: 3, color: '#a0c0e0' },
   { id: 'thermal', label: 'Thermal', icon: '\uD83C\uDF21', weight: 4, tier: 3, color: '#ff6040' },
