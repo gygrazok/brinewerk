@@ -1,17 +1,14 @@
 import type { Genotype } from '../../creatures/creature';
-import { getPalette } from '../palette';
 import { type PixelGrid, setPixel, fillCircle, addEyes, spatialRandom } from '../pixel-grid';
+import { bodyStyle } from '../body-style';
 
 export function renderCorallid(genes: Genotype, time: number, seed: number): PixelGrid {
   const grid: PixelGrid = {};
-  const pal = getPalette(genes.palette1);
-  const pal2 = getPalette(genes.palette2);
+  const { pal, pal2, pattern, wobble } = bodyStyle(genes, seed);
   const cx = 25, cy = 25;
   const size = 12 + Math.floor(genes.size * 13);
   const branches = 2 + Math.round(genes.branches * 4);
   const density = 0.3 + genes.density * 0.7;
-  const pattern = Math.round(genes.pattern * 4);
-  const wobble = genes.wobble * 3;
   const spiky = genes.spikes > 0.5;
 
   // --- Base / trunk (wider, tapered) ---

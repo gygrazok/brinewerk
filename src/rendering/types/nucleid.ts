@@ -1,18 +1,15 @@
 import type { Genotype } from '../../creatures/creature';
-import { getPalette } from '../palette';
 import { type PixelGrid, setPixel, fillCircle, addEyes, spatialRandom } from '../pixel-grid';
+import { bodyStyle } from '../body-style';
 
 export function renderNucleid(genes: Genotype, time: number, seed: number): PixelGrid {
   const grid: PixelGrid = {};
-  const pal = getPalette(genes.palette1);
-  const pal2 = getPalette(genes.palette2);
+  const { pal, pal2, pattern, wobble } = bodyStyle(genes, seed);
   const cx = 25, cy = 25;
   const facets = 3 + Math.floor(genes.facets * 6);
   const rings = 1 + Math.floor(genes.rings * 3);
   const size = 10 + Math.floor(genes.size * 13);
-  const pattern = Math.round(genes.pattern * 4);
   const spikes = Math.round(genes.spikes * 3);
-  const wobble = genes.wobble * 3;
 
   for (let r = rings; r >= 0; r--) {
     const radius = Math.round((size * 0.6) * ((r + 1) / (rings + 1)));

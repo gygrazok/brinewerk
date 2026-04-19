@@ -1,19 +1,17 @@
 import type { Genotype } from '../../creatures/creature';
-import { getPalette } from '../palette';
-import { type PixelGrid, setPixel, addEyes, spatialRandom } from '../pixel-grid';
+import { type PixelGrid, setPixel, addEyes } from '../pixel-grid';
+import { bodyStyle, bodyPixelColor } from '../body-style';
 
 export function renderStellarid(genes: Genotype, time: number, seed: number): PixelGrid {
   const grid: PixelGrid = {};
-  const pal = getPalette(genes.palette1);
-  const pal2 = getPalette(genes.palette2);
+  const style = bodyStyle(genes, seed);
+  const { pal, pal2, pattern, wobble } = style;
   const cx = 25, cy = 25;
   const armCount = 3 + Math.floor(genes.arms * 6);
   const size = 10 + Math.floor(genes.size * 13);
   const fatness = 0.3 + genes.fatness * 0.7;
   const bodyR = Math.round(size * 0.35 * fatness + 2);
   const spikes = Math.round(genes.spikes * 3);
-  const pattern = Math.round(genes.pattern * 4);
-  const wobble = genes.wobble * 3;
 
   // Arms
   for (let i = 0; i < armCount; i++) {
@@ -51,17 +49,16 @@ export function renderStellarid(genes: Genotype, time: number, seed: number): Pi
     }
   }
 
-  // Body
+  // Body — hooks hoisted out of the per-pixel loop to avoid allocations
+  const bodyHooks = {
+    stripe: (dx: number, dy: number) => (dx + dy) % 3 === 0,
+    highlight: (dx: number) => Math.abs(dx) < 2,
+  };
   for (let dy = -bodyR - 1; dy <= bodyR + 1; dy++) {
     for (let dx = -bodyR - 1; dx <= bodyR + 1; dx++) {
       const d = Math.sqrt(dx * dx + dy * dy);
       if (d <= bodyR) {
-        const o = d > bodyR - 1.2;
-        let c = o ? pal.outline : pal.body;
-        if (!o && pattern >= 1 && (dx + dy) % 3 === 0) c = pal.accent;
-        if (!o && pattern >= 2 && spatialRandom(dx, dy, seed) > 0.75) c = pal2.body;
-        if (!o && pattern >= 3 && Math.abs(dx) < 2) c = pal2.accent;
-        setPixel(grid, cx + dx, cy + dy, c);
+        setPixel(grid, cx + dx, cy + dy, bodyPixelColor(style, dx, dy, d > bodyR - 1.2, bodyHooks));
       }
     }
   }
