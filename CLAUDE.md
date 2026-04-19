@@ -121,3 +121,8 @@ Key non-source files:
 - **Performance target**: 60fps with ~50 visible creatures on a 2019 mid-range phone
 - **itch.io deployment**: `dist/` is zipped and uploaded directly; `base: './'` in Vite config is required for relative asset paths
 - **No UI framework**: all DOM UI is vanilla TypeScript + CSS
+
+## Project Maturity & Workflow
+
+- **Still in active development**: no published player base yet, testing happens locally. Breaking previous behaviour is acceptable when it improves the code or enables a new feature — don't carry backwards-compatibility shims or preservation logic unless the user asks. Priority is shipping new features cleanly, not defending old ones.
+- **One branch at a time**: finish and merge the current branch before opening a new one. Parallel branches from `main` accumulate conflicts on overlapping files (the three `2026-04-19-*` tranches were a one-off that cost a rebase).
