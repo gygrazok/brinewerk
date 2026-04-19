@@ -66,10 +66,18 @@ function hexToRgb(hex: string): [number, number, number] {
   return [(v >> 16) & 0xff, (v >> 8) & 0xff, v & 0xff];
 }
 
-/** Render pixel grid onto a canvas context using bulk ImageData writes */
-export function renderGridToCanvas(grid: PixelGrid, ctx: CanvasRenderingContext2D): void {
-  const imageData = ctx.createImageData(CANVAS_PX, CANVAS_PX);
+/** Render pixel grid onto a canvas context using bulk ImageData writes.
+ *  Pass `existing` to reuse a previously-allocated buffer (the function clears
+ *  it first, since grids are sparse and stale pixels would otherwise leak). */
+export function renderGridToCanvas(
+  grid: PixelGrid,
+  ctx: CanvasRenderingContext2D,
+  existing?: ImageData | null,
+): ImageData {
+  const imageData = existing ?? ctx.createImageData(CANVAS_PX, CANVAS_PX);
   const data = imageData.data; // Uint8ClampedArray [r,g,b,a, r,g,b,a, ...]
+
+  if (existing) data.fill(0);
 
   for (const key in grid) {
     const comma = key.indexOf(',');
@@ -93,6 +101,7 @@ export function renderGridToCanvas(grid: PixelGrid, ctx: CanvasRenderingContext2
   }
 
   ctx.putImageData(imageData, 0, 0);
+  return imageData;
 }
 
 /** Re-export for creature type renderers that need seeded noise per pixel */

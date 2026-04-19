@@ -19,6 +19,23 @@ const TYPE_RENDERERS: Record<CreatureType, TypeRenderer> = {
   [CreatureType.Nucleid]: renderNucleid,
 };
 
+/**
+ * Target frequency (Hz) for creature pixel-grid regeneration.
+ * The base grid carries wobble/sway animation driven by `genes.wobble`,
+ * which is visually a slow oscillation — 30Hz is indistinguishable from 60Hz
+ * but halves CPU cost on the rendering hot path. Lower further if perf
+ * is still tight; raise to 60 to restore pre-throttle behaviour.
+ */
+export const CREATURE_ANIM_HZ = 30;
+const CREATURE_ANIM_INTERVAL = 1 / CREATURE_ANIM_HZ;
+
+/**
+ * Creatures with `genes.wobble` below this threshold are treated as static:
+ * the grid is rendered once at creation and never regenerated (unless a
+ * grid-mutating rare effect like fire/frost/toxic demands it).
+ */
+const STATIC_WOBBLE_THRESHOLD = 0.05;
+
 export interface CreatureVisual {
   /** The root container (holds glowSprite behind + main sprite on top) */
   sprite: Container;
@@ -30,7 +47,7 @@ export interface CreatureVisual {
   /** Offscreen canvas for real-time pixel grid rendering */
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
-  /** The single texture backed by the canvas — updated every frame */
+  /** The single texture backed by the canvas — updated when grid changes */
   texture: Texture;
   timeOffset: number;
   /** Private filter owned by this visual (if any) — destroyed with the visual */
@@ -39,6 +56,14 @@ export interface CreatureVisual {
    *  Defaults to creature.id; preview visuals use a unique suffix to avoid
    *  sharing mutable state with the game visual. */
   effectKey: string;
+  /** Timestamp (in the renderer's time coordinate) of the last grid regen. */
+  _lastRenderTime: number;
+  /** Reusable ImageData buffer for renderGridToCanvas, avoids per-frame alloc. */
+  _imageData: ImageData | null;
+  /** True when wobble is negligible → grid is effectively static. */
+  _isStatic: boolean;
+  /** True when the creature's rare effect mutates the pixel grid per frame. */
+  _hasGridMutatingEffect: boolean;
 }
 
 /** Parse hex color to 0xRRGGBB number */
@@ -61,7 +86,7 @@ export function createCreatureVisual(creature: Creature, ownFilters = false): Cr
   // Render initial frame
   const renderer = TYPE_RENDERERS[creature.type];
   const grid = renderer(creature.genes, 0, creature.seed);
-  renderGridToCanvas(grid, ctx);
+  const imageData = renderGridToCanvas(grid, ctx);
 
   // Create texture from canvas (nearest-neighbor for pixel art)
   const texture = Texture.from(canvas);
@@ -121,6 +146,9 @@ export function createCreatureVisual(creature: Creature, ownFilters = false): Cr
 
   container.addChild(mainSprite); // on top
 
+  const isStatic = creature.genes.wobble < STATIC_WOBBLE_THRESHOLD;
+  const hasGridMutatingEffect = creature.rare ? getPixelEffect(creature.rare) !== undefined : false;
+
   return {
     sprite: container,
     creature,
@@ -132,31 +160,43 @@ export function createCreatureVisual(creature: Creature, ownFilters = false): Cr
     timeOffset: Math.random() * 100,
     _ownedFilter: ownedFilter,
     effectKey: ownFilters ? `${creature.id}_preview` : creature.id,
+    _lastRenderTime: 0,
+    _imageData: imageData,
+    _isStatic: isStatic,
+    _hasGridMutatingEffect: hasGridMutatingEffect,
   };
 }
 
-/** Update creature animation — re-render pixel grid every frame (like POC) */
+/**
+ * Update a creature visual for the current frame.
+ * Grid regeneration is throttled to CREATURE_ANIM_HZ (static creatures
+ * skip it entirely after initial paint); sprite-level animations
+ * (glow pulse, rotation, pulse, tiny bounce) still run every frame.
+ */
 export function updateCreatureVisual(visual: CreatureVisual, _deltaSec: number, totalTime: number): void {
   const time = totalTime + visual.timeOffset;
 
-  // Re-render pixel grid with current time
-  const renderer = TYPE_RENDERERS[visual.creature.type];
-  const grid = renderer(visual.creature.genes, time, visual.creature.seed);
+  // Skip grid regen for static creatures without grid-mutating effects; throttle others.
+  const needsRegen = !visual._isStatic || visual._hasGridMutatingEffect;
+  if (needsRegen && time - visual._lastRenderTime >= CREATURE_ANIM_INTERVAL) {
+    const renderer = TYPE_RENDERERS[visual.creature.type];
+    const grid = renderer(visual.creature.genes, time, visual.creature.seed);
 
-  // Apply pixel-level rare effect (if any)
-  if (visual.creature.rare) {
-    const fx = getPixelEffect(visual.creature.rare);
-    if (fx) fx(grid, time, visual.effectKey);
-  }
+    if (visual.creature.rare) {
+      const fx = getPixelEffect(visual.creature.rare);
+      if (fx) fx(grid, time, visual.effectKey);
+    }
 
-  renderGridToCanvas(grid, visual.ctx);
+    visual._imageData = renderGridToCanvas(grid, visual.ctx, visual._imageData);
 
-  // Tell PixiJS the texture source has changed (no-op if context lost)
-  try {
-    visual.texture.source.update();
-  } catch {
-    // WebGL context lost — skip this frame
-    return;
+    try {
+      visual.texture.source.update();
+    } catch {
+      // WebGL context lost — skip this frame
+      return;
+    }
+
+    visual._lastRenderTime = time;
   }
 
   // Update uTime on privately-owned filter (preview panels)
