@@ -1,5 +1,6 @@
 import type { ResourceBundle, SeabedPool } from '../core/game-state';
 import { SeededRng } from '../util/prng';
+import { baseLayer1TerrainY } from './terrain';
 import {
   COLLECTIBLE_SPAWN_INTERVAL,
   COLLECTIBLE_SPAWN_JITTER,
@@ -150,20 +151,6 @@ function spawnDriftCollectible(mgr: CollectibleManager, worldW: number, worldH: 
   };
 }
 
-/**
- * Approximate the upper terrain profile (layer 1) at a given x.
- * This mirrors the formula in seabed-bg.ts without depending on the render module.
- * Returns a y value: corals should spawn at or below this line.
- */
-function getTerrainY(x: number, w: number, h: number): number {
-  const t = x / w;
-  const leftP = Math.max(0, 1 - t / 0.3);
-  const rightP = Math.max(0, (t - 0.7) / 0.3);
-  const plateau = Math.max(leftP * leftP * (3 - 2 * leftP), rightP * rightP * (3 - 2 * rightP));
-  const baseY = 0.80 - plateau * 0.25;
-  return Math.floor(h * baseY);
-}
-
 /** Check if a position is too close to any slot (within exclusion radius). */
 function overlapsSlot(x: number, y: number, pool: SeabedPool): boolean {
   const SLOT_EXCLUSION = 70; // slightly less than slot visual size (80px)
@@ -186,7 +173,7 @@ function spawnCoralCollectible(mgr: CollectibleManager, worldW: number, worldH: 
   let y = 0;
   for (let attempt = 0; attempt < 10; attempt++) {
     x = mgr.rng.float(margin, worldW - margin);
-    const terrainTop = getTerrainY(x, worldW, worldH);
+    const terrainTop = Math.floor(baseLayer1TerrainY(x, worldW, worldH));
     // Spawn anywhere from terrain surface down to near bottom
     y = mgr.rng.float(terrainTop + 10, worldH - 15);
     if (!pool || !overlapsSlot(x, y, pool)) break;

@@ -2,6 +2,7 @@ import { Container, Sprite, Texture, Graphics } from 'pixi.js';
 import { getRenderSettings } from './render-settings';
 import { GRID_SIZE } from './pixel-grid';
 import { SeededRng, seededNoise } from '../util/prng';
+import { baseLayer1TerrainY } from '../systems/terrain';
 
 /**
  * Uniform pixel density across all pixel-art elements.
@@ -101,15 +102,9 @@ function initTerrainPhases(seed: number): void {
  * All have gentle seed-based undulation.
  */
 function getLayer1Profile(x: number, w: number, h: number): number {
-  const t = x / w;
-  const leftP = smoothstep(Math.max(0, 1 - t / 0.3));
-  const rightP = smoothstep(Math.max(0, (t - 0.7) / 0.3));
-  const plateau = Math.max(leftP, rightP);
-
-  // Upper layer: 0.55h at corners, 0.80h at center
-  const baseY = 0.80 - plateau * 0.25;
+  const basePx = baseLayer1TerrainY(x, w, h);
   const wave = Math.sin(x * 0.04 + tp.p1a) * 0.012 + Math.sin(x * 0.09 + tp.p1b) * 0.006;
-  return Math.floor(h * (baseY + wave));
+  return Math.floor(basePx + h * wave);
 }
 
 function getLayer2Profile(x: number, w: number, h: number): number {

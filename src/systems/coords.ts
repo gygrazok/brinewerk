@@ -1,27 +1,13 @@
 import type { SeabedPool, SeabedSlot } from '../core/game-state';
 import { DEPTH_SHALLOW_MAX, DEPTH_TERRAIN_MARGIN, WORLD_WIDTH, WORLD_HEIGHT } from '../core/balance';
+import { baseLayer1TerrainY } from './terrain';
 
 export type SlotDepth = 'shallow' | 'mid' | 'deep';
-
-/**
- * Approximates Layer 1 terrain y at a given x, mirroring the profile used
- * by `seabed-bg.ts` (edge plateaus dip 0.55h at corners, 0.80h at center).
- * Used for gameplay classification — a slot counts as "deep" when it sits
- * on/below this line. Does not include per-playthrough wave noise.
- */
-function approxTerrainY(x: number): number {
-  const t = x / WORLD_WIDTH;
-  let edge = 0;
-  if (t < 0.3) edge = 1 - t / 0.3;
-  else if (t > 0.7) edge = (t - 0.7) / 0.3;
-  const smooth = edge * edge * (3 - 2 * edge);
-  return (0.80 - smooth * 0.25) * WORLD_HEIGHT;
-}
 
 /** Classify a slot by its vertical position. Drives minerite (deep) / lux (shallow) production. */
 export function getSlotDepth(slot: SeabedSlot): SlotDepth {
   if (slot.y <= DEPTH_SHALLOW_MAX) return 'shallow';
-  if (slot.y >= approxTerrainY(slot.x) - DEPTH_TERRAIN_MARGIN) return 'deep';
+  if (slot.y >= baseLayer1TerrainY(slot.x, WORLD_WIDTH, WORLD_HEIGHT) - DEPTH_TERRAIN_MARGIN) return 'deep';
   return 'mid';
 }
 
