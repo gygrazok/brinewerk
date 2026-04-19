@@ -80,8 +80,17 @@ Key non-source files:
 - `ARCHITECTURE.md` — detailed technical architecture documentation
 - `GDD.md` — game design document (mechanics, progression, content)
 - `EFFECTS.md` — rare effects specifications
+- `docs/` — area-specific technical references (see `docs/README.md` for the index)
 - `index.html` — entry point that mounts canvas + UI overlay
 - `vite.config.ts` — Vite config with GLSL plugin, `base: './'` for itch.io
+
+## Domain references
+
+Deep-dive per-area docs live in `docs/`. Start here when touching a system:
+
+- [Achievements](docs/ACHIEVEMENTS.md) — data-driven registry, 1 Hz polling, feature-unlock selector pattern
+
+Keep this list a line per area — put the actual content inside the area doc, not here.
 
 ## Code Conventions
 
