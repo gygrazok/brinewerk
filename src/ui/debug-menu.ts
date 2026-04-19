@@ -3,7 +3,7 @@ import { createDefaultState, clearSave } from '../core/game-state';
 import { disableSaving } from '../core/game-loop';
 import { forceTide } from '../systems/tides';
 import { createCreature, RARE_EFFECTS, type RareEffect } from '../creatures/creature';
-import { CreatureType } from '../creatures/types';
+import { CreatureType, CREATURE_NAMES } from '../creatures/types';
 
 export interface DebugMenuOptions {
   onStateChange: () => void;
@@ -69,10 +69,6 @@ export function initDebugMenu(
       <div class="debug-row">
         <select id="dbg-type">
           <option value="">Random</option>
-          <option value="stellarid">Stellarid</option>
-          <option value="blobid">Blobid</option>
-          <option value="corallid">Corallid</option>
-          <option value="nucleid">Nucleid</option>
         </select>
         <select id="dbg-rare">
           <option value="">Random</option>
@@ -91,6 +87,15 @@ export function initDebugMenu(
   `;
 
   document.body.appendChild(panel);
+
+  // Populate type dropdown dynamically from CreatureType enum
+  const typeSelect = panel.querySelector('#dbg-type') as HTMLSelectElement;
+  for (const t of Object.values(CreatureType)) {
+    const opt = document.createElement('option');
+    opt.value = t;
+    opt.textContent = CREATURE_NAMES[t];
+    typeSelect.appendChild(opt);
+  }
 
   // Populate rare dropdown dynamically from RARE_EFFECTS registry
   const rareSelect = panel.querySelector('#dbg-rare') as HTMLSelectElement;
