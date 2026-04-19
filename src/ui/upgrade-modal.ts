@@ -1,5 +1,6 @@
 import type { GameState, ResourceBundle } from '../core/game-state';
 import { UPGRADES, getUpgradeLevel, purchaseUpgrade, getUpgradeCostResource } from '../systems/upgrades';
+import { createModal } from './modal';
 
 const RESOURCE_ICONS: Record<keyof ResourceBundle, string> = {
   plankton: '🟢',
@@ -9,74 +10,36 @@ const RESOURCE_ICONS: Record<keyof ResourceBundle, string> = {
   coral: '🪸',
 };
 
-// ---------------------------------------------------------------------------
-// Module state
-// ---------------------------------------------------------------------------
-
-let modalOpen = false;
 let stateRef: GameState | null = null;
-let modalAbort: AbortController | null = null;
 let onPurchaseCb: (() => void) | null = null;
 
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
+const controller = createModal({
+  id: 'upgrade',
+  width: '420px',
+  render: (panel, signal) => {
+    injectStyles();
+    if (!stateRef) return;
+    renderContent(panel, stateRef, signal);
+  },
+});
 
 export function openUpgradeModal(state: GameState): void {
-  if (modalOpen) return;
   stateRef = state;
-  modalOpen = true;
-
-  modalAbort?.abort();
-  modalAbort = new AbortController();
-  const { signal } = modalAbort;
-
-  injectStyles();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'upgrade-overlay';
-  overlay.addEventListener('click', () => closeUpgradeModal(), { signal });
-  document.body.appendChild(overlay);
-
-  const modal = document.createElement('div');
-  modal.id = 'upgrade-modal';
-  modal.addEventListener('click', (e) => e.stopPropagation(), { signal });
-  document.body.appendChild(modal);
-
-  renderContent(state);
-
-  requestAnimationFrame(() => {
-    overlay.classList.add('open');
-    modal.classList.add('open');
-  });
+  controller.open();
 }
 
 export function closeUpgradeModal(): void {
-  if (!modalOpen) return;
-  modalOpen = false;
-  modalAbort?.abort();
-  modalAbort = null;
-
-  const overlay = document.getElementById('upgrade-overlay');
-  const modal = document.getElementById('upgrade-modal');
-  if (overlay) {
-    overlay.classList.remove('open');
-    setTimeout(() => overlay.remove(), 250);
-  }
-  if (modal) {
-    modal.classList.remove('open');
-    setTimeout(() => modal.remove(), 300);
-  }
+  controller.close();
 }
 
 export function updateUpgradeModal(state: GameState): void {
-  if (!modalOpen) return;
+  if (!controller.isOpen) return;
   stateRef = state;
   updateBuyButtons(state);
 }
 
 export function isUpgradeModalOpen(): boolean {
-  return modalOpen;
+  return controller.isOpen;
 }
 
 export function setOnUpgradePurchase(cb: () => void): void {
@@ -84,21 +47,15 @@ export function setOnUpgradePurchase(cb: () => void): void {
 }
 
 export function destroyUpgradeModal(): void {
-  closeUpgradeModal();
-  const styles = document.getElementById('upgrade-modal-styles');
-  if (styles) styles.remove();
+  controller.destroy();
+  document.getElementById('upgrade-modal-styles')?.remove();
 }
 
 // ---------------------------------------------------------------------------
 // Content rendering
 // ---------------------------------------------------------------------------
 
-function renderContent(state: GameState): void {
-  const modal = document.getElementById('upgrade-modal');
-  if (!modal) return;
-
-  const signal = modalAbort?.signal;
-
+function renderContent(modal: HTMLElement, state: GameState, signal: AbortSignal): void {
   // Sort: affordable (not maxed) first, then unaffordable (not maxed), then maxed.
   // Within each bucket preserve UPGRADES declaration order.
   const bucketed = UPGRADES.map((def) => {
@@ -150,16 +107,18 @@ function renderContent(state: GameState): void {
     </div>
   `;
 
-  // Close button
-  document.getElementById('upgrade-close-btn')!.addEventListener('click', () => closeUpgradeModal(), { signal });
+  document.getElementById('upgrade-close-btn')!.addEventListener(
+    'click',
+    () => controller.close(),
+    { signal },
+  );
 
-  // Buy buttons
   modal.querySelectorAll('.upgrade-buy-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       if (!stateRef) return;
       const id = (btn as HTMLElement).dataset.id!;
       if (purchaseUpgrade(stateRef, id)) {
-        renderContent(stateRef);
+        controller.rerender();
         onPurchaseCb?.();
       }
     }, { signal });
@@ -183,7 +142,7 @@ function updateBuyButtons(state: GameState): void {
 }
 
 // ---------------------------------------------------------------------------
-// CSS injection
+// Content-specific styles (frame/animation CSS is provided by modal.ts)
 // ---------------------------------------------------------------------------
 
 function injectStyles(): void {
@@ -191,49 +150,6 @@ function injectStyles(): void {
   const style = document.createElement('style');
   style.id = 'upgrade-modal-styles';
   style.textContent = `
-    /* Overlay */
-    #upgrade-overlay {
-      position: fixed; inset: 0; z-index: 100;
-      background: rgba(4, 10, 14, 0.7);
-      opacity: 0; pointer-events: none;
-      transition: opacity 0.25s ease;
-    }
-    #upgrade-overlay.open { opacity: 1; pointer-events: auto; }
-
-    /* Modal */
-    #upgrade-modal {
-      position: fixed; z-index: 101;
-      background: var(--bg-panel);
-      border: 1px solid var(--border);
-      font-family: var(--font-body);
-      color: var(--text);
-      display: flex; flex-direction: column;
-      overflow-y: auto;
-    }
-    @media (min-width: 641px) {
-      #upgrade-modal {
-        top: 50%; left: 50%;
-        transform: translate(-50%, -50%) scale(0.95);
-        opacity: 0;
-        width: 420px;
-        max-height: 85vh;
-        border-radius: 10px;
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
-      }
-      #upgrade-modal.open { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-    }
-    @media (max-width: 640px) {
-      #upgrade-modal {
-        left: 0; right: 0; bottom: 0;
-        max-height: 85vh;
-        border-radius: 12px 12px 0 0;
-        border-bottom: none;
-        transform: translateY(100%);
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      }
-      #upgrade-modal.open { transform: translateY(0); }
-    }
-
     .upgrade-header {
       display: flex; align-items: center; justify-content: space-between;
       padding: 14px 16px 10px;

@@ -1,88 +1,48 @@
 import type { GameState } from '../core/game-state';
 import { ACHIEVEMENTS } from '../systems/achievements';
+import { createModal } from './modal';
 
-// ---------------------------------------------------------------------------
-// Module state
-// ---------------------------------------------------------------------------
+let stateRef: GameState | null = null;
 
-let modalOpen = false;
-let modalAbort: AbortController | null = null;
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
+const controller = createModal({
+  id: 'ach',
+  width: '460px',
+  render: (panel, signal) => {
+    injectStyles();
+    if (!stateRef) return;
+    renderContent(panel, stateRef, signal);
+  },
+});
 
 export function openAchievementModal(state: GameState): void {
-  if (modalOpen) return;
-  modalOpen = true;
-
-  modalAbort?.abort();
-  modalAbort = new AbortController();
-  const { signal } = modalAbort;
-
-  injectStyles();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'ach-overlay';
-  overlay.addEventListener('click', () => closeAchievementModal(), { signal });
-  document.body.appendChild(overlay);
-
-  const modal = document.createElement('div');
-  modal.id = 'ach-modal';
-  modal.addEventListener('click', (e) => e.stopPropagation(), { signal });
-  document.body.appendChild(modal);
-
-  renderContent(state);
-
-  requestAnimationFrame(() => {
-    overlay.classList.add('open');
-    modal.classList.add('open');
-  });
+  stateRef = state;
+  controller.open();
 }
 
 export function closeAchievementModal(): void {
-  if (!modalOpen) return;
-  modalOpen = false;
-  modalAbort?.abort();
-  modalAbort = null;
-
-  const overlay = document.getElementById('ach-overlay');
-  const modal = document.getElementById('ach-modal');
-  if (overlay) {
-    overlay.classList.remove('open');
-    setTimeout(() => overlay.remove(), 250);
-  }
-  if (modal) {
-    modal.classList.remove('open');
-    setTimeout(() => modal.remove(), 300);
-  }
+  controller.close();
 }
 
 export function updateAchievementModal(state: GameState): void {
-  if (!modalOpen) return;
-  renderContent(state);
+  if (!controller.isOpen) return;
+  stateRef = state;
+  controller.rerender();
 }
 
 export function isAchievementModalOpen(): boolean {
-  return modalOpen;
+  return controller.isOpen;
 }
 
 export function destroyAchievementModal(): void {
-  closeAchievementModal();
-  const styles = document.getElementById('ach-modal-styles');
-  if (styles) styles.remove();
+  controller.destroy();
+  document.getElementById('ach-modal-styles')?.remove();
 }
 
 // ---------------------------------------------------------------------------
 // Content rendering
 // ---------------------------------------------------------------------------
 
-function renderContent(state: GameState): void {
-  const modal = document.getElementById('ach-modal');
-  if (!modal) return;
-
-  const signal = modalAbort?.signal;
-
+function renderContent(modal: HTMLElement, state: GameState, signal: AbortSignal): void {
   const completed = Object.values(state.achievements).filter(Boolean).length;
 
   let cardsHtml = '';
@@ -112,11 +72,15 @@ function renderContent(state: GameState): void {
     </div>
   `;
 
-  document.getElementById('ach-close-btn')!.addEventListener('click', () => closeAchievementModal(), { signal });
+  document.getElementById('ach-close-btn')!.addEventListener(
+    'click',
+    () => controller.close(),
+    { signal },
+  );
 }
 
 // ---------------------------------------------------------------------------
-// CSS injection
+// Content-specific styles (frame/animation CSS is provided by modal.ts)
 // ---------------------------------------------------------------------------
 
 function injectStyles(): void {
@@ -124,49 +88,6 @@ function injectStyles(): void {
   const style = document.createElement('style');
   style.id = 'ach-modal-styles';
   style.textContent = `
-    /* Overlay */
-    #ach-overlay {
-      position: fixed; inset: 0; z-index: 100;
-      background: rgba(4, 10, 14, 0.7);
-      opacity: 0; pointer-events: none;
-      transition: opacity 0.25s ease;
-    }
-    #ach-overlay.open { opacity: 1; pointer-events: auto; }
-
-    /* Modal */
-    #ach-modal {
-      position: fixed; z-index: 101;
-      background: var(--bg-panel);
-      border: 1px solid var(--border);
-      font-family: var(--font-body);
-      color: var(--text);
-      display: flex; flex-direction: column;
-      overflow-y: auto;
-    }
-    @media (min-width: 641px) {
-      #ach-modal {
-        top: 50%; left: 50%;
-        transform: translate(-50%, -50%) scale(0.95);
-        opacity: 0;
-        width: 460px;
-        max-height: 85vh;
-        border-radius: 10px;
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
-      }
-      #ach-modal.open { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-    }
-    @media (max-width: 640px) {
-      #ach-modal {
-        left: 0; right: 0; bottom: 0;
-        max-height: 85vh;
-        border-radius: 12px 12px 0 0;
-        border-bottom: none;
-        transform: translateY(100%);
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      }
-      #ach-modal.open { transform: translateY(0); }
-    }
-
     .ach-header {
       display: flex; align-items: center; justify-content: space-between;
       padding: 14px 16px 10px;

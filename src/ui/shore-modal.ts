@@ -15,16 +15,16 @@ import {
 import { openUpgradeModal } from './upgrade-modal';
 import { openAchievementModal } from './achievement-modal';
 import { getCompletedCount, getTotalCount } from '../systems/achievements';
+import { createModal } from './modal';
 
 // ---------------------------------------------------------------------------
 // Module state
 // ---------------------------------------------------------------------------
 
-let modalOpen = false;
 let selectedIndex: number | null = null;
 let onTakeCreatureCb: ((creature: Creature) => void) | null = null;
 let stateRef: GameState | null = null;
-let mounted = false;
+let bottomBarMounted = false;
 /** Cached refs into the bottom bar, populated on first mount. */
 let shoreBtnTextEl: HTMLSpanElement | null = null;
 let achBtnEl: HTMLButtonElement | null = null;
@@ -32,13 +32,25 @@ let achBtnEl: HTMLButtonElement | null = null;
 let lastKnownTideTimestamp = 0;
 /** Active PixiJS creature previews */
 let activePreviews: CreaturePreviewApp[] = [];
-/** AbortController for modal event listeners — aborted on close/destroy */
-let modalAbort: AbortController | null = null;
 
 function destroyPreviews(): void {
   for (const p of activePreviews) p.destroy();
   activePreviews = [];
 }
+
+const controller = createModal({
+  id: 'shore',
+  width: 'min(90vw, 800px)',
+  render: (panel, signal) => {
+    injectStyles();
+    if (!stateRef) return;
+    renderModalContent(panel, stateRef, signal);
+  },
+  onClose: () => {
+    destroyPreviews();
+    selectedIndex = null;
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -49,7 +61,7 @@ export function setOnTakeCreature(cb: (creature: Creature) => void): void {
 }
 
 export function isShoreModalOpen(): boolean {
-  return modalOpen;
+  return controller.isOpen;
 }
 
 /** Update the always-visible shore button at the bottom of the screen. */
@@ -59,7 +71,7 @@ export function renderShoreButton(state: GameState): void {
   const bar = document.getElementById('bottom-bar');
   if (!bar) return;
 
-  if (!mounted) {
+  if (!bottomBarMounted) {
     bar.textContent = '';
 
     const shoreBtn = document.createElement('button');
@@ -94,7 +106,7 @@ export function renderShoreButton(state: GameState): void {
     });
     bar.appendChild(achBtnEl);
 
-    mounted = true;
+    bottomBarMounted = true;
   }
 
   const btn = document.getElementById('shore-btn');
@@ -122,14 +134,14 @@ export function renderShoreButton(state: GameState): void {
 
 /** Update modal contents if open (called every ~1s from game loop). */
 export function updateShoreModal(state: GameState): void {
-  if (!modalOpen) return;
+  if (!controller.isOpen) return;
   stateRef = state;
 
   // Detect new tide arrival (timestamp changed since we last rendered)
   if (state.lastTideTimestamp !== lastKnownTideTimestamp) {
     lastKnownTideTimestamp = state.lastTideTimestamp;
     selectedIndex = null;
-    renderModalContent(state);
+    controller.rerender();
     return;
   }
 
@@ -139,13 +151,23 @@ export function updateShoreModal(state: GameState): void {
   updateTakeButton(state);
 }
 
+export function openShoreModal(state: GameState): void {
+  if (controller.isOpen) return;
+  stateRef = state;
+  selectedIndex = null;
+  lastKnownTideTimestamp = state.lastTideTimestamp;
+  controller.open();
+}
+
+export function closeShoreModal(): void {
+  controller.close();
+}
+
 /** Destroy all modal DOM for HMR cleanup. */
 export function destroyShoreModal(): void {
-  destroyPreviews();
-  closeShoreModal();
-  const styles = document.getElementById('shore-modal-styles');
-  if (styles) styles.remove();
-  mounted = false;
+  controller.destroy();
+  document.getElementById('shore-modal-styles')?.remove();
+  bottomBarMounted = false;
   shoreBtnTextEl = null;
   achBtnEl = null;
   const bar = document.getElementById('bottom-bar');
@@ -153,68 +175,12 @@ export function destroyShoreModal(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Modal open / close
-// ---------------------------------------------------------------------------
-
-export function openShoreModal(state: GameState): void {
-  if (modalOpen) return;
-  stateRef = state;
-  selectedIndex = null;
-  modalOpen = true;
-  lastKnownTideTimestamp = state.lastTideTimestamp;
-
-  // Abort any previous listeners
-  modalAbort?.abort();
-  modalAbort = new AbortController();
-  const { signal } = modalAbort;
-
-  injectStyles();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'shore-overlay';
-  overlay.addEventListener('click', () => closeShoreModal(), { signal });
-  document.body.appendChild(overlay);
-
-  const modal = document.createElement('div');
-  modal.id = 'shore-modal';
-  modal.addEventListener('click', (e) => e.stopPropagation(), { signal });
-  document.body.appendChild(modal);
-
-  renderModalContent(state);
-
-  requestAnimationFrame(() => {
-    overlay.classList.add('open');
-    modal.classList.add('open');
-  });
-}
-
-export function closeShoreModal(): void {
-  if (!modalOpen) return;
-  modalOpen = false;
-  selectedIndex = null;
-  modalAbort?.abort();
-  modalAbort = null;
-  destroyPreviews();
-
-  const overlay = document.getElementById('shore-overlay');
-  const modal = document.getElementById('shore-modal');
-  if (overlay) {
-    overlay.classList.remove('open');
-    setTimeout(() => overlay.remove(), 250);
-  }
-  if (modal) {
-    modal.classList.remove('open');
-    setTimeout(() => modal.remove(), 300);
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Modal content rendering
 // ---------------------------------------------------------------------------
 
-function renderModalContent(state: GameState): void {
-  const modal = document.getElementById('shore-modal');
-  if (!modal) return;
+function renderModalContent(modal: HTMLElement, state: GameState, signal: AbortSignal): void {
+  // Previews from any previous render are invalidated by the DOM wipe.
+  destroyPreviews();
 
   modal.innerHTML = `
     <div class="shore-header">
@@ -233,17 +199,13 @@ function renderModalContent(state: GameState): void {
     </div>
   `;
 
-  const signal = modalAbort?.signal;
+  document.getElementById('shore-close-btn')!.addEventListener('click', () => controller.close(), { signal });
 
-  // Close button
-  document.getElementById('shore-close-btn')!.addEventListener('click', () => closeShoreModal(), { signal });
-
-  // Refresh buttons
   document.getElementById('shore-refresh')!.addEventListener('click', () => {
     if (!stateRef) return;
     if (refreshShore(stateRef)) {
       selectedIndex = null;
-      renderModalContent(stateRef);
+      controller.rerender();
       renderShoreButton(stateRef);
     }
   }, { signal });
@@ -251,23 +213,22 @@ function renderModalContent(state: GameState): void {
     if (!stateRef) return;
     if (rareRefreshShore(stateRef)) {
       selectedIndex = null;
-      renderModalContent(stateRef);
+      controller.rerender();
       renderShoreButton(stateRef);
     }
   }, { signal });
 
-  // Take button
   document.getElementById('shore-take-btn')!.addEventListener('click', () => {
     if (selectedIndex === null || !stateRef) return;
     const creature = pickUpCreature(stateRef, selectedIndex);
     if (creature) {
-      closeShoreModal();
+      controller.close();
       renderShoreButton(stateRef);
       onTakeCreatureCb?.(creature);
     }
   }, { signal });
 
-  renderCreatureCards(state);
+  renderCreatureCards(state, signal);
   updateTimer(state);
   updateRefreshButtons(state);
   updateTakeButton(state);
@@ -277,7 +238,7 @@ function renderModalContent(state: GameState): void {
 // Creature cards with pixel art preview
 // ---------------------------------------------------------------------------
 
-function renderCreatureCards(state: GameState): void {
+function renderCreatureCards(state: GameState, signal: AbortSignal): void {
   const container = document.getElementById('shore-creatures');
   if (!container) return;
 
@@ -288,54 +249,45 @@ function renderCreatureCards(state: GameState): void {
     return;
   }
 
-  // Only rebuild DOM + previews if cards haven't been created yet
-  const needsBuild = container.childElementCount === 0
-    || container.querySelector('.shore-empty-msg') !== null;
+  let html = '';
+  for (let i = 0; i < state.shore.length; i++) {
+    const c = state.shore[i];
+    const rareInfo = c.rare ? getRareInfo(c.rare) : null;
+    const rareBadge = rareInfo
+      ? `<span class="shore-card-rare" style="color:${rareInfo.color}; border-color:${rareInfo.color}40; background:${rareInfo.color}15;">${rareInfo.icon} ${rareInfo.label}</span>`
+      : '';
 
-  if (needsBuild) {
-    let html = '';
-    for (let i = 0; i < state.shore.length; i++) {
-      const c = state.shore[i];
-      const rareInfo = c.rare ? getRareInfo(c.rare) : null;
-      const rareBadge = rareInfo
-        ? `<span class="shore-card-rare" style="color:${rareInfo.color}; border-color:${rareInfo.color}40; background:${rareInfo.color}15;">${rareInfo.icon} ${rareInfo.label}</span>`
-        : '';
-
-      html += `
-        <div class="shore-creature-card" data-index="${i}">
-          <div class="shore-card-preview" id="shore-preview-${i}"></div>
-          <div class="shore-card-info">
-            <div class="shore-card-name">${c.name}</div>
-            <div class="shore-card-type">${CREATURE_ICONS[c.type]} ${CREATURE_NAMES[c.type]}</div>
-            ${rareBadge}
-          </div>
+    html += `
+      <div class="shore-creature-card" data-index="${i}">
+        <div class="shore-card-preview" id="shore-preview-${i}"></div>
+        <div class="shore-card-info">
+          <div class="shore-card-name">${c.name}</div>
+          <div class="shore-card-type">${CREATURE_ICONS[c.type]} ${CREATURE_NAMES[c.type]}</div>
+          ${rareBadge}
         </div>
-      `;
-    }
-    container.innerHTML = html;
-
-    // Create PixiJS creature previews (with rare shader effects)
-    destroyPreviews();
-    const PREVIEW_SIZE = 120;
-    for (let i = 0; i < state.shore.length; i++) {
-      const previewEl = document.getElementById(`shore-preview-${i}`);
-      if (previewEl) {
-        createCreaturePreviewApp(state.shore[i], previewEl, PREVIEW_SIZE).then((preview) => {
-          activePreviews.push(preview);
-        });
-      }
-    }
-
-    // Click handlers (use modal AbortController for cleanup)
-    const signal = modalAbort?.signal;
-    container.querySelectorAll('.shore-creature-card').forEach((card) => {
-      card.addEventListener('click', () => {
-        const idx = parseInt((card as HTMLElement).dataset.index!, 10);
-        selectedIndex = idx;
-        updateSelection(state);
-      }, { signal });
-    });
+      </div>
+    `;
   }
+  container.innerHTML = html;
+
+  // Create PixiJS creature previews (with rare shader effects)
+  const PREVIEW_SIZE = 120;
+  for (let i = 0; i < state.shore.length; i++) {
+    const previewEl = document.getElementById(`shore-preview-${i}`);
+    if (previewEl) {
+      createCreaturePreviewApp(state.shore[i], previewEl, PREVIEW_SIZE).then((preview) => {
+        activePreviews.push(preview);
+      });
+    }
+  }
+
+  container.querySelectorAll('.shore-creature-card').forEach((card) => {
+    card.addEventListener('click', () => {
+      const idx = parseInt((card as HTMLElement).dataset.index!, 10);
+      selectedIndex = idx;
+      updateSelection(state);
+    }, { signal });
+  });
 
   updateSelection(state);
 }
@@ -436,9 +388,9 @@ function updateTimer(state: GameState): void {
       flushTide(stateRef);
       lastKnownTideTimestamp = stateRef.lastTideTimestamp;
       selectedIndex = null;
-      renderModalContent(stateRef);
+      controller.rerender();
       renderShoreButton(stateRef);
-    }, { signal: modalAbort?.signal });
+    });
   } else {
     const remaining = getTideTimeRemaining(state);
     if (remaining <= 0) {
@@ -463,7 +415,7 @@ function updateRefreshButtons(state: GameState): void {
 }
 
 // ---------------------------------------------------------------------------
-// CSS injection
+// Content-specific styles (frame/animation CSS is provided by modal.ts)
 // ---------------------------------------------------------------------------
 
 function injectStyles(): void {
@@ -471,50 +423,6 @@ function injectStyles(): void {
   const style = document.createElement('style');
   style.id = 'shore-modal-styles';
   style.textContent = `
-
-    /* Overlay */
-    #shore-overlay {
-      position: fixed; inset: 0; z-index: 100;
-      background: rgba(4, 10, 14, 0.7);
-      opacity: 0; pointer-events: none;
-      transition: opacity 0.25s ease;
-    }
-    #shore-overlay.open { opacity: 1; pointer-events: auto; }
-
-    /* Modal */
-    #shore-modal {
-      position: fixed; z-index: 101;
-      background: var(--bg-panel);
-      border: 1px solid var(--border);
-      font-family: var(--font-body);
-      color: var(--text);
-      display: flex; flex-direction: column;
-      overflow: hidden;
-    }
-    @media (min-width: 641px) {
-      #shore-modal {
-        top: 50%; left: 50%;
-        transform: translate(-50%, -50%) scale(0.95);
-        opacity: 0;
-        width: min(90vw, 800px);
-        max-height: 85vh;
-        border-radius: 10px;
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
-      }
-      #shore-modal.open { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-    }
-    @media (max-width: 640px) {
-      #shore-modal {
-        left: 0; right: 0; bottom: 0;
-        max-height: 85vh;
-        border-radius: 12px 12px 0 0;
-        border-bottom: none;
-        transform: translateY(100%);
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      }
-      #shore-modal.open { transform: translateY(0); }
-    }
-
     .shore-header {
       display: flex; align-items: center; justify-content: space-between;
       padding: 14px 16px 10px;
@@ -522,6 +430,7 @@ function injectStyles(): void {
       flex-shrink: 0;
     }
     .shore-title { font-family: var(--font-display); font-size: 13px; color: var(--name); }
+
     /* Timer */
     .shore-timer { text-align: center; padding: 10px 16px; font-size: 15px; color: var(--text-dim); flex-shrink: 0; }
     .timer-value { color: var(--accent); margin-left: 6px; font-family: var(--font-body); }
