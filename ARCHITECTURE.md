@@ -38,7 +38,7 @@ brinewerk/
 │   │   └── taxonomy.ts         # Name generator, species classification
 │   ├── creatures/
 │   │   ├── creature.ts         # Creature entity: genes, type, rare effect, stats
-│   │   ├── types.ts            # Stellarid, Blobid, Corallid, Nucleid definitions
+│   │   ├── types.ts            # Stellarid, Blobid, Corallid, Nucleid, Craboid definitions
 │   │   └── production.ts       # Resource output calculation per creature
 │   ├── rendering/
 │   │   ├── renderer.ts         # Pixi app setup, main render orchestration
@@ -47,7 +47,8 @@ brinewerk/
 │   │   │   ├── stellarid.ts    # Radial star pixel art generation
 │   │   │   ├── blobid.ts       # Jellyfish/anemone dome + tentacles
 │   │   │   ├── corallid.ts     # Branching coral fractal
-│   │   │   └── nucleid.ts      # Geometric polygon rings
+│   │   │   ├── nucleid.ts      # Geometric polygon rings
+│   │   │   └── craboid.ts      # Top-down crab shell + claws + segmented legs
 │   │   ├── shaders/
 │   │   │   ├── metallic.glsl   # Specular highlight bands
 │   │   │   ├── glitch.glsl     # Scanline displacement, chromatic aberration

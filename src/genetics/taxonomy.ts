@@ -21,6 +21,11 @@ const SYLLABLES: Record<string, { pre: string[]; mid: string[]; suf: string[] }>
     mid: ['a', 'i', 'o', 'y', 'e'],
     suf: ['ion', 'trix', 'gon', 'dex', 'ron', 'lis', 'nar', 'zen', 'plex', 'tor'],
   },
+  craboid: {
+    pre: ['Car', 'Che', 'Scu', 'Pag', 'Gra', 'Cal', 'Pin', 'Uca', 'Bra', 'Mac'],
+    mid: ['a', 'i', 'o', 'e', 'u'],
+    suf: ['pus', 'dax', 'cer', 'ton', 'ops', 'rix', 'vus', 'nax', 'tes', 'ger'],
+  },
 };
 
 export function generateName(type: CreatureType, rng: () => number): string {

@@ -10,7 +10,7 @@ import { mulberry32 } from '../util/prng';
 import { getUpgradeLevel, getUpgradeEffect } from './upgrades';
 
 /** Creature types available from tides */
-const TIDE_TYPES = [CreatureType.Stellarid, CreatureType.Blobid, CreatureType.Corallid, CreatureType.Nucleid];
+const TIDE_TYPES = [CreatureType.Stellarid, CreatureType.Blobid, CreatureType.Corallid, CreatureType.Nucleid, CreatureType.Craboid];
 
 /** Generate shore creatures. If forceRareOnFirst is true, the first creature is guaranteed rare. */
 function generateShoreCreatures(state: GameState, forceRareOnFirst = false): Creature[] {

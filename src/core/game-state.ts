@@ -3,7 +3,7 @@ import { SEABED_SLOTS } from '../systems/seabed-layout';
 import { DEFAULT_RARE_CHANCE, DEFAULT_UNLOCKED_RARE_IDS } from './balance';
 
 const SAVE_KEY = 'brinewerk_save';
-const CURRENT_SAVE_VERSION = 12;
+const CURRENT_SAVE_VERSION = 13;
 
 // --- Seabed pool (v3+) ---
 
@@ -261,6 +261,34 @@ function migrateState(data: Record<string, unknown>): GameState {
   if ((data.saveVersion as number) < 12) {
     delete (data as Record<string, unknown>).releaseUnlocked;
     data.saveVersion = 12;
+  }
+
+  // V12 → V13: add legs/claws genes for craboid. Backfill on every existing
+  // creature (pool + shore) with a bell-curve roll derived from the creature's
+  // own seed so results are deterministic across reloads.
+  if ((data.saveVersion as number) < 13) {
+    const backfill = (cs: { seed?: number; genes?: Record<string, number> }[]): void => {
+      for (const c of cs) {
+        if (!c.genes) continue;
+        const seed = (c.seed ?? 0) ^ 0x10b517;
+        let s = seed >>> 0;
+        const rand = (): number => {
+          s = (s + 0x6D2B79F5) >>> 0;
+          let t = s;
+          t = Math.imul(t ^ (t >>> 15), t | 1);
+          t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+        const bell = (): number => Math.max(0, Math.min(1, (rand() + rand() + rand()) / 3));
+        if (c.genes.legs === undefined) c.genes.legs = bell();
+        if (c.genes.claws === undefined) c.genes.claws = bell();
+      }
+    };
+    const creatures = (data.creatures as unknown as { seed?: number; genes?: Record<string, number> }[]) ?? [];
+    const shore = (data.shore as unknown as { seed?: number; genes?: Record<string, number> }[]) ?? [];
+    backfill(creatures);
+    backfill(shore);
+    data.saveVersion = 13;
   }
 
   // Validate critical fields exist after migration

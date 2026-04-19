@@ -5,6 +5,7 @@ import { renderStellarid } from './types/stellarid';
 import { renderBlobid } from './types/blobid';
 import { renderCorallid } from './types/corallid';
 import { renderNucleid } from './types/nucleid';
+import { renderCraboid } from './types/craboid';
 import { type PixelGrid, CANVAS_PX, BLOCK_PX, GRID_SIZE, renderGridToCanvas } from './pixel-grid';
 import { getRareFilter, createRareFilter } from './shader-loader';
 import { getPixelEffect, cleanupEffectState } from './effects';
@@ -17,6 +18,7 @@ const TYPE_RENDERERS: Record<CreatureType, TypeRenderer> = {
   [CreatureType.Blobid]: renderBlobid,
   [CreatureType.Corallid]: renderCorallid,
   [CreatureType.Nucleid]: renderNucleid,
+  [CreatureType.Craboid]: renderCraboid,
 };
 
 /**

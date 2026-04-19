@@ -28,6 +28,8 @@ export function randomGenotype(rng: () => number): Genotype {
     density: bellCurve(rng),
     facets: bellCurve(rng),
     rings: bellCurve(rng),
+    legs: bellCurve(rng),
+    claws: bellCurve(rng),
     palette1: rng(),
     palette2: rng(),
   };

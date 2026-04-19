@@ -8,6 +8,7 @@ export const TYPE_SPECIFIC_TRAITS = {
   blobid: ['tentacles'] as const,
   corallid: ['branches', 'density'] as const,
   nucleid: ['facets', 'rings'] as const,
+  craboid: ['legs', 'claws'] as const,
 } as const;
 
 /** Display-friendly traits for a given type (universal + type-specific) */
@@ -28,4 +29,6 @@ export const TRAIT_COLORS: Record<string, string> = {
   density: '#8aee8a',
   facets: '#7aaaff',
   rings: '#9a9abd',
+  legs: '#b08a4a',
+  claws: '#e08040',
 };

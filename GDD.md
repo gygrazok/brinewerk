@@ -8,7 +8,7 @@ Tone: scientific, slightly weird, deeply systemic. Think Dwarf Fortress meets a 
 
 ## Creature Types
 
-Four base phyla, each with distinct visual rendering and gameplay role:
+Five base phyla, each with distinct visual rendering and gameplay role:
 
 ### Stellarid (✦)
 - **Appearance**: Radial star shape, variable arm count (3-8), spikes, patterns
@@ -30,6 +30,11 @@ Four base phyla, each with distinct visual rendering and gameplay role:
 - **Role**: Explorers. Best success rate on expeditions, produce Minerite.
 - **Special trait**: Facets/Rings — more complex = better expedition outcomes
 
+### Craboid (⬣)
+- **Appearance**: Top-down crab silhouette — oval/trapezoidal/hexagonal shell, two raised claws, 4–10 segmented side legs, stalked eyes. ~30% exhibit fiddler-style claw asymmetry (one oversized claw).
+- **Role**: Solid plankton producers (0.9× multiplier). Ecological generalists.
+- **Special traits**: Legs — number of walking legs per side (2–5); Claws — pincer size and reach.
+
 ## Genetics System
 
 ### Genotype
@@ -50,6 +55,7 @@ Every creature has a set of gene values (0.0 to 1.0 floats) that map to phenotyp
 - Blobid: `tentacles`
 - Corallid: `branches`, `density`
 - Nucleid: `facets`, `rings`
+- Craboid: `legs`, `claws`
 
 **Palette genes**: Two palette indices that determine body/accent/outline colors. Uniformly distributed (not bell curve — they're color indices, not quality).
 

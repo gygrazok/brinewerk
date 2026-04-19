@@ -36,7 +36,7 @@ src/
 │   └── balance.ts             # Game balance constants (costs, rates, multipliers)
 ├── creatures/                 # Creature entity definitions
 │   ├── creature.ts            # Creature interface, Genotype, RareEffect types
-│   ├── types.ts               # CreatureType enum (Stellarid, Blobid, Corallid, Nucleid)
+│   ├── types.ts               # CreatureType enum (Stellarid, Blobid, Corallid, Nucleid, Craboid)
 │   └── production.ts          # Per-creature resource output calculation
 ├── genetics/                  # Breeding & trait system
 │   ├── traits.ts              # Trait definitions (universal + type-specific)

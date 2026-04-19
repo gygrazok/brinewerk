@@ -21,6 +21,8 @@ export interface Genotype {
   density: number;
   facets: number;
   rings: number;
+  legs: number;
+  claws: number;
   palette1: number;
   palette2: number;
 }
@@ -87,7 +89,7 @@ export const RARE_EFFECTS: RareInfo[] = [
   { id: 'nebula', label: 'Nebula', icon: '\u2605', weight: 6, tier: 2, color: '#c0a0ff' },
   { id: 'toxic', label: 'Toxic', icon: '\u2623', weight: 6, tier: 2, color: '#80ff40' },
   { id: 'phantom', label: 'Phantom', icon: '\uD83D\uDC7B', weight: 6, tier: 2, color: '#a080c0' },
-  { id: 'rotating', label: 'Rotating', icon: '\uD83C\uDF00', weight: 8, tier: 2, color: '#60c0e0', types: [CreatureType.Stellarid, CreatureType.Nucleid], pivotMode: 'center' },
+  { id: 'rotating', label: 'Rotating', icon: '\uD83C\uDF00', weight: 8, tier: 2, color: '#60c0e0', types: [CreatureType.Stellarid, CreatureType.Nucleid, CreatureType.Craboid], pivotMode: 'center' },
   { id: 'upside-down', label: 'Upside Down', icon: '\uD83D\uDD03', weight: 8, tier: 2, color: '#e0a060', types: [CreatureType.Blobid, CreatureType.Corallid], pivotMode: 'inverted' },
   { id: 'wave', label: 'Wave', icon: '\u223F', weight: 8, tier: 2, color: '#40c0ff' },
   { id: 'rainbow', label: 'Rainbow', icon: '\uD83C\uDF08', weight: 6, tier: 2, color: '#ff80c0' },
