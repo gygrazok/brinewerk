@@ -22,36 +22,10 @@ const DEFAULTS: RenderSettings = {
   slotGlow: true,
 };
 
-export type RenderPreset = 'high' | 'medium' | 'low';
-
-const PRESETS: Record<RenderPreset, Partial<RenderSettings>> = {
-  high: {},
-  medium: { lightRays: false, ambientParticles: false },
-  low: {
-    lightRays: false,
-    ambientParticles: false,
-    decorations: false,
-    creatureGlow: false,
-    rareShaders: false,
-    rarePixelFx: false,
-    slotGlow: false,
-  },
-};
-
 let settings: RenderSettings = { ...DEFAULTS };
 
 export function getRenderSettings(): Readonly<RenderSettings> {
   return settings;
-}
-
-export function setRenderSetting<K extends keyof RenderSettings>(key: K, value: boolean): void {
-  settings[key] = value;
-  saveRenderSettings();
-}
-
-export function applyPreset(preset: RenderPreset): void {
-  settings = { ...DEFAULTS, ...PRESETS[preset] };
-  saveRenderSettings();
 }
 
 export function loadRenderSettings(): void {
@@ -63,13 +37,5 @@ export function loadRenderSettings(): void {
     }
   } catch {
     // corrupt data — use defaults
-  }
-}
-
-function saveRenderSettings(): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  } catch {
-    // localStorage full or unavailable
   }
 }

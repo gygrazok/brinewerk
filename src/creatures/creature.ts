@@ -179,19 +179,7 @@ export interface CreateCreatureOpts {
   unlockedRares?: ReadonlySet<string>;
 }
 
-export function createCreature(
-  typeOrOpts?: CreatureType | CreateCreatureOpts,
-  seed?: number,
-  forceRare?: RareEffect | null,
-): Creature {
-  // Support both old positional API and new opts object
-  let opts: CreateCreatureOpts;
-  if (typeOrOpts !== undefined && typeof typeOrOpts === 'object') {
-    opts = typeOrOpts;
-  } else {
-    opts = { type: typeOrOpts, seed, forceRare };
-  }
-
+export function createCreature(opts: CreateCreatureOpts = {}): Creature {
   const finalSeed = opts.seed ?? ((Date.now() + _nextId * 7919) & 0x7fffffff);
   const types = Object.values(CreatureType);
   const typeRng = mulberry32(finalSeed ^ 0xbeef);

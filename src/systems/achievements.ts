@@ -64,10 +64,6 @@ export function checkAchievements(state: GameState): AchievementDefinition[] {
 // Helpers
 // ---------------------------------------------------------------------------
 
-export function isAchievementCompleted(state: GameState, id: string): boolean {
-  return state.achievements[id] === true;
-}
-
 export function getCompletedCount(state: GameState): number {
   return Object.values(state.achievements).filter(Boolean).length;
 }

@@ -92,8 +92,3 @@ export function tickProduction(state: GameState, deltaSec: number): void {
   state.resources.minerite += totalMinerite * deltaSec;
   state.resources.lux += totalLux * deltaSec;
 }
-
-/** Backwards-compat: total plankton per second (used by HUD/tests). */
-export function getTotalProductionRate(state: GameState): number {
-  return getProductionRates(state).plankton;
-}

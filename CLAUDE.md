@@ -105,7 +105,7 @@ Key non-source files:
 ### State Management
 - Single `GameState` object in `src/core/game-state.ts`
 - Saved to localStorage every 30s and on significant actions
-- Save versioning with migration chain (currently v4) — always increment `CURRENT_SAVE_VERSION` and add a migration step when changing the state shape
+- Save versioning with migration chain (currently v11) — always increment `CURRENT_SAVE_VERSION` and add a migration step when changing the state shape
 - Offline progress calculated from `lastSaveTimestamp` on load
 
 ### Adding a New Rare Effect

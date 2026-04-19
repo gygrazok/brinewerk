@@ -711,7 +711,7 @@ interface Particle {
   maxLife: number;
 }
 
-export interface AmbientParticles {
+interface AmbientParticles {
   particles: Particle[];
   gfx: Graphics;
   worldW: number;
@@ -720,7 +720,7 @@ export interface AmbientParticles {
 
 const MAX_PARTICLES = 80;
 
-export function createAmbientParticles(worldW: number, worldH: number): AmbientParticles {
+function createAmbientParticles(worldW: number, worldH: number): AmbientParticles {
   const gfx = new Graphics();
   const particles: Particle[] = [];
 
@@ -747,7 +747,7 @@ function spawnParticle(worldW: number, worldH: number, randomY: boolean): Partic
   };
 }
 
-export function updateAmbientParticles(ap: AmbientParticles, dt: number): void {
+function updateAmbientParticles(ap: AmbientParticles, dt: number): void {
   const settings = getRenderSettings();
   if (!settings.ambientParticles) {
     ap.gfx.visible = false;
@@ -782,14 +782,14 @@ export function updateAmbientParticles(ap: AmbientParticles, dt: number): void {
 
 // --- Light rays ---
 
-export interface LightRays {
+interface LightRays {
   container: Container;
   rays: Graphics[];
   time: number;
   _rayDefs: { x: number; baseX: number; w: number; angle: number; alpha: number }[];
 }
 
-export function createLightRays(): LightRays {
+function createLightRays(): LightRays {
   const container = new Container();
   const rays: Graphics[] = [];
 
@@ -818,7 +818,7 @@ export function createLightRays(): LightRays {
   return { container, rays, time: 0, _rayDefs: rayDefs };
 }
 
-export function updateLightRays(lr: LightRays, dt: number): void {
+function updateLightRays(lr: LightRays, dt: number): void {
   const settings = getRenderSettings();
   if (!settings.lightRays) {
     lr.container.visible = false;

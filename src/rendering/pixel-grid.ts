@@ -33,23 +33,6 @@ export function fillCircle(
   }
 }
 
-export function fillEllipse(
-  grid: PixelGrid,
-  cx: number,
-  cy: number,
-  rx: number,
-  ry: number,
-  color: string,
-): void {
-  for (let dy = -Math.ceil(ry); dy <= Math.ceil(ry); dy++) {
-    for (let dx = -Math.ceil(rx); dx <= Math.ceil(rx); dx++) {
-      if ((dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1) {
-        setPixel(grid, cx + dx, cy + dy, color);
-      }
-    }
-  }
-}
-
 export function addEyes(
   grid: PixelGrid,
   cx: number,

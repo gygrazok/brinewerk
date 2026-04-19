@@ -141,7 +141,7 @@ export function initDebugMenu(
           rareVal === '' ? undefined :        // random
           rareVal === 'none' ? null :         // force no rare
           (rareVal as RareEffect);            // specific rare
-        const creature = createCreature(type, undefined, rare);
+        const creature = createCreature({ type, forceRare: rare });
         state.creatures.push(creature);
         state.shore.push(creature);
         break;

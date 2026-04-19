@@ -10,8 +10,6 @@ export const TYPE_SPECIFIC_TRAITS = {
   nucleid: ['facets', 'rings'] as const,
 } as const;
 
-export const PALETTE_TRAITS = ['palette1', 'palette2'] as const;
-
 /** Display-friendly traits for a given type (universal + type-specific) */
 export function getDisplayTraits(type: string): string[] {
   const specific = TYPE_SPECIFIC_TRAITS[type as keyof typeof TYPE_SPECIFIC_TRAITS] ?? [];
