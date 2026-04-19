@@ -3,7 +3,7 @@ import { SEABED_SLOTS } from '../systems/seabed-layout';
 import { DEFAULT_RARE_CHANCE, DEFAULT_UNLOCKED_RARE_IDS } from './balance';
 
 const SAVE_KEY = 'brinewerk_save';
-const CURRENT_SAVE_VERSION = 10;
+const CURRENT_SAVE_VERSION = 11;
 
 // --- Seabed pool (v3+) ---
 
@@ -236,6 +236,27 @@ function migrateState(data: Record<string, unknown>): GameState {
       (d.achievements as Record<string, boolean>)['tide_pool_keeper'] = true;
     }
     data.saveVersion = 10;
+  }
+
+  // V10 → V11: re-apply seabed layout (x/y/theme/tier) to each slot while
+  // preserving unlocked state and creatureId. Needed when slot positions
+  // change (e.g., classifying certain slots as "deep" by moving them onto the terrain).
+  if ((data.saveVersion as number) < 11) {
+    const pool = data.pool as SeabedPool | undefined;
+    if (pool?.slots) {
+      for (const def of SEABED_SLOTS) {
+        const existing = pool.slots[def.id];
+        if (existing) {
+          existing.x = def.x;
+          existing.y = def.y;
+          existing.theme = def.theme;
+          existing.tier = def.tier;
+        } else {
+          pool.slots[def.id] = { ...def, creatureId: null };
+        }
+      }
+    }
+    data.saveVersion = 11;
   }
 
   // Validate critical fields exist after migration

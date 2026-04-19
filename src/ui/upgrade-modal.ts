@@ -1,5 +1,13 @@
-import type { GameState } from '../core/game-state';
-import { UPGRADES, getUpgradeLevel, purchaseUpgrade } from '../systems/upgrades';
+import type { GameState, ResourceBundle } from '../core/game-state';
+import { UPGRADES, getUpgradeLevel, purchaseUpgrade, getUpgradeCostResource } from '../systems/upgrades';
+
+const RESOURCE_ICONS: Record<keyof ResourceBundle, string> = {
+  plankton: '🟢',
+  minerite: '🔵',
+  lux: '✨',
+  nacre: '⚬',
+  coral: '🪸',
+};
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -91,12 +99,21 @@ function renderContent(state: GameState): void {
 
   const signal = modalAbort?.signal;
 
-  let cardsHtml = '';
-  for (const def of UPGRADES) {
+  // Sort: affordable (not maxed) first, then unaffordable (not maxed), then maxed.
+  // Within each bucket preserve UPGRADES declaration order.
+  const bucketed = UPGRADES.map((def) => {
     const level = getUpgradeLevel(state, def.id);
     const isMaxed = level >= def.maxLevel;
     const cost = isMaxed ? 0 : def.costFn(level);
-    const affordable = state.resources.plankton >= cost;
+    const resource = getUpgradeCostResource(def);
+    const affordable = state.resources[resource] >= cost;
+    const bucket = isMaxed ? 2 : affordable ? 0 : 1;
+    return { def, level, isMaxed, cost, resource, affordable, bucket };
+  }).sort((a, b) => a.bucket - b.bucket);
+
+  let cardsHtml = '';
+  for (const { def, level, isMaxed, cost, resource, affordable } of bucketed) {
+    const costIcon = RESOURCE_ICONS[resource];
 
     const levelStr = isMaxed
       ? '<span class="upgrade-max">MAX</span>'
@@ -104,7 +121,7 @@ function renderContent(state: GameState): void {
 
     const buttonHtml = isMaxed
       ? '<span class="upgrade-purchased">Purchased</span>'
-      : `<button class="btn btn-secondary btn-sm upgrade-buy-btn${affordable ? '' : ' unaffordable'}" data-id="${def.id}">${cost} 🟢</button>`;
+      : `<button class="btn btn-secondary btn-sm upgrade-buy-btn${affordable ? '' : ' unaffordable'}" data-id="${def.id}">${cost} ${costIcon}</button>`;
 
     cardsHtml += `
       <div class="upgrade-card${isMaxed ? ' maxed' : ''}" data-id="${def.id}">
@@ -157,9 +174,10 @@ function updateBuyButtons(state: GameState): void {
     const level = getUpgradeLevel(state, def.id);
     if (level >= def.maxLevel) continue;
     const cost = def.costFn(level);
+    const resource = getUpgradeCostResource(def);
     const btn = modal.querySelector(`.upgrade-buy-btn[data-id="${def.id}"]`);
     if (btn) {
-      btn.classList.toggle('unaffordable', state.resources.plankton < cost);
+      btn.classList.toggle('unaffordable', state.resources[resource] < cost);
     }
   }
 }

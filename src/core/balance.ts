@@ -64,6 +64,19 @@ export const CORAL_SPRITE_SIZE = 14;                     // pixel grid resolutio
 export const CORAL_DISPLAY_SIZE = 56;                    // on-screen world px
 export const CORAL_CLICK_RADIUS = 40;                    // click hit-test radius in world px
 
+/** Depth classification. Shallow is a flat y threshold; deep is terrain-relative
+ *  (a slot is deep when it sits on/near the seabed floor, which varies with x). */
+export const WORLD_WIDTH = 1920;
+export const WORLD_HEIGHT = 1080;
+export const DEPTH_SHALLOW_MAX = 350;
+/** A slot counts as deep when its y is within this many world px of the seabed profile. */
+export const DEPTH_TERRAIN_MARGIN = 30;
+
+/** Passive minerite/s per deep slot, multiplied by the creature's trait deviation (0-1). */
+export const MINERITE_BASE_RATE = 0.1;
+/** Passive lux/s per shallow slot, multiplied by max(0, glow-0.5) * 2. */
+export const LUX_BASE_RATE = 0.05;
+
 /**
  * Slot unlock cost by tier (position-based).
  * Cost is in Nacre only, growing exponentially: 2^(tier-1).

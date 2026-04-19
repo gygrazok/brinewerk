@@ -4,7 +4,7 @@ import type { GameState, SeabedSlot } from '../core/game-state';
 import type { ResourceBundle } from '../core/game-state';
 import { getCreatureAt } from '../systems/pool';
 import { getSlotUnlockCost } from '../core/balance';
-import { allSlots, worldToSlot } from '../systems/coords';
+import { allSlots, worldToSlot, getSlotDepth } from '../systems/coords';
 import {
   createCreatureVisual,
   updateCreatureVisual,
@@ -22,20 +22,18 @@ import { getRenderSettings } from '../rendering/render-settings';
 const SLOT_SIZE = 80;
 const CREATURE_DISPLAY = 64;
 const SLOT_BG = 0x0d2228;
-const SLOT_BORDER = 0x1a3a3f;
 const SLOT_HOVER = 0x3aada8;
 const HIT_RADIUS = 50;
 
 const ZOOM_MAX = 4.0;
 const DRAG_THRESHOLD = 4;
 
-// Theme-specific slot border colors
-const THEME_COLORS: Record<string, number> = {
-  rock:    0x3a5a60,
-  coral:   0x8b3366,
-  shell:   0xaa9060,
-  anemone: 0x5a8a3a,
-  vent:    0x8a5a2a,
+// Depth-based slot border colors — always visible so the vertical puzzle is legible
+// before the player unlocks Deep Drilling / Bioluminescence.
+const DEPTH_COLORS: Record<'shallow' | 'mid' | 'deep', number> = {
+  shallow: 0xc9a642, // warm gold (lux)
+  mid:     0x3aada8, // teal (neutral, matches --accent)
+  deep:    0x3a6aad, // cold blue (minerite)
 };
 
 interface DragState {
@@ -658,14 +656,14 @@ function syncSlotGlow(poolView: PoolView, state: GameState): void {
 }
 
 function drawSlotGlow(gfx: Graphics, slot: SeabedSlot): void {
-  const themeColor = THEME_COLORS[slot.theme] ?? SLOT_BORDER;
+  const depthColor = DEPTH_COLORS[getSlotDepth(slot)];
   const r = SLOT_SIZE * 0.8;
   gfx.circle(slot.x, slot.y, r);
-  gfx.fill({ color: themeColor, alpha: 0.12 });
+  gfx.fill({ color: depthColor, alpha: 0.12 });
   gfx.circle(slot.x, slot.y, r * 0.6);
-  gfx.fill({ color: themeColor, alpha: 0.08 });
+  gfx.fill({ color: depthColor, alpha: 0.08 });
   gfx.circle(slot.x, slot.y, r * 0.35);
-  gfx.fill({ color: themeColor, alpha: 0.06 });
+  gfx.fill({ color: depthColor, alpha: 0.06 });
 }
 
 /** Check if a world-space point is within the visible viewport (with margin) */
@@ -764,26 +762,24 @@ function drawLockIcon(gfx: Graphics, cx: number, cy: number, affordable = false)
 function drawSlot(gfx: Graphics, slot: SeabedSlot, affordable = false): void {
   const x = slot.x - SLOT_SIZE / 2;
   const y = slot.y - SLOT_SIZE / 2;
-  const themeColor = THEME_COLORS[slot.theme] ?? SLOT_BORDER;
+  const depthColor = DEPTH_COLORS[getSlotDepth(slot)];
 
   if (slot.unlocked) {
     gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
     gfx.fill({ color: SLOT_BG, alpha: 0.7 });
     gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
-    gfx.stroke({ color: themeColor, width: 2, alpha: 0.6 });
+    gfx.stroke({ color: depthColor, width: 2, alpha: 0.6 });
   } else if (affordable) {
-    // Affordable: bright border, inviting appearance
     gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
     gfx.fill({ color: SLOT_BG, alpha: 0.6 });
     gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
-    gfx.stroke({ color: 0x3aada8, width: 2, alpha: 0.8 });
+    gfx.stroke({ color: depthColor, width: 2, alpha: 0.8 });
     drawLockIcon(gfx, slot.x, slot.y - 14, true);
   } else {
-    // Too expensive: dim, ghostly
     gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
     gfx.fill({ color: SLOT_BG, alpha: 0.25 });
     gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
-    gfx.stroke({ color: SLOT_BORDER, width: 1, alpha: 0.3 });
+    gfx.stroke({ color: depthColor, width: 1, alpha: 0.35 });
     drawLockIcon(gfx, slot.x, slot.y - 14, false);
   }
 }
@@ -816,6 +812,7 @@ function ensureSlotCostText(gfx: Graphics, slot: SeabedSlot, affordable = false)
 function drawSlotHighlight(gfx: Graphics, slot: SeabedSlot, affordable = false): void {
   const x = slot.x - SLOT_SIZE / 2;
   const y = slot.y - SLOT_SIZE / 2;
+  const depthColor = DEPTH_COLORS[getSlotDepth(slot)];
 
   if (slot.unlocked) {
     gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
@@ -832,7 +829,7 @@ function drawSlotHighlight(gfx: Graphics, slot: SeabedSlot, affordable = false):
     gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
     gfx.fill({ color: SLOT_BG, alpha: 0.35 });
     gfx.roundRect(x, y, SLOT_SIZE, SLOT_SIZE, 6);
-    gfx.stroke({ color: 0x1a3a3f, width: 1, alpha: 0.5 });
+    gfx.stroke({ color: depthColor, width: 1.5, alpha: 0.55 });
     drawLockIcon(gfx, slot.x, slot.y - 14, false);
   }
 }

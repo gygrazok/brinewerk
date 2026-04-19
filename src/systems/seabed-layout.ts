@@ -32,9 +32,9 @@ export const SEABED_SLOTS: SlotDef[] = [
   // --- Tier 2: spreading out (plankton + minerite) ---
   { id: 'slot_9',  x: 480,  y: 480, unlocked: false, theme: 'vent',    tier: 2 },
   { id: 'slot_10', x: 1400, y: 500, unlocked: false, theme: 'anemone', tier: 2 },
-  { id: 'slot_11', x: 540,  y: 680, unlocked: false, theme: 'shell',   tier: 2 },
+  { id: 'slot_11', x: 540,  y: 840, unlocked: false, theme: 'shell',   tier: 2 },
   { id: 'slot_12', x: 780,  y: 200, unlocked: false, theme: 'rock',    tier: 2 },
-  { id: 'slot_13', x: 1340, y: 740, unlocked: false, theme: 'coral',   tier: 2 },
+  { id: 'slot_13', x: 1340, y: 840, unlocked: false, theme: 'coral',   tier: 2 },
 
   // --- Tier 3: periphery (plankton + minerite + lux) ---
   { id: 'slot_14', x: 300,  y: 400, unlocked: false, theme: 'vent',    tier: 3 },

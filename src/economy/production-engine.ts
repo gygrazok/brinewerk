@@ -1,7 +1,9 @@
 import type { GameState } from '../core/game-state';
 import { calculateProduction } from '../creatures/production';
-import { unlockedSlots } from '../systems/coords';
+import { calculateTraitDeviation } from '../creatures/creature';
+import { unlockedSlots, getSlotDepth } from '../systems/coords';
 import { getUpgradeLevel, getUpgradeEffect } from '../systems/upgrades';
+import { MINERITE_BASE_RATE, LUX_BASE_RATE } from '../core/balance';
 
 /** Cached creature-id lookup map — invalidated when creatures array is mutated */
 let cachedMap: Map<string, GameState['creatures'][0]> | null = null;
@@ -17,11 +19,56 @@ function getCreatureMap(state: GameState): Map<string, GameState['creatures'][0]
   return map;
 }
 
+export interface ProductionRates {
+  plankton: number;
+  minerite: number;
+  lux: number;
+}
+
+/** Compute current per-second production rates for plankton, minerite, lux. */
+export function getProductionRates(state: GameState): ProductionRates {
+  const creatureMap = getCreatureMap(state);
+  const fertileMul = getUpgradeEffect('fertile_waters', getUpgradeLevel(state, 'fertile_waters'));
+  const deepDrilling = getUpgradeLevel(state, 'deep_drilling') > 0;
+  const biolum = getUpgradeLevel(state, 'bioluminescence') > 0;
+
+  let plankton = 0;
+  let minerite = 0;
+  let lux = 0;
+
+  for (const slot of unlockedSlots(state.pool)) {
+    if (!slot.creatureId) continue;
+    const creature = creatureMap.get(slot.creatureId);
+    if (!creature) continue;
+
+    plankton += calculateProduction(creature);
+
+    const depth = getSlotDepth(slot);
+    if (deepDrilling && depth === 'deep') {
+      minerite += MINERITE_BASE_RATE * calculateTraitDeviation(creature);
+    }
+    if (biolum && depth === 'shallow') {
+      lux += LUX_BASE_RATE * Math.max(0, creature.genes.glow - 0.5) * 2;
+    }
+  }
+
+  return {
+    plankton: plankton * fertileMul,
+    minerite,
+    lux,
+  };
+}
+
 /** Advance resource production for one tick */
 export function tickProduction(state: GameState, deltaSec: number): void {
-  let totalPlanktonPerSec = 0;
   const creatureMap = getCreatureMap(state);
-  const fertileMultiplier = getUpgradeEffect('fertile_waters', getUpgradeLevel(state, 'fertile_waters'));
+  const fertileMul = getUpgradeEffect('fertile_waters', getUpgradeLevel(state, 'fertile_waters'));
+  const deepDrilling = getUpgradeLevel(state, 'deep_drilling') > 0;
+  const biolum = getUpgradeLevel(state, 'bioluminescence') > 0;
+
+  let totalPlankton = 0;
+  let totalMinerite = 0;
+  let totalLux = 0;
 
   for (const slot of unlockedSlots(state.pool)) {
     if (!slot.creatureId) continue;
@@ -29,23 +76,24 @@ export function tickProduction(state: GameState, deltaSec: number): void {
     if (!creature) continue;
 
     const prod = calculateProduction(creature);
-    totalPlanktonPerSec += prod;
-    creature.lifetimePlankton += prod * deltaSec * fertileMultiplier;
+    totalPlankton += prod;
+    creature.lifetimePlankton += prod * deltaSec * fertileMul;
+
+    const depth = getSlotDepth(slot);
+    if (deepDrilling && depth === 'deep') {
+      totalMinerite += MINERITE_BASE_RATE * calculateTraitDeviation(creature);
+    }
+    if (biolum && depth === 'shallow') {
+      totalLux += LUX_BASE_RATE * Math.max(0, creature.genes.glow - 0.5) * 2;
+    }
   }
 
-  state.resources.plankton += totalPlanktonPerSec * deltaSec * fertileMultiplier;
+  state.resources.plankton += totalPlankton * deltaSec * fertileMul;
+  state.resources.minerite += totalMinerite * deltaSec;
+  state.resources.lux += totalLux * deltaSec;
 }
 
-/** Get current total plankton/s rate */
+/** Backwards-compat: total plankton per second (used by HUD/tests). */
 export function getTotalProductionRate(state: GameState): number {
-  let total = 0;
-  const creatureMap = getCreatureMap(state);
-  for (const slot of unlockedSlots(state.pool)) {
-    if (!slot.creatureId) continue;
-    const creature = creatureMap.get(slot.creatureId);
-    if (!creature) continue;
-    total += calculateProduction(creature);
-  }
-  const fertileMultiplier = getUpgradeEffect('fertile_waters', getUpgradeLevel(state, 'fertile_waters'));
-  return total * fertileMultiplier;
+  return getProductionRates(state).plankton;
 }

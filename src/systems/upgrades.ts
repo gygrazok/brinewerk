@@ -1,4 +1,4 @@
-import type { GameState } from '../core/game-state';
+import type { GameState, ResourceBundle } from '../core/game-state';
 
 // ---------------------------------------------------------------------------
 // Upgrade definitions
@@ -12,6 +12,8 @@ export interface UpgradeDefinition {
   maxLevel: number;
   costFn: (level: number) => number;
   effectFn: (level: number) => number;
+  /** Resource used to pay for this upgrade. Defaults to plankton. */
+  costResource?: keyof ResourceBundle;
 }
 
 const costs = (arr: number[]) => (lv: number) => arr[lv] ?? Infinity;
@@ -80,6 +82,26 @@ export const UPGRADES: UpgradeDefinition[] = [
     costFn: costs([200, 450, 900]),
     effectFn: (lv) => 1 + lv * 0.25,
   },
+  {
+    id: 'deep_drilling',
+    name: 'Deep Drilling',
+    description: 'Deep slots produce minerite (scales with trait quality)',
+    icon: '⛏',
+    maxLevel: 1,
+    costFn: costs([10]),
+    effectFn: (lv) => lv,
+    costResource: 'nacre',
+  },
+  {
+    id: 'bioluminescence',
+    name: 'Bioluminescence',
+    description: 'Shallow slots produce lux (scales with glow trait)',
+    icon: '💡',
+    maxLevel: 1,
+    costFn: costs([50]),
+    effectFn: (lv) => lv,
+    costResource: 'minerite',
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -96,14 +118,19 @@ export function getUpgradeEffect(upgradeId: string, level: number): number {
   return def.effectFn(level);
 }
 
+export function getUpgradeCostResource(def: UpgradeDefinition): keyof ResourceBundle {
+  return def.costResource ?? 'plankton';
+}
+
 export function purchaseUpgrade(state: GameState, upgradeId: string): boolean {
   const def = UPGRADES.find((u) => u.id === upgradeId);
   if (!def) return false;
   const level = getUpgradeLevel(state, upgradeId);
   if (level >= def.maxLevel) return false;
   const cost = def.costFn(level);
-  if (state.resources.plankton < cost) return false;
-  state.resources.plankton -= cost;
+  const resource = getUpgradeCostResource(def);
+  if (state.resources[resource] < cost) return false;
+  state.resources[resource] -= cost;
   state.upgrades[upgradeId] = level + 1;
   return true;
 }

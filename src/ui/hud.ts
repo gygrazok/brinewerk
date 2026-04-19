@@ -1,5 +1,6 @@
 import type { GameState } from '../core/game-state';
-import { getTotalProductionRate } from '../economy/production-engine';
+import { getProductionRates } from '../economy/production-engine';
+import { getUpgradeLevel } from '../systems/upgrades';
 
 let mounted = false;
 
@@ -8,14 +9,16 @@ interface ResourceDef {
   key: keyof GameState['resources'];
   icon: string;
   showRate?: boolean;
+  /** Function returning true when this resource's slot should be rendered. */
+  visible?: (state: GameState) => boolean;
 }
 
 const RESOURCES: ResourceDef[] = [
   { key: 'plankton', icon: '🟢', showRate: true },
-  { key: 'minerite', icon: '🔵' },
-  { key: 'lux',      icon: '✨' },
-  { key: 'nacre',    icon: '⚬' },
-  { key: 'coral',    icon: '🪸' },
+  { key: 'minerite', icon: '🔵', showRate: true, visible: (s) => getUpgradeLevel(s, 'deep_drilling') > 0 },
+  { key: 'lux',      icon: '✨', showRate: true, visible: (s) => getUpgradeLevel(s, 'bioluminescence') > 0 },
+  { key: 'nacre',    icon: '⚬', visible: (s) => s.releaseUnlocked },
+  { key: 'coral',    icon: '🪸', visible: (s) => s.resources.coral > 0 },
 ];
 
 export function updateHud(state: GameState): void {
@@ -27,18 +30,18 @@ export function updateHud(state: GameState): void {
     mounted = true;
   }
 
-  const rate = getTotalProductionRate(state);
+  const rates = getProductionRates(state);
   const resList = document.getElementById('resource-list')!;
-  const visibleResources = RESOURCES.filter((r) => {
-    if (r.key === 'nacre') return state.releaseUnlocked;
-    if (r.key === 'coral') return state.resources.coral > 0;
-    return true;
-  });
+  const visibleResources = RESOURCES.filter((r) => r.visible ? r.visible(state) : true);
   resList.innerHTML = visibleResources
     .map((r) => {
       const val = Math.floor(state.resources[r.key]);
+      const rate = r.key === 'plankton' ? rates.plankton
+                 : r.key === 'minerite' ? rates.minerite
+                 : r.key === 'lux'      ? rates.lux
+                 : 0;
       const rateHtml = r.showRate
-        ? `<span class="res-rate">+${rate.toFixed(1)}/s</span>`
+        ? `<span class="res-rate">+${rate.toFixed(2)}/s</span>`
         : '';
       return `
         <div class="resource-item">
