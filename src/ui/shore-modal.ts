@@ -25,6 +25,9 @@ let selectedIndex: number | null = null;
 let onTakeCreatureCb: ((creature: Creature) => void) | null = null;
 let stateRef: GameState | null = null;
 let mounted = false;
+/** Cached refs into the bottom bar, populated on first mount. */
+let shoreBtnTextEl: HTMLSpanElement | null = null;
+let achBtnEl: HTMLButtonElement | null = null;
 /** Track last known tide timestamp to detect new tide arrivals */
 let lastKnownTideTimestamp = 0;
 /** Active PixiJS creature previews */
@@ -57,44 +60,63 @@ export function renderShoreButton(state: GameState): void {
   if (!bar) return;
 
   if (!mounted) {
-    bar.innerHTML = `
-      <button id="shore-btn" class="btn btn-secondary"></button>
-      <button id="upgrades-btn" class="btn btn-secondary">⬆ Upgrades</button>
-      <button id="achievements-btn" class="btn btn-secondary">🏆</button>
-    `;
-    document.getElementById('shore-btn')!.addEventListener('click', () => {
+    bar.textContent = '';
+
+    const shoreBtn = document.createElement('button');
+    shoreBtn.id = 'shore-btn';
+    shoreBtn.className = 'btn btn-secondary';
+    const icon = document.createElement('span');
+    icon.className = 'shore-btn-icon';
+    icon.textContent = '🌊';
+    shoreBtn.appendChild(icon);
+    shoreBtnTextEl = document.createElement('span');
+    shoreBtn.appendChild(shoreBtnTextEl);
+    shoreBtn.addEventListener('click', () => {
       if (stateRef) openShoreModal(stateRef);
     });
-    document.getElementById('upgrades-btn')!.addEventListener('click', () => {
+    bar.appendChild(shoreBtn);
+
+    const upgradesBtn = document.createElement('button');
+    upgradesBtn.id = 'upgrades-btn';
+    upgradesBtn.className = 'btn btn-secondary';
+    upgradesBtn.textContent = '⬆ Upgrades';
+    upgradesBtn.addEventListener('click', () => {
       if (stateRef) openUpgradeModal(stateRef);
     });
-    document.getElementById('achievements-btn')!.addEventListener('click', () => {
+    bar.appendChild(upgradesBtn);
+
+    achBtnEl = document.createElement('button');
+    achBtnEl.id = 'achievements-btn';
+    achBtnEl.className = 'btn btn-secondary';
+    achBtnEl.textContent = '🏆';
+    achBtnEl.addEventListener('click', () => {
       if (stateRef) openAchievementModal(stateRef);
     });
+    bar.appendChild(achBtnEl);
+
     mounted = true;
   }
 
   const btn = document.getElementById('shore-btn');
-  if (!btn) return;
+  if (!btn || !shoreBtnTextEl) return;
 
   if (!state.shoreTaken && state.shore.length > 0) {
-    btn.innerHTML = `<span class="shore-btn-icon">🌊</span> Shore (${state.shore.length})`;
+    shoreBtnTextEl.textContent = ` Shore (${state.shore.length})`;
     btn.classList.add('btn-pulse');
   } else {
     const remaining = getTideTimeRemaining(state);
-    const min = Math.floor(remaining / 60);
-    const sec = Math.floor(remaining % 60);
-    const timeStr = `${min}:${sec.toString().padStart(2, '0')}`;
-    btn.innerHTML = `<span class="shore-btn-icon">🌊</span> ${remaining <= 0 ? 'Tide ready!' : timeStr}`;
+    if (remaining <= 0) {
+      shoreBtnTextEl.textContent = ' Tide ready!';
+    } else {
+      const min = Math.floor(remaining / 60);
+      const sec = Math.floor(remaining % 60);
+      shoreBtnTextEl.textContent = ` ${min}:${sec.toString().padStart(2, '0')}`;
+    }
     btn.classList.remove('btn-pulse');
   }
 
-  // Update achievements badge
-  const achBtn = document.getElementById('achievements-btn');
-  if (achBtn) {
-    const done = getCompletedCount(state);
-    const total = getTotalCount();
-    achBtn.textContent = `🏆 ${done}/${total}`;
+  if (achBtnEl) {
+    achBtnEl.textContent = `🏆 ${getCompletedCount(state)}/${getTotalCount()}`;
   }
 }
 
@@ -124,8 +146,10 @@ export function destroyShoreModal(): void {
   const styles = document.getElementById('shore-modal-styles');
   if (styles) styles.remove();
   mounted = false;
+  shoreBtnTextEl = null;
+  achBtnEl = null;
   const bar = document.getElementById('bottom-bar');
-  if (bar) bar.innerHTML = '';
+  if (bar) bar.textContent = '';
 }
 
 // ---------------------------------------------------------------------------
