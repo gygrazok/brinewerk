@@ -30,12 +30,16 @@ export const LEVEL_MILESTONES: readonly number[] = [10, 25, 50, 75, 100, 150, 20
 
 /** Growth stages: cap step once the milestone list is exhausted. */
 export const STAGE_CAP_STEP_AFTER_LAST = 100;
-/** Stage-up cost in species material: STAGE_COST_BASE * STAGE_COST_GROWTH^stage (2, 5, 13, 32, 79, ...). */
-export const STAGE_COST_BASE = 2;
-export const STAGE_COST_GROWTH = 2.5;
-/** Species material from release: floor((1 + level / MATERIAL_LEVEL_DIVISOR) * rareMul). */
-export const MATERIAL_LEVEL_DIVISOR = 10;
-export const MATERIAL_RARE_TIER_MULTIPLIERS: Record<number, number> = { 1: 1.5, 2: 2, 3: 3 };
+/**
+ * Stage-up cost in species material: 1, 2, 3, 5, 8, 12, 17, 23, ... (2 + s(s-1)/2 from stage 1).
+ * Each release yields a fixed amount of material, so this is effectively "creatures of the
+ * same species sacrificed": cap 100 needs 11, cap 200 needs 31.
+ */
+export function stageUpCostFor(stage: number): number {
+  return stage === 0 ? 1 : 2 + (stage * (stage - 1)) / 2;
+}
+/** Level that completes a species' "mature" achievement and unlocks its Harvest upgrade. */
+export const MATURE_LEVEL = 100;
 
 /** Initial game state */
 export const INITIAL_PLANKTON = 50;

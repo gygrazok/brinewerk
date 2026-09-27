@@ -1,6 +1,8 @@
 import type { GameState } from '../core/game-state';
 import { unlockedSlots } from './coords';
 import type { IconId } from '../rendering/icon-data';
+import { CreatureType, CREATURE_NAMES } from '../creatures/types';
+import { MATURE_LEVEL } from '../core/balance';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -43,6 +45,20 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
   },
 ];
 
+/** Achievement id completed by reaching MATURE_LEVEL with a creature of this species. */
+export function matureAchievementId(type: CreatureType): string {
+  return `mature_${type}`;
+}
+
+ACHIEVEMENTS.push(...Object.values(CreatureType).map((type): AchievementDefinition => ({
+  id: matureAchievementId(type),
+  name: `Mature ${CREATURE_NAMES[type]}`,
+  description: `Reach Lv ${MATURE_LEVEL} with a ${CREATURE_NAMES[type]}`,
+  icon: `type-${type}` as IconId,
+  condition: (state) => state.creatures.some((c) => c.type === type && c.level >= MATURE_LEVEL),
+  reward: { type: 'feature-unlock', label: `Unlocks: ${CREATURE_NAMES[type]} Harvest upgrade` },
+})));
+
 // ---------------------------------------------------------------------------
 // Checking
 // ---------------------------------------------------------------------------
@@ -76,6 +92,11 @@ export function getTotalCount(): number {
 /** True when the tide_pool_keeper achievement is complete — gates release/nacre. */
 export function isReleaseUnlocked(state: GameState): boolean {
   return state.achievements[RELEASE_UNLOCK_ACHIEVEMENT_ID] === true;
+}
+
+/** True once the species has reached MATURE_LEVEL: gates its Harvest upgrade. */
+export function isSpeciesMature(state: GameState, type: CreatureType): boolean {
+  return state.achievements[matureAchievementId(type)] === true;
 }
 
 /** The registry opens together with release: both turn a pool creature into long-term progress. */

@@ -13,7 +13,7 @@ Append to `ACHIEVEMENTS` in `src/systems/achievements.ts`:
   id: 'nacre_hoarder',                           // stable string key, stored in save
   name: 'Nacre Hoarder',
   description: 'Accumulate 1000 nacre',
-  icon: '⚬',
+  icon: 'ach-shell',                             // IconId from rendering/icon-data.ts
   condition: (state) => state.resources.nacre >= 1000,
   reward: { type: 'bonus', label: '+10% nacre from release' },
 }

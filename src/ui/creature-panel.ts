@@ -463,7 +463,7 @@ function renderDynamic(): void {
     const nacreYield = calculateNacreYield(creature, state);
     const nacrePart = nacreYield > 0 ? `+${formatNumber(nacreYield)} ${res('nacre')} ` : '';
     const title = `Nacre = (Lv / 10)² × gene quality × rare tier${nacreYield > 0 ? '' : ` (0 below Lv ${nextNacreLevel(creature, state)})`}`
-      + ` · ${matName} = floor(1 + Lv / 10) × rare tier`;
+      + ` · ${matName} per release = 1 + ${CREATURE_NAMES[creature.type]} Harvest level`;
     actionsHtml += `<button class="btn btn-secondary" data-action="release" title="${title}">Release · ${nacrePart}+${formatNumber(materialYield(creature, state))} ${icon(mat)}</button>`;
   }
   setHtml(actions, actionsHtml);

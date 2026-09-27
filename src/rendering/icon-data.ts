@@ -434,17 +434,6 @@ export const ICON_DATA = {
     '.........',
     '.........',
   ],
-  'up-tidal_salvage': [
-    's.s.s.s.s',
-    '.s.s.s.s.',
-    's.s.s.s.s',
-    '.s.s.s.s.',
-    's.sRs.s.s',
-    '.s.s.s.s.',
-    '..s.s.s..',
-    '...s.s...',
-    '....s....',
-  ],
   'rare-metallic': [
     '...w.w...',
     '.w.www.w.',

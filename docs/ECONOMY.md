@@ -33,11 +33,17 @@ Tuning reference (greedy simulation, 50% active collection): levels 20 at 5 min,
 
 `systems/growth.ts`. A creature's level is capped by its stage: caps are the milestone
 levels (10, 25, 50, 75, 100, 150, ... then +100). Feeding stops at the cap; a stage-up
-raises it and costs `ceil(2 × 2.5^stage)` material of the creature's own species
-(Spicules, Gel, Calcite, Prisms, Chitin; `MATERIAL_NAMES`).
+raises it and costs `stageUpCostFor(stage)` material of the creature's own species:
+1, 2, 3, 5, 8, 12, 17, 23, ... (Spicules, Gel, Calcite, Prisms, Chitin; `MATERIAL_NAMES`).
 
-Material comes only from releasing that species: `floor((1 + level/10) × rareTierMul × tidal_salvage)`.
-Shore creatures can be released directly (uses the tide's pickup, yields 1+ material).
+Material comes only from releasing that species and is a fixed `1 + <Species> Harvest level`
+per creature, regardless of level or rarity (as candy per transfer in Pokémon GO): material
+counts sacrificed duplicates, nacre repays investment. Shore creatures can be released
+directly (uses the tide's pickup).
+
+Each species has a Harvest upgrade (+1 material per release per level, nacre, 5 levels),
+hidden until its "Mature <Species>" achievement: reach Lv 100 (`MATURE_LEVEL`) with that species.
+Feature-unlock pattern: `isSpeciesMature(state, type)` reads `state.achievements`.
 Design intent: plankton feeding stays the between-stages loop; the decision moves to
 which creature gets the scarce material, and duplicates of a species gain value.
 

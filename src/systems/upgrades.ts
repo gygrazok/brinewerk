@@ -1,5 +1,6 @@
 import type { GameState, ResourceBundle } from '../core/game-state';
-import { isReleaseUnlocked } from './achievements';
+import { isReleaseUnlocked, isSpeciesMature } from './achievements';
+import { CreatureType, CREATURE_NAMES, MATERIAL_NAMES } from '../creatures/types';
 import { hasShallowSlot } from './coords';
 import { RARE_EFFECTS } from '../creatures/creature';
 import { formatMultiplier } from '../util/format';
@@ -136,18 +137,6 @@ export const UPGRADES: UpgradeDefinition[] = [
     visible: nacreVisible,
   },
   {
-    id: 'tidal_salvage',
-    name: 'Tidal Salvage',
-    description: '+25% species material from release per level',
-    effectLabel: formatMultiplier,
-    icon: 'up-tidal_salvage',
-    maxLevel: 5,
-    costFn: geometric(6, 2.5),
-    effectFn: (lv) => 1 + lv * 0.25,
-    costResource: 'nacre',
-    visible: nacreVisible,
-  },
-  {
     id: 'rare_lure',
     name: 'Rare Lure',
     description: '+1% rare creature chance per level',
@@ -233,6 +222,25 @@ export const UPGRADES: UpgradeDefinition[] = [
     visible: luxVisible,
   },
 ];
+
+/** Upgrade id for a species' Harvest upgrade (extra material per release). */
+export function harvestUpgradeId(type: CreatureType): string {
+  return `harvest_${type}`;
+}
+
+// --- Species Harvest: unlocked by reaching Lv 100 with that species (achievement) ---
+UPGRADES.push(...Object.values(CreatureType).map((type): UpgradeDefinition => ({
+  id: harvestUpgradeId(type),
+  name: `${CREATURE_NAMES[type]} Harvest`,
+  description: `+1 ${MATERIAL_NAMES[type]} per ${CREATURE_NAMES[type]} release per level`,
+  effectLabel: (e) => `+${e} per release`,
+  icon: `mat-${type}` as IconId,
+  maxLevel: 5,
+  costFn: geometric(10, 2.5),
+  effectFn: (lv) => lv,
+  costResource: 'nacre',
+  visible: (state) => isSpeciesMature(state, type),
+})));
 
 // ---------------------------------------------------------------------------
 // Helpers

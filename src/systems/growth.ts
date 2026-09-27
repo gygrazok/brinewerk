@@ -1,10 +1,7 @@
 import type { GameState } from '../core/game-state';
-import { type Creature, getRareInfo } from '../creatures/creature';
-import {
-  LEVEL_MILESTONES, STAGE_COST_BASE, STAGE_COST_GROWTH, STAGE_CAP_STEP_AFTER_LAST,
-  MATERIAL_LEVEL_DIVISOR, MATERIAL_RARE_TIER_MULTIPLIERS,
-} from '../core/balance';
-import { upgradeEffect } from './upgrades';
+import type { Creature } from '../creatures/creature';
+import { LEVEL_MILESTONES, STAGE_CAP_STEP_AFTER_LAST, stageUpCostFor } from '../core/balance';
+import { upgradeEffect, harvestUpgradeId } from './upgrades';
 
 /**
  * Growth stages: a creature's level is capped by its stage. Caps coincide with the
@@ -29,7 +26,7 @@ export function isAtCap(creature: Creature): boolean {
 
 /** Species material needed to go from the creature's stage to the next. */
 export function stageUpCost(creature: Creature): number {
-  return Math.ceil(STAGE_COST_BASE * Math.pow(STAGE_COST_GROWTH, creature.stage));
+  return stageUpCostFor(creature.stage);
 }
 
 export function canStageUp(state: GameState, creature: Creature): boolean {
@@ -44,9 +41,10 @@ export function stageUp(state: GameState, creature: Creature): boolean {
   return true;
 }
 
-/** Species material returned by releasing a creature: grows with level, scaled by rarity. */
+/**
+ * Species material returned by releasing a creature: 1, plus the species' Harvest upgrade level.
+ * Independent of the creature's level or rarity: investment is repaid in nacre, not material.
+ */
 export function materialYield(creature: Creature, state: GameState): number {
-  const rareMul = creature.rare ? MATERIAL_RARE_TIER_MULTIPLIERS[getRareInfo(creature.rare).tier] : 1;
-  const base = 1 + creature.level / MATERIAL_LEVEL_DIVISOR;
-  return Math.floor(base * rareMul * upgradeEffect(state, 'tidal_salvage'));
+  return 1 + upgradeEffect(state, harvestUpgradeId(creature.type));
 }
