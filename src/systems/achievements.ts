@@ -32,13 +32,13 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
   {
     id: RELEASE_UNLOCK_ACHIEVEMENT_ID,
     name: 'Tide Pool Keeper',
-    description: 'Place 4 creatures in the tide pool',
+    description: 'Fill 4 pool slots',
     icon: '🐚',
     condition: (state) => {
       const placed = unlockedSlots(state.pool).filter(s => s.creatureId !== null).length;
       return placed >= 4;
     },
-    reward: { type: 'feature-unlock', label: 'Unlocks Nacre, Creature Release & Collection' },
+    reward: { type: 'feature-unlock', label: 'Unlocks: Nacre, Release, Collection' },
   },
 ];
 

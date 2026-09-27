@@ -2,15 +2,18 @@ import type { Creature } from '../creatures/creature';
 import type { GameState } from '../core/game-state';
 import { getRareInfo } from '../creatures/creature';
 import { CREATURE_NAMES, CREATURE_ICONS, TYPE_MULTIPLIERS } from '../creatures/types';
-import { calculateGeneticRate, nextMilestone, PRODUCTION_GENE } from '../creatures/production';
+import {
+  calculateGeneticRate, nextMilestone, milestonesReached, PRODUCTION_GENE,
+} from '../creatures/production';
+import { PROD_GENE_EXPONENT } from '../core/balance';
 import { getDisplayTraits, TRAIT_COLORS } from '../genetics/traits';
 import { createCreaturePreviewApp, type CreaturePreviewApp } from '../rendering/creature-preview';
 import { calculateNacreYield } from '../systems/release';
 import { quoteFeed } from '../systems/feeding';
 import { findCreatureSlot } from '../systems/pool';
-import { getRegisteredSpecimen, specimenBonus } from '../systems/registry';
+import { getRegisteredSpecimen, specimenBonus, specimenBonusFormula } from '../systems/registry';
 import { isReleaseUnlocked, isRegistryUnlocked } from '../systems/achievements';
-import { getCreatureRates } from '../economy/production-engine';
+import { getCreatureRates, getPlanktonMultiplier } from '../economy/production-engine';
 import { formatNumber, formatPercent, formatMultiplier } from '../util/format';
 
 let overlayEl: HTMLDivElement | null = null;
@@ -276,8 +279,11 @@ export async function showCreaturePanel(creature: Creature, opts: CreaturePanelO
     const color = TRAIT_COLORS[trait] ?? '#3aada8';
     const pct = Math.round(val * 100);
     const isProd = prodGenes.has(trait);
+    const prodTitle = isProd
+      ? ` title="Production gene: ×${Math.pow(2, PROD_GENE_EXPONENT * (val - 0.5)).toFixed(2)} plankton (×1 at 50%)"`
+      : '';
     html += `
-        <div class="trait-row"${isProd ? ' title="Drives plankton production"' : ''}>
+        <div class="trait-row"${prodTitle}>
           <span class="trait-label${isProd ? ' prod' : ''}">${isProd ? '★ ' : ''}${trait.toUpperCase()}</span>
           <div class="trait-bar-bg">
             <div class="trait-bar-fill" style="width:${pct}%; background:${color};"></div>
@@ -370,11 +376,12 @@ function renderDynamic(): void {
 
   const state = opts.state;
   const geneMul = calculateGeneticRate(creature) / TYPE_MULTIPLIERS[creature.type];
+  const geneLine = `<div class="stat-dim" title="Size gene × ${PRODUCTION_GENE[creature.type]} gene, relative to a 50%/50% ${CREATURE_NAMES[creature.type]}">Gene multiplier ${formatMultiplier(geneMul)}</div>`;
 
   if (opts.mode === 'registry') {
     setHtml(dyn, `
-      <div class="registry-note">📖 Collection specimen · ${formatPercent(specimenBonus(creature))} production</div>
-      <div class="stat-dim">Genes ${formatMultiplier(geneMul)} vs. an average ${CREATURE_NAMES[creature.type]}</div>
+      <div class="registry-note" title="${specimenBonusFormula(creature)}">📖 Collection specimen · ${formatPercent(specimenBonus(creature))} global production</div>
+      ${geneLine}
     `);
     setHtml(actions, '');
     return;
@@ -387,7 +394,10 @@ function renderDynamic(): void {
 
   let rateLines = '';
   if (rates) {
-    rateLines += `<div class="production">+${formatNumber(rates.plankton, 2)} 🟢/s</div>`;
+    const breakdown = `Base ${formatNumber(calculateGeneticRate(creature), 2)}/s × Lv ${creature.level}`
+      + ` × milestones ×${Math.pow(2, milestonesReached(creature.level))}`
+      + ` × global ${formatMultiplier(getPlanktonMultiplier(state))}`;
+    rateLines += `<div class="production" title="${breakdown}">+${formatNumber(rates.plankton, 2)} 🟢/s</div>`;
     if (rates.minerite > 0) rateLines += `<div class="stat-dim">+${formatNumber(rates.minerite, 2)} 🔵/s</div>`;
     if (rates.lux > 0) rateLines += `<div class="stat-dim">+${formatNumber(rates.lux, 2)} ✨/s</div>`;
   }
@@ -402,11 +412,11 @@ function renderDynamic(): void {
   setHtml(dyn, `
     <div class="level-row">
       <span class="level-value">Lv ${creature.level}</span>
-      <span class="milestone">${milestone ? `×2 at Lv ${milestone}` : 'All milestones'}</span>
+      <span class="milestone" title="Each milestone doubles production">${milestone ? `×2 at Lv ${milestone}` : 'All milestones reached'}</span>
     </div>
     <div class="stat-lines">
       ${rateLines}
-      <div class="stat-dim">Genes ${formatMultiplier(geneMul)} vs. an average ${CREATURE_NAMES[creature.type]}</div>
+      ${geneLine}
     </div>
     <div class="feed-row">
       ${feedBtn(1, 'Feed')}
@@ -421,14 +431,14 @@ function renderDynamic(): void {
     const bonus = specimenBonus(creature);
     const label = existing
       ? `📖 Replace specimen · ${formatPercent(specimenBonus(existing))} → ${formatPercent(bonus)}`
-      : `📖 Add to collection · ${formatPercent(bonus)} production`;
-    actionsHtml += `<button class="btn btn-secondary" data-action="register">${label}</button>`;
+      : `📖 Add to collection · ${formatPercent(bonus)} global production`;
+    actionsHtml += `<button class="btn btn-secondary" data-action="register" title="${specimenBonusFormula(creature)}">${label}</button>`;
   }
   if (isReleaseUnlocked(state) && opts.onRelease) {
     const nacreYield = calculateNacreYield(creature, state);
     actionsHtml += nacreYield > 0
-      ? `<button class="btn btn-secondary" data-action="release">⚬ Release for ${formatNumber(nacreYield)} Nacre</button>`
-      : `<button class="btn btn-secondary disabled">⚬ Feed to Lv ${nextNacreLevel(creature, state)} to earn Nacre</button>`;
+      ? `<button class="btn btn-secondary" data-action="release" title="Nacre = (Lv / 10)² × gene quality × rare tier">⚬ Release for ${formatNumber(nacreYield)} Nacre</button>`
+      : `<button class="btn btn-secondary disabled">⚬ Nacre yield 0 below Lv ${nextNacreLevel(creature, state)}</button>`;
   }
   setHtml(actions, actionsHtml);
 }
@@ -491,7 +501,7 @@ function showReleaseConfirm(creature: Creature, opts: CreaturePanelOptions): voi
   const nacre = formatNumber(calculateNacreYield(creature, opts.state));
   showConfirm({
     title: `Release ${creature.name}?`,
-    text: 'It will return to the ocean forever.',
+    text: 'Removes the creature from the pool permanently. Level and slot are lost.',
     highlight: `⚬ ${nacre} Nacre`,
     confirmLabel: `Release ⚬${nacre}`,
     onConfirm: () => opts.onRelease?.(creature),
@@ -501,12 +511,12 @@ function showReleaseConfirm(creature: Creature, opts: CreaturePanelOptions): voi
 function showRegisterConfirm(creature: Creature, opts: CreaturePanelOptions): void {
   const existing = getRegisteredSpecimen(opts.state, creature);
   const replaceText = existing
-    ? ` The current specimen (${existing.name}, ${formatPercent(specimenBonus(existing))}) will be discarded.`
+    ? ` Replaces ${existing.name} (${formatPercent(specimenBonus(existing))}), which is discarded.`
     : '';
   showConfirm({
     title: `Add ${creature.name} to the collection?`,
-    text: `It leaves the pool and joins the collection permanently.${replaceText}`,
-    highlight: `📖 ${formatPercent(specimenBonus(creature))} production`,
+    text: `Removes the creature from the pool permanently. The bonus applies to plankton, minerite and lux.${replaceText}`,
+    highlight: `📖 ${formatPercent(specimenBonus(creature))} global production`,
     confirmLabel: existing ? 'Replace' : 'Add',
     onConfirm: () => opts.onRegister?.(creature),
   });

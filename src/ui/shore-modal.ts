@@ -212,8 +212,8 @@ function renderModalContent(modal: HTMLElement, state: GameState, signal: AbortS
     </div>
     <div class="shore-timer" id="shore-timer"></div>
     <div class="shore-actions" id="shore-actions">
-      <button class="btn btn-secondary shore-action-btn" id="shore-refresh">Refresh<br><span class="btn-cost" id="shore-refresh-cost"></span></button>
-      <button class="btn btn-secondary btn-rare shore-action-btn" id="shore-rare-refresh">Rare Refresh<br><span class="btn-cost">${SHORE_RARE_REFRESH_COST} 🪸</span></button>
+      <button class="btn btn-secondary shore-action-btn" id="shore-refresh" title="New shore + 1 pickup. Cost = max(100, 30 s of plankton production), ×2 per refresh this tide; resets on tide">Refresh<br><span class="btn-cost" id="shore-refresh-cost"></span></button>
+      <button class="btn btn-secondary btn-rare shore-action-btn" id="shore-rare-refresh" title="New shore + 1 pickup; first creature is guaranteed rare (unlocked tiers only)">Rare Refresh<br><span class="btn-cost">${SHORE_RARE_REFRESH_COST} 🪸</span></button>
     </div>
     <div class="shore-creatures" id="shore-creatures"></div>
     <div class="shore-stats" id="shore-stats"></div>
@@ -353,8 +353,10 @@ function updateSelection(state: GameState): void {
 function registryBadge(state: GameState, creature: Creature): string {
   if (!isRegistryUnlocked(state)) return '';
   const existing = getRegisteredSpecimen(state, creature);
-  if (!existing) return '<span class="shore-card-reg">📖 NEW</span>';
-  if (specimenBonus(creature) > specimenBonus(existing)) return '<span class="shore-card-reg">📖 ↑</span>';
+  if (!existing) return `<span class="shore-card-reg" title="Empty collection slot · ${formatPercent(specimenBonus(creature))}">📖 NEW</span>`;
+  if (specimenBonus(creature) > specimenBonus(existing)) {
+    return `<span class="shore-card-reg" title="Collection upgrade · ${formatPercent(specimenBonus(existing))} → ${formatPercent(specimenBonus(creature))}">📖 ↑</span>`;
+  }
   return '';
 }
 
@@ -373,7 +375,7 @@ function renderStats(state: GameState, creature: Creature | null): void {
 
   const traits = getDisplayTraits(creature.type);
   const geneMul = calculateGeneticRate(creature) / TYPE_MULTIPLIERS[creature.type];
-  let summary = `Genes ${formatMultiplier(geneMul)}`;
+  let summary = `Lv 1: ${formatNumber(calculateGeneticRate(creature), 2)} 🟢/s · Gene multiplier ${formatMultiplier(geneMul)}`;
   if (isRegistryUnlocked(state)) summary += ` · Collection ${formatPercent(specimenBonus(creature))}`;
   let html = `<div class="shore-stats-inner"><div class="shore-stats-summary">${summary}</div>`;
   for (const trait of traits) {
@@ -410,7 +412,7 @@ function updateTakeButton(state: GameState): void {
     takeBtn.textContent = 'Select a creature';
   } else if (noSlots) {
     takeBtn.classList.add('disabled');
-    takeBtn.textContent = 'No empty slots';
+    takeBtn.textContent = 'No free slot';
   } else if (selectedIndex !== null) {
     takeBtn.classList.remove('disabled');
     takeBtn.textContent = `Take ${state.shore[selectedIndex].name}`;

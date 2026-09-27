@@ -12,14 +12,21 @@ interface ResourceDef {
   showRate?: boolean;
   /** Function returning true when this resource's slot should be rendered. */
   visible?: (state: GameState) => boolean;
+  /** Source → sinks, shown on hover. */
+  tooltip: string;
 }
 
 const RESOURCES: ResourceDef[] = [
-  { key: 'plankton', icon: '🟢', showRate: true },
-  { key: 'minerite', icon: '🔵', showRate: true, visible: (s) => getUpgradeLevel(s, 'deep_drilling') > 0 },
-  { key: 'lux',      icon: '✨', showRate: true, visible: (s) => hasShallowSlot(s.pool) },
-  { key: 'nacre',    icon: '⚬', visible: (s) => isReleaseUnlocked(s) },
-  { key: 'coral',    icon: '🪸', visible: (s) => s.resources.coral > 0 },
+  { key: 'plankton', icon: '🟢', showRate: true,
+    tooltip: 'Plankton · from all creatures + floating clumps · spent on feeding, upgrades, shore refresh' },
+  { key: 'minerite', icon: '🔵', showRate: true, visible: (s) => getUpgradeLevel(s, 'deep_drilling') > 0,
+    tooltip: 'Minerite · from creatures in deep slots · spent on upgrades' },
+  { key: 'lux',      icon: '✨', showRate: true, visible: (s) => hasShallowSlot(s.pool),
+    tooltip: 'Lux · from creatures in shallow slots · spent on upgrades' },
+  { key: 'nacre',    icon: '⚬', visible: (s) => isReleaseUnlocked(s),
+    tooltip: 'Nacre · from releasing creatures · spent on slots and upgrades' },
+  { key: 'coral',    icon: '🪸', visible: (s) => s.resources.coral > 0,
+    tooltip: 'Coral · click seabed coral · spent on rare refresh' },
 ];
 
 interface ResourceRow {
@@ -48,6 +55,7 @@ function mount(bar: HTMLElement): Map<ResourceDef['key'], ResourceRow> {
 
     const item = document.createElement('div');
     item.className = 'resource-item';
+    item.title = r.tooltip;
 
     const value = document.createElement('span');
     value.className = 'res-value';

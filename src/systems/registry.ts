@@ -45,10 +45,25 @@ export function registryKeyOf(creature: Pick<Creature, 'type' | 'rare'>): string
 // Bonuses
 // ---------------------------------------------------------------------------
 
+/** Components of a specimen's bonus: tier base (fraction) and gene-quality multiplier. */
+export function specimenBonusParts(creature: Creature): { tierBonus: number; qualityMul: number } {
+  const tier = creature.rare ? getRareInfo(creature.rare).tier : 0;
+  return {
+    tierBonus: REGISTRY_TIER_BONUS[tier],
+    qualityMul: 1 + REGISTRY_DEVIATION_SCALE * calculateTraitDeviation(creature),
+  };
+}
+
 /** Production bonus (fraction, e.g. 0.12 = +12%) a specimen grants while registered. */
 export function specimenBonus(creature: Creature): number {
-  const tier = creature.rare ? getRareInfo(creature.rare).tier : 0;
-  return REGISTRY_TIER_BONUS[tier] * (1 + REGISTRY_DEVIATION_SCALE * calculateTraitDeviation(creature));
+  const { tierBonus, qualityMul } = specimenBonusParts(creature);
+  return tierBonus * qualityMul;
+}
+
+/** One-line formula for tooltips: "Tier base +10% × gene quality ×1.42". */
+export function specimenBonusFormula(creature: Creature): string {
+  const { tierBonus, qualityMul } = specimenBonusParts(creature);
+  return `Tier base +${Math.round(tierBonus * 100)}% × gene quality ×${qualityMul.toFixed(2)}`;
 }
 
 /** Global production multiplier from all registered specimens. */

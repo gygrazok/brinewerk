@@ -5,7 +5,7 @@ import { CreatureType, CREATURE_NAMES, CREATURE_ICONS } from '../creatures/types
 import { renderCreatureThumbnail } from '../rendering/creature-renderer';
 import {
   REGISTRY_SLOTS, type RegistrySlotDef,
-  getRegistryMultiplier, getRegisteredCount, isSighted, specimenBonus,
+  getRegistryMultiplier, getRegisteredCount, isSighted, specimenBonus, specimenBonusFormula,
 } from '../systems/registry';
 import { getUnlockedRareTiers } from '../systems/rarity';
 import { formatMultiplier, formatPercent } from '../util/format';
@@ -65,11 +65,11 @@ function thumbnailFor(creature: Creature): HTMLCanvasElement {
 }
 
 function cellTitle(def: RegistrySlotDef, specimen: Creature | undefined, sighted: boolean, tierUnlocked: boolean): string {
-  const effect = def.rare ? getRareInfo(def.rare).label : 'Common';
-  if (specimen) return `${specimen.name} · ${effect} · ${formatPercent(specimenBonus(specimen))} production`;
-  if (sighted) return `${effect}: sighted, not collected`;
-  if (!tierUnlocked) return `Unknown · requires ${TIER_UNLOCK_HINT[def.tier]}`;
-  return 'Unknown';
+  const effect = def.rare ? `${getRareInfo(def.rare).label} (T${def.tier})` : 'Common';
+  if (specimen) return `${effect} · ${specimen.name} · ${formatPercent(specimenBonus(specimen))} (${specimenBonusFormula(specimen)})`;
+  if (sighted) return `${effect} · sighted, empty slot`;
+  if (!tierUnlocked) return `Unknown · tier ${def.tier} locked (requires ${TIER_UNLOCK_HINT[def.tier]})`;
+  return 'Unknown · not yet sighted';
 }
 
 function renderContent(modal: HTMLElement, state: GameState, signal: AbortSignal): void {
@@ -113,10 +113,10 @@ function renderContent(modal: HTMLElement, state: GameState, signal: AbortSignal
   modal.innerHTML = `
     <div class="reg-header">
       <span class="reg-title">📖 Collection</span>
-      <span class="reg-summary">${getRegisteredCount(state)}/${total} · ${formatMultiplier(getRegistryMultiplier(state))} production</span>
+      <span class="reg-summary">${getRegisteredCount(state)}/${total} · ${formatMultiplier(getRegistryMultiplier(state))} global production</span>
       <button class="btn btn-ghost" id="registry-close-btn">✕</button>
     </div>
-    <div class="reg-hint">One specimen per species and effect. Better genes give a bigger bonus; rarer effects give much more.</div>
+    <div class="reg-hint">1 slot per species × effect. Specimen bonus = tier base (Common 5%, T1 10%, T2 25%, T3 50%) × gene quality (1 + 2 × avg. trait distance from 50%). Bonuses add up into one multiplier on plankton, minerite and lux.</div>
     <div class="reg-body">${sectionsHtml}</div>
   `;
 
