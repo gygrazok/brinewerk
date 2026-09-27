@@ -1,6 +1,7 @@
 import type { GameState, ResourceBundle } from '../core/game-state';
 import {
   UPGRADES, getUpgradeLevel, purchaseUpgrade, getUpgradeCostResource, isUpgradeVisible,
+  type UpgradeDefinition,
 } from '../systems/upgrades';
 import { formatNumber } from '../util/format';
 import { createModal } from './modal';
@@ -102,6 +103,7 @@ function renderContent(modal: HTMLElement, state: GameState, signal: AbortSignal
           <div class="upgrade-info">
             <div class="upgrade-name">${def.name}</div>
             <div class="upgrade-desc">${def.description}</div>
+            ${effectLine(def, level, isMaxed)}
           </div>
           <div class="upgrade-level">${levelStr}</div>
         </div>
@@ -138,6 +140,14 @@ function renderContent(modal: HTMLElement, state: GameState, signal: AbortSignal
       }
     }, { signal });
   });
+}
+
+/** "Current → next" cumulative effect, e.g. "×1.56 → ×1.95". */
+function effectLine(def: UpgradeDefinition, level: number, isMaxed: boolean): string {
+  if (!def.effectLabel) return '';
+  const now = def.effectLabel(def.effectFn(level));
+  const text = isMaxed ? now : `${now} → ${def.effectLabel(def.effectFn(level + 1))}`;
+  return `<div class="upgrade-effect">${text}</div>`;
 }
 
 function updateBuyButtons(state: GameState): void {
@@ -198,6 +208,7 @@ function injectStyles(): void {
     .upgrade-info { flex: 1; min-width: 0; }
     .upgrade-name { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
     .upgrade-desc { font-size: 13px; color: var(--text-dim); }
+    .upgrade-effect { font-size: 12px; color: var(--accent-hi); margin-top: 2px; }
 
     .upgrade-level {
       font-size: 12px; color: var(--text-dim);

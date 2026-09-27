@@ -1,6 +1,8 @@
 import type { GameState, ResourceBundle } from '../core/game-state';
 import { isReleaseUnlocked } from './achievements';
 import { hasShallowSlot } from './coords';
+import { RARE_EFFECTS } from '../creatures/creature';
+import { formatMultiplier } from '../util/format';
 
 // ---------------------------------------------------------------------------
 // Upgrade definitions
@@ -18,10 +20,14 @@ export interface UpgradeDefinition {
   costResource?: keyof ResourceBundle;
   /** When set, the upgrade is hidden from the shop until this returns true. */
   visible?: (state: GameState) => boolean;
+  /** Formats the cumulative effect for the shop ("×1.56"); omit for one-shot unlocks. */
+  effectLabel?: (effect: number) => string;
 }
 
 const costs = (arr: number[]) => (lv: number) => arr[lv] ?? Infinity;
 const geometric = (base: number, growth: number) => (lv: number) => Math.ceil(base * Math.pow(growth, lv));
+
+const TIER_COUNT = (tier: number) => RARE_EFFECTS.filter((e) => e.tier === tier).length;
 
 const hasUpgrade = (id: string) => (state: GameState) => getUpgradeLevel(state, id) > 0;
 /** Nacre upgrades appear together with the nacre economy (release unlocked). */
@@ -34,7 +40,8 @@ export const UPGRADES: UpgradeDefinition[] = [
   {
     id: 'fertile_waters',
     name: 'Fertile Waters',
-    description: 'All creatures produce 25% more plankton. Stacks with each level.',
+    description: '×1.25 plankton production per level',
+    effectLabel: formatMultiplier,
     icon: '🌿',
     maxLevel: 15,
     costFn: geometric(100, 3),
@@ -43,7 +50,8 @@ export const UPGRADES: UpgradeDefinition[] = [
   {
     id: 'plankton_surge',
     name: 'Plankton Surge',
-    description: 'Floating plankton clumps are worth 50% more per level.',
+    description: '+50% plankton clump value per level',
+    effectLabel: formatMultiplier,
     icon: '💚',
     maxLevel: 5,
     costFn: geometric(300, 6),
@@ -52,7 +60,8 @@ export const UPGRADES: UpgradeDefinition[] = [
   {
     id: 'magnetic_current',
     name: 'Magnetic Current',
-    description: 'Your cursor pulls in floating clumps from 30% farther away per level.',
+    description: '+30% clump collection radius per level',
+    effectLabel: formatMultiplier,
     icon: '🧲',
     maxLevel: 3,
     costFn: costs([150, 1500, 15000]),
@@ -61,7 +70,8 @@ export const UPGRADES: UpgradeDefinition[] = [
   {
     id: 'swift_tides',
     name: 'Swift Tides',
-    description: 'Tides arrive 10% sooner per level, bringing new creatures more often.',
+    description: '-10% tide interval per level',
+    effectLabel: formatMultiplier,
     icon: '🌊',
     maxLevel: 3,
     costFn: costs([300, 5000, 80000]),
@@ -70,7 +80,8 @@ export const UPGRADES: UpgradeDefinition[] = [
   {
     id: 'bountiful_shore',
     name: 'Bountiful Shore',
-    description: 'Each tide brings one more creature to choose from.',
+    description: '+1 creature per tide',
+    effectLabel: (e) => `${e} per tide`,
     icon: '🏖️',
     maxLevel: 2,
     costFn: costs([800, 25000]),
@@ -79,7 +90,8 @@ export const UPGRADES: UpgradeDefinition[] = [
   {
     id: 'coral_growth',
     name: 'Coral Growth',
-    description: 'Coral sprouts on the seabed 15% more often per level.',
+    description: '-15% coral spawn interval per level',
+    effectLabel: formatMultiplier,
     icon: '🪸',
     maxLevel: 3,
     costFn: costs([500, 8000, 120000]),
@@ -88,7 +100,8 @@ export const UPGRADES: UpgradeDefinition[] = [
   {
     id: 'nacre_refinement',
     name: 'Nacre Refinement',
-    description: 'Releasing a creature gives 25% more nacre per level.',
+    description: '+25% nacre from release per level',
+    effectLabel: formatMultiplier,
     icon: '⚬',
     maxLevel: 5,
     costFn: geometric(2000, 8),
@@ -100,7 +113,8 @@ export const UPGRADES: UpgradeDefinition[] = [
   {
     id: 'pearl_bloom',
     name: 'Pearl Bloom',
-    description: 'All creatures produce 20% more plankton. Stacks with each level.',
+    description: '×1.2 plankton production per level',
+    effectLabel: formatMultiplier,
     icon: '🦪',
     maxLevel: 30,
     costFn: geometric(3, 1.6),
@@ -111,7 +125,8 @@ export const UPGRADES: UpgradeDefinition[] = [
   {
     id: 'rich_brine',
     name: 'Rich Brine',
-    description: 'Feeding creatures costs 15% less per level.',
+    description: '×0.85 feeding cost per level',
+    effectLabel: formatMultiplier,
     icon: '🧂',
     maxLevel: 10,
     costFn: geometric(5, 2),
@@ -122,7 +137,8 @@ export const UPGRADES: UpgradeDefinition[] = [
   {
     id: 'rare_lure',
     name: 'Rare Lure',
-    description: 'Rare creatures show up on the shore more often (+1% chance per level).',
+    description: '+1% rare creature chance per level',
+    effectLabel: (e) => `+${Math.round(e * 100)}%`,
     icon: '🎣',
     maxLevel: 7,
     costFn: geometric(4, 2),
@@ -133,7 +149,7 @@ export const UPGRADES: UpgradeDefinition[] = [
   {
     id: 'strange_tides',
     name: 'Strange Tides',
-    description: 'Tides can bring creatures with uncommon effects, such as Glitch, On Fire and Frost.',
+    description: `Unlocks ${TIER_COUNT(2)} tier-2 rare effects`,
     icon: '🌀',
     maxLevel: 1,
     costFn: costs([15]),
@@ -144,7 +160,7 @@ export const UPGRADES: UpgradeDefinition[] = [
   {
     id: 'deep_drilling',
     name: 'Deep Drilling',
-    description: 'Creatures placed in the deep slots at the bottom of the pool start producing minerite.',
+    description: 'Unlocks minerite production in deep slots',
     icon: '⛏',
     maxLevel: 1,
     costFn: costs([10]),
@@ -157,7 +173,8 @@ export const UPGRADES: UpgradeDefinition[] = [
   {
     id: 'bioluminescence',
     name: 'Bioluminescence',
-    description: 'Creatures near the surface produce more lux. The brighter their glow, the bigger the boost.',
+    description: 'Per-creature lux multiplier +2 × Glow per level',
+    effectLabel: (e) => `×(1 + ${2 * e} × Glow)`,
     icon: '💡',
     maxLevel: 5,
     costFn: geometric(50, 3),
@@ -168,7 +185,8 @@ export const UPGRADES: UpgradeDefinition[] = [
   {
     id: 'mineral_feed',
     name: 'Mineral Feed',
-    description: 'Minerite-enriched water: all creatures produce 50% more plankton. Stacks with each level.',
+    description: '×1.5 plankton production per level',
+    effectLabel: formatMultiplier,
     icon: '💎',
     maxLevel: 12,
     costFn: geometric(20, 2.5),
@@ -181,7 +199,7 @@ export const UPGRADES: UpgradeDefinition[] = [
   {
     id: 'abyssal_legends',
     name: 'Abyssal Legends',
-    description: 'Tides can bring creatures with legendary effects, such as Hologram, Holy and X-Ray.',
+    description: `Unlocks ${TIER_COUNT(3)} tier-3 rare effects`,
     icon: '🌌',
     maxLevel: 1,
     costFn: costs([100]),
@@ -192,7 +210,8 @@ export const UPGRADES: UpgradeDefinition[] = [
   {
     id: 'glow_lure',
     name: 'Glow Lure',
-    description: 'Glowing lures draw rare creatures to the shore (+1% chance per level).',
+    description: '+1% rare creature chance per level',
+    effectLabel: (e) => `+${Math.round(e * 100)}%`,
     icon: '🏮',
     maxLevel: 5,
     costFn: geometric(20, 2),
