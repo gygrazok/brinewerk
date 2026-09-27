@@ -126,7 +126,7 @@ function injectStyles(): void {
     #creature-detail .traits { display: flex; flex-direction: column; gap: 5px; }
     #creature-detail .trait-row { display: flex; align-items: center; gap: 6px; }
     #creature-detail .trait-label {
-      width: 60px; text-align: right;
+      width: 84px; text-align: right; white-space: nowrap;
       font-size: 12px; color: var(--text-dim); flex-shrink: 0;
       text-transform: uppercase; letter-spacing: 0.5px;
     }
@@ -181,6 +181,7 @@ function injectStyles(): void {
     #creature-detail .stat-dim { font-size: 12px; color: var(--text-dim); }
     #creature-detail .feed-row { display: flex; gap: 6px; }
     #creature-detail .feed-row .btn { flex: 1; padding: 6px 4px; }
+    #creature-detail .feed-label { font-size: 13px; white-space: nowrap; }
     #creature-detail .panel-actions { display: flex; flex-direction: column; gap: 8px; }
     #creature-detail .registry-note {
       font-size: 13px; color: var(--accent-hi);
@@ -193,7 +194,7 @@ function injectStyles(): void {
       #creature-detail .type-badge { font-size: 12px; }
       #creature-detail .rare-badge { font-size: 12px; }
       #creature-detail .production { font-size: 13px; }
-      #creature-detail .trait-label { font-size: 11px; width: 50px; }
+      #creature-detail .trait-label { font-size: 11px; width: 76px; }
       #creature-detail .trait-val { font-size: 11px; }
       #panel-confirm-dialog .confirm-text { font-size: 13px; }
       #panel-confirm-dialog .confirm-highlight { font-size: 16px; }
@@ -410,13 +411,15 @@ function renderDynamic(): void {
     if (rates.lux > 0) rateLines += `<div class="stat-dim">+${formatNumber(rates.lux, 2)} ${res('lux')}/s</div>`;
   }
 
-  const feedBtn = (count: number | 'max', label: string): string => {
+  // Each button states where it takes the creature ("×10 → Lv 20"), so clamping by the
+  // stage cap or by the budget (Max) is visible instead of a bare "+N"
+  const feedBtn = (count: number | 'max', label: string, hint: string): string => {
     const q = quoteFeed(state, creature, count);
     const affordable = q.levels > 0 && q.cost <= state.resources.plankton;
-    // Show the real level gain when it differs from the button's nominal count (max, or clamped by the cap)
-    const clamped = typeof count === 'number' && q.levels > 0 && q.levels < count;
-    const title = (count === 'max' && affordable) || clamped ? `${count === 'max' ? label : 'Feed'} +${q.levels}` : label;
-    return `<button class="btn btn-secondary${affordable ? '' : ' unaffordable'}" data-action="feed" data-count="${count}">${title}<br><span class="btn-cost">${formatNumber(q.cost)} ${res('plankton')}</span></button>`;
+    const target = creature.level + q.levels;
+    return `<button class="btn btn-secondary${affordable ? '' : ' unaffordable'}" data-action="feed" data-count="${count}" title="${hint}">`
+      + `<span class="feed-label">${label} → Lv ${target}</span>`
+      + `<br><span class="btn-cost">${formatNumber(q.cost)} ${res('plankton')}</span></button>`;
   };
 
   const cap = levelCap(creature);
@@ -432,9 +435,9 @@ function renderDynamic(): void {
   } else {
     growRow = `
     <div class="feed-row">
-      ${feedBtn(1, 'Feed')}
-      ${feedBtn(10, '×10')}
-      ${feedBtn('max', 'Max')}
+      ${feedBtn(1, '×1', 'Feed 1 level')}
+      ${feedBtn(10, '×10', `Feed 10 levels (stops at the stage cap, Lv ${cap})`)}
+      ${feedBtn('max', 'Max', 'Feed as many levels as your plankton allows, up to the stage cap')}
     </div>`;
   }
 
