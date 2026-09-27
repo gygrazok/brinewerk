@@ -121,6 +121,16 @@ export function injectTheme(): void {
       flex-shrink: 0;
     }
 
+    /* ── Pixel icons (9×9 source, integer scaling) ── */
+    .px-icon {
+      width: 18px; height: 18px;
+      image-rendering: pixelated;
+      vertical-align: -4px;
+      display: inline-block;
+    }
+    .px-icon.lg { width: 27px; height: 27px; vertical-align: middle; }
+    .resource-item .px-icon { margin-left: 4px; }
+
     /* ── Shared button styles ────────────────── */
 
     .btn {

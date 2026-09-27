@@ -103,7 +103,7 @@ export function initDebugMenu(
     if (eff.id === 'none') continue; // already added as static option
     const opt = document.createElement('option');
     opt.value = eff.id;
-    opt.textContent = `${eff.icon} ${eff.label}`;
+    opt.textContent = eff.label;
     rareSelect.appendChild(opt);
   }
 

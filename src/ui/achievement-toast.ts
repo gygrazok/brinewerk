@@ -1,4 +1,5 @@
 import type { AchievementDefinition } from '../systems/achievements';
+import { icon } from './icons';
 
 let stylesInjected = false;
 
@@ -55,7 +56,7 @@ export function showAchievementToast(def: AchievementDefinition): void {
   const el = document.createElement('div');
   el.className = 'achievement-toast';
   el.innerHTML = `
-    <span class="achievement-toast-icon">${def.icon}</span>
+    <span class="achievement-toast-icon">${icon(def.icon, 'lg')}</span>
     <div class="achievement-toast-info">
       <span class="achievement-toast-title">ACHIEVEMENT UNLOCKED</span>
       <span class="achievement-toast-name">${def.name}</span>

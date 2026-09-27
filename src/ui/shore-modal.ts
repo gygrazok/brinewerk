@@ -1,7 +1,9 @@
 import type { GameState } from '../core/game-state';
 import type { Creature } from '../creatures/creature';
 import { getRareInfo } from '../creatures/creature';
-import { CREATURE_NAMES, CREATURE_ICONS, TYPE_MULTIPLIERS } from '../creatures/types';
+import { CREATURE_NAMES, TYPE_MULTIPLIERS } from '../creatures/types';
+import { rareIcon, typeIcon } from '../rendering/pixel-icons';
+import { icon, iconEl, res } from './icons';
 import { calculateGeneticRate } from '../creatures/production';
 import { getDisplayTraits, TRAIT_COLORS } from '../genetics/traits';
 import { createCreaturePreviewApp, type CreaturePreviewApp } from '../rendering/creature-preview';
@@ -86,10 +88,9 @@ export function renderShoreButton(state: GameState): void {
     const shoreBtn = document.createElement('button');
     shoreBtn.id = 'shore-btn';
     shoreBtn.className = 'btn btn-secondary';
-    const icon = document.createElement('span');
-    icon.className = 'shore-btn-icon';
-    icon.textContent = '🌊';
-    shoreBtn.appendChild(icon);
+    const shoreIcon = iconEl('shore');
+    shoreIcon.classList.add('shore-btn-icon');
+    shoreBtn.appendChild(shoreIcon);
     shoreBtnTextEl = document.createElement('span');
     shoreBtn.appendChild(shoreBtnTextEl);
     shoreBtn.addEventListener('click', () => {
@@ -100,7 +101,7 @@ export function renderShoreButton(state: GameState): void {
     const upgradesBtn = document.createElement('button');
     upgradesBtn.id = 'upgrades-btn';
     upgradesBtn.className = 'btn btn-secondary';
-    upgradesBtn.textContent = '⬆ Upgrades';
+    upgradesBtn.innerHTML = `${icon('upgrades')} Upgrades`;
     upgradesBtn.addEventListener('click', () => {
       if (stateRef) openUpgradeModal(stateRef);
     });
@@ -117,7 +118,7 @@ export function renderShoreButton(state: GameState): void {
     achBtnEl = document.createElement('button');
     achBtnEl.id = 'achievements-btn';
     achBtnEl.className = 'btn btn-secondary';
-    achBtnEl.textContent = '🏆';
+
     achBtnEl.addEventListener('click', () => {
       if (stateRef) openAchievementModal(stateRef);
     });
@@ -145,12 +146,12 @@ export function renderShoreButton(state: GameState): void {
   }
 
   if (achBtnEl) {
-    achBtnEl.textContent = `🏆 ${getCompletedCount(state)}/${getTotalCount()}`;
+    achBtnEl.innerHTML = `${icon('achievements')} ${getCompletedCount(state)}/${getTotalCount()}`;
   }
   if (registryBtnEl) {
     const unlocked = isRegistryUnlocked(state);
     registryBtnEl.style.display = unlocked ? '' : 'none';
-    if (unlocked) registryBtnEl.textContent = `📖 ${getRegisteredCount(state)}/${REGISTRY_SLOTS.length}`;
+    if (unlocked) registryBtnEl.innerHTML = `${icon('collection')} ${getRegisteredCount(state)}/${REGISTRY_SLOTS.length}`;
   }
 }
 
@@ -207,13 +208,13 @@ function renderModalContent(modal: HTMLElement, state: GameState, signal: AbortS
 
   modal.innerHTML = `
     <div class="shore-header">
-      <span class="shore-title">🌊 Shore</span>
+      <span class="shore-title">${icon('shore')} Shore</span>
       <button class="btn btn-ghost shore-close" id="shore-close-btn">✕</button>
     </div>
     <div class="shore-timer" id="shore-timer"></div>
     <div class="shore-actions" id="shore-actions">
       <button class="btn btn-secondary shore-action-btn" id="shore-refresh" title="New shore + 1 pickup. Cost = max(100, 30 s of plankton production), ×2 per refresh this tide; resets on tide">Refresh<br><span class="btn-cost" id="shore-refresh-cost"></span></button>
-      <button class="btn btn-secondary btn-rare shore-action-btn" id="shore-rare-refresh" title="New shore + 1 pickup; first creature is guaranteed rare (unlocked tiers only)">Rare Refresh<br><span class="btn-cost">${SHORE_RARE_REFRESH_COST} 🪸</span></button>
+      <button class="btn btn-secondary btn-rare shore-action-btn" id="shore-rare-refresh" title="New shore + 1 pickup; first creature is guaranteed rare (unlocked tiers only)">Rare Refresh<br><span class="btn-cost">${SHORE_RARE_REFRESH_COST} ${res('coral')}</span></button>
     </div>
     <div class="shore-creatures" id="shore-creatures"></div>
     <div class="shore-stats" id="shore-stats"></div>
@@ -288,7 +289,7 @@ function renderCreatureCards(state: GameState, signal: AbortSignal): void {
     const c = state.shore[i];
     const rareInfo = c.rare ? getRareInfo(c.rare) : null;
     const rareBadge = rareInfo
-      ? `<span class="shore-card-rare" style="color:${rareInfo.color}; border-color:${rareInfo.color}40; background:${rareInfo.color}15;">${rareInfo.icon} ${rareInfo.label}</span>`
+      ? `<span class="shore-card-rare" style="color:${rareInfo.color}; border-color:${rareInfo.color}40; background:${rareInfo.color}15;">${icon(rareIcon(c.rare!))} ${rareInfo.label}</span>`
       : '';
     const regBadge = registryBadge(state, c);
 
@@ -297,7 +298,7 @@ function renderCreatureCards(state: GameState, signal: AbortSignal): void {
         <div class="shore-card-preview" id="shore-preview-${i}"></div>
         <div class="shore-card-info">
           <div class="shore-card-name">${c.name}</div>
-          <div class="shore-card-type">${CREATURE_ICONS[c.type]} ${CREATURE_NAMES[c.type]}</div>
+          <div class="shore-card-type">${icon(typeIcon(c.type))} ${CREATURE_NAMES[c.type]}</div>
           ${rareBadge}
           ${regBadge}
         </div>
@@ -353,9 +354,9 @@ function updateSelection(state: GameState): void {
 function registryBadge(state: GameState, creature: Creature): string {
   if (!isRegistryUnlocked(state)) return '';
   const existing = getRegisteredSpecimen(state, creature);
-  if (!existing) return `<span class="shore-card-reg" title="Empty collection slot · ${formatPercent(specimenBonus(creature))}">📖 NEW</span>`;
+  if (!existing) return `<span class="shore-card-reg" title="Empty collection slot · ${formatPercent(specimenBonus(creature))}">${icon('collection')} NEW</span>`;
   if (specimenBonus(creature) > specimenBonus(existing)) {
-    return `<span class="shore-card-reg" title="Collection upgrade · ${formatPercent(specimenBonus(existing))} → ${formatPercent(specimenBonus(creature))}">📖 ↑</span>`;
+    return `<span class="shore-card-reg" title="Collection upgrade · ${formatPercent(specimenBonus(existing))} → ${formatPercent(specimenBonus(creature))}">${icon('collection')} ↑</span>`;
   }
   return '';
 }
@@ -375,7 +376,7 @@ function renderStats(state: GameState, creature: Creature | null): void {
 
   const traits = getDisplayTraits(creature.type);
   const geneMul = calculateGeneticRate(creature) / TYPE_MULTIPLIERS[creature.type];
-  let summary = `Lv 1: ${formatNumber(calculateGeneticRate(creature), 2)} 🟢/s · Gene multiplier ${formatMultiplier(geneMul)}`;
+  let summary = `Lv 1: ${formatNumber(calculateGeneticRate(creature), 2)} ${res('plankton')}/s · Gene multiplier ${formatMultiplier(geneMul)}`;
   if (isRegistryUnlocked(state)) summary += ` · Collection ${formatPercent(specimenBonus(creature))}`;
   let html = `<div class="shore-stats-inner"><div class="shore-stats-summary">${summary}</div>`;
   for (const trait of traits) {
@@ -433,9 +434,9 @@ function updateRegisterButton(state: GameState): void {
   }
   const existing = getRegisteredSpecimen(state, creature);
   btn.style.display = '';
-  btn.textContent = existing
-    ? `📖 Replace specimen · ${formatPercent(specimenBonus(existing))} → ${formatPercent(specimenBonus(creature))}`
-    : `📖 Add to collection · ${formatPercent(specimenBonus(creature))}`;
+  btn.innerHTML = existing
+    ? `${icon('collection')} Replace specimen · ${formatPercent(specimenBonus(existing))} → ${formatPercent(specimenBonus(creature))}`
+    : `${icon('collection')} Add to collection · ${formatPercent(specimenBonus(creature))}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -449,7 +450,7 @@ function updateTimer(state: GameState): void {
   const tideReady = isTideReady(state);
 
   if (tideReady && !state.shoreTaken && state.shore.length > 0) {
-    timerEl.innerHTML = '<button class="btn btn-primary" id="tide-flush-btn">🌊 New Tide!</button>';
+    timerEl.innerHTML = `<button class="btn btn-primary" id="tide-flush-btn">${icon('shore')} New Tide!</button>`;
     document.getElementById('tide-flush-btn')!.addEventListener('click', () => {
       if (!stateRef) return;
       flushTide(stateRef);
@@ -477,7 +478,7 @@ function updateRefreshButtons(state: GameState): void {
     const cost = getRefreshCost(state);
     refreshBtn.classList.toggle('unaffordable', state.resources.plankton < cost);
     const costEl = document.getElementById('shore-refresh-cost');
-    if (costEl) costEl.textContent = `${formatNumber(cost)} 🟢`;
+    if (costEl) costEl.innerHTML = `${formatNumber(cost)} ${res('plankton')}`;
   }
   if (rareBtn) {
     rareBtn.classList.toggle('unaffordable', state.resources.coral < SHORE_RARE_REFRESH_COST);

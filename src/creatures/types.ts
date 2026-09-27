@@ -6,14 +6,6 @@ export enum CreatureType {
   Craboid = 'craboid',
 }
 
-export const CREATURE_ICONS: Record<CreatureType, string> = {
-  [CreatureType.Stellarid]: '✦',
-  [CreatureType.Blobid]: '◎',
-  [CreatureType.Corallid]: '❋',
-  [CreatureType.Nucleid]: '◇',
-  [CreatureType.Craboid]: '⬣',
-};
-
 export const CREATURE_NAMES: Record<CreatureType, string> = {
   [CreatureType.Stellarid]: 'Stellarid',
   [CreatureType.Blobid]: 'Blobid',

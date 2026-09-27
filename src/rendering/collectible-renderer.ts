@@ -1,7 +1,8 @@
 import { Container, Sprite, Text, TextStyle, Texture } from 'pixi.js';
 import { SeededRng } from '../util/prng';
 import type { Collectible, CollectibleManager, CollectionEvent } from '../systems/collectibles';
-import type { ResourceBundle } from '../core/game-state';
+import { iconTexture, RESOURCE_ICON } from './pixel-icons';
+import { formatNumber } from '../util/format';
 import {
   COLLECTIBLE_SPRITE_SIZE,
   COLLECTIBLE_DISPLAY_SIZE,
@@ -212,13 +213,8 @@ function createSpriteForCollectible(c: Collectible, layer: CollectibleLayer): Sp
 // Floating pickup popups (+5 🟢)
 // ---------------------------------------------------------------------------
 
-const RESOURCE_ICONS: Record<keyof ResourceBundle, string> = {
-  plankton: '🟢',
-  minerite: '🔵',
-  lux: '✨',
-  nacre: '⚬',
-  coral: '🪸',
-};
+/** Popup icon size in world px (9 px source at 1:1). */
+const POPUP_ICON_SIZE = 9;
 
 const POPUP_STYLE = new TextStyle({
   fontFamily: '"Press Start 2P", monospace',
@@ -232,7 +228,8 @@ const POPUP_DURATION = 0.8; // seconds
 const POPUP_RISE_SPEED = 60; // world px/sec
 
 interface Popup {
-  text: Text;
+  /** "+N" text and resource icon, laid out side by side */
+  text: Container;
   age: number;
   startY: number;
 }
@@ -249,14 +246,21 @@ export function createPopupLayer(): PopupLayer {
 /** Spawn floating popups for collection events. */
 export function spawnPickupPopups(layer: PopupLayer, events: CollectionEvent[]): void {
   for (const ev of events) {
-    const label = `+${ev.amount} ${RESOURCE_ICONS[ev.resource]}`;
-    const text = new Text({ text: label, style: POPUP_STYLE });
-    text.anchor.set(0.5);
-    text.x = ev.x;
-    text.y = ev.y;
-    text.resolution = 4; // crisp at zoom
-    layer.container.addChild(text);
-    layer.popups.push({ text, age: 0, startY: ev.y });
+    const group = new Container();
+    const label = new Text({ text: `+${formatNumber(ev.amount)}`, style: POPUP_STYLE });
+    label.resolution = 4; // crisp at zoom
+    label.anchor.set(0, 0.5);
+    const iconSprite = new Sprite(iconTexture(RESOURCE_ICON[ev.resource]));
+    iconSprite.width = POPUP_ICON_SIZE;
+    iconSprite.height = POPUP_ICON_SIZE;
+    iconSprite.anchor.set(0, 0.5);
+    iconSprite.x = label.width + 2;
+    group.addChild(label, iconSprite);
+    group.pivot.x = (label.width + 2 + POPUP_ICON_SIZE) / 2;
+    group.x = ev.x;
+    group.y = ev.y;
+    layer.container.addChild(group);
+    layer.popups.push({ text: group, age: 0, startY: ev.y });
   }
 }
 
@@ -268,7 +272,7 @@ export function updatePopups(layer: PopupLayer, dt: number): void {
     const t = p.age / POPUP_DURATION; // 0→1
 
     if (t >= 1) {
-      p.text.destroy();
+      p.text.destroy({ children: true });
       layer.popups.splice(i, 1);
       continue;
     }
@@ -291,7 +295,7 @@ export function destroyCollectibleLayer(layer: CollectibleLayer): void {
 
 /** Destroy popup layer. */
 export function destroyPopupLayer(layer: PopupLayer): void {
-  for (const p of layer.popups) p.text.destroy();
+  for (const p of layer.popups) p.text.destroy({ children: true });
   layer.popups.length = 0;
   layer.container.destroy({ children: true });
 }

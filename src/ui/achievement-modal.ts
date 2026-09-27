@@ -1,6 +1,7 @@
 import type { GameState } from '../core/game-state';
 import { ACHIEVEMENTS } from '../systems/achievements';
 import { createModal } from './modal';
+import { icon } from './icons';
 
 let stateRef: GameState | null = null;
 
@@ -50,7 +51,7 @@ function renderContent(modal: HTMLElement, state: GameState, signal: AbortSignal
     const done = state.achievements[def.id] === true;
     cardsHtml += `
       <div class="ach-card${done ? ' completed' : ''}">
-        <span class="ach-icon">${def.icon}</span>
+        <span class="ach-icon">${icon(def.icon, 'lg')}</span>
         <div class="ach-info">
           <div class="ach-name">${def.name}</div>
           <div class="ach-desc">${def.description}</div>
@@ -63,7 +64,7 @@ function renderContent(modal: HTMLElement, state: GameState, signal: AbortSignal
 
   modal.innerHTML = `
     <div class="ach-header">
-      <span class="ach-title">🏆 Achievements</span>
+      <span class="ach-title">${icon('achievements')} Achievements</span>
       <span class="ach-count">${completed}/${ACHIEVEMENTS.length}</span>
       <button class="btn btn-ghost" id="ach-close-btn">✕</button>
     </div>

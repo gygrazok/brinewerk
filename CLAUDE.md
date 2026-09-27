@@ -100,6 +100,7 @@ Keep this list a line per area — put the actual content inside the area doc, n
 - **File structure**: Types/interfaces at the top of each file, then functions
 - **One concern per file**: clear separation between types, logic, rendering, and UI
 - **No classes for game logic**: prefer plain interfaces + pure functions
+- **Icons**: no emoji in UI. Use pixel icons from `src/rendering/icon-data.ts` via `icon()`/`res()` (`src/ui/icons.ts`) in HTML and `iconTexture()` in Pixi
 - **Seeded RNG**: use `src/util/prng.ts` (Mulberry32) for any procedural generation — never use `Math.random()` for game-affecting randomness
 - **HMR cleanup**: always register `import.meta.hot.dispose(() => cleanup())` when creating persistent resources (event listeners, caches, Pixi objects)
 - **Shader cache management**: call `destroyRareFilterCache()` on teardown to avoid WebGL resource leaks

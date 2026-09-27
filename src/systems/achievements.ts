@@ -1,5 +1,6 @@
 import type { GameState } from '../core/game-state';
 import { unlockedSlots } from './coords';
+import type { IconId } from '../rendering/icon-data';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -14,7 +15,7 @@ export interface AchievementDefinition {
   id: string;
   name: string;
   description: string;
-  icon: string;
+  icon: IconId;
   condition: (state: GameState) => boolean;
   reward: AchievementReward;
   /** Called once when the achievement is newly completed */
@@ -33,7 +34,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     id: RELEASE_UNLOCK_ACHIEVEMENT_ID,
     name: 'Tide Pool Keeper',
     description: 'Fill 4 pool slots',
-    icon: '🐚',
+    icon: 'ach-shell',
     condition: (state) => {
       const placed = unlockedSlots(state.pool).filter(s => s.creatureId !== null).length;
       return placed >= 4;

@@ -1,7 +1,9 @@
 import type { GameState } from '../core/game-state';
 import type { Creature } from '../creatures/creature';
 import { getRareInfo } from '../creatures/creature';
-import { CreatureType, CREATURE_NAMES, CREATURE_ICONS } from '../creatures/types';
+import { CreatureType, CREATURE_NAMES } from '../creatures/types';
+import { rareIcon, typeIcon } from '../rendering/pixel-icons';
+import { icon } from './icons';
 import { renderCreatureThumbnail } from '../rendering/creature-renderer';
 import {
   REGISTRY_SLOTS, type RegistrySlotDef,
@@ -89,11 +91,12 @@ function renderContent(modal: HTMLElement, state: GameState, signal: AbortSignal
       const info = def.rare ? getRareInfo(def.rare) : null;
       const cls = specimen ? 'filled' : sighted ? 'sighted' : 'unknown';
       const border = specimen && info ? ` style="border-color:${info.color}"` : '';
-      const icon = info && (specimen || sighted) ? `<span class="reg-icon">${info.icon}</span>` : '';
-      const body = specimen ? '' : `<span class="reg-q">${sighted ? (info?.icon ?? CREATURE_ICONS[type]) : '?'}</span>`;
+      const cellIcon = def.rare ? icon(rareIcon(def.rare)) : icon(typeIcon(type));
+      const badge = specimen && def.rare ? `<span class="reg-icon">${cellIcon}</span>` : '';
+      const body = specimen ? '' : `<span class="reg-q">${sighted ? cellIcon : '?'}</span>`;
       cells += `
         <div class="reg-cell ${cls}" data-key="${def.key}" title="${cellTitle(def, specimen, sighted, tierUnlocked)}"${border}>
-          ${body}${specimen ? icon : ''}
+          ${body}${badge}
           <span class="reg-tier" style="background:${TIER_COLORS[def.tier]}"></span>
         </div>
       `;
@@ -102,7 +105,7 @@ function renderContent(modal: HTMLElement, state: GameState, signal: AbortSignal
     sectionsHtml += `
       <div class="reg-section">
         <div class="reg-section-head">
-          <span>${CREATURE_ICONS[type]} ${CREATURE_NAMES[type]}</span>
+          <span>${icon(typeIcon(type))} ${CREATURE_NAMES[type]}</span>
           <span class="reg-count">${filled}/${defs.length}</span>
         </div>
         <div class="reg-grid">${cells}</div>
@@ -112,7 +115,7 @@ function renderContent(modal: HTMLElement, state: GameState, signal: AbortSignal
 
   modal.innerHTML = `
     <div class="reg-header">
-      <span class="reg-title">📖 Collection</span>
+      <span class="reg-title">${icon('collection')} Collection</span>
       <span class="reg-summary">${getRegisteredCount(state)}/${total} · ${formatMultiplier(getRegistryMultiplier(state))} global production</span>
       <button class="btn btn-ghost" id="registry-close-btn">✕</button>
     </div>

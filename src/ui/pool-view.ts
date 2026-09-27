@@ -21,6 +21,7 @@ import {
 import { cleanupEffectState } from '../rendering/effects/index';
 import { getRenderSettings } from '../rendering/render-settings';
 import { formatNumber } from '../util/format';
+import { iconTexture } from '../rendering/pixel-icons';
 const SLOT_SIZE = 80;
 const CREATURE_DISPLAY = 64;
 const SLOT_BG = 0x0d2228;
@@ -767,6 +768,8 @@ const COST_STYLE_AFFORDABLE = new TextStyle({
   fill: '#7eeee4',
   align: 'center',
 });
+/** Nacre icon beside slot costs: 9 px source at 1:1 world px. */
+const COST_ICON_SIZE = 9;
 const COST_STYLE_LOCKED = new TextStyle({
   fontFamily: '"Press Start 2P", monospace',
   fontSize: 7,
@@ -782,7 +785,7 @@ function canAffordSlot(res: ResourceBundle, tier: number): boolean {
 
 /** Format slot cost as a display string */
 function formatSlotCost(cost: ResourceBundle): string {
-  if (cost.nacre > 0) return `${formatNumber(cost.nacre)}\u26AC`;
+  if (cost.nacre > 0) return formatNumber(cost.nacre);
   return '';
 }
 
@@ -843,7 +846,7 @@ function ensureSlotCostText(gfx: Graphics, slot: SeabedSlot, affordable = false)
   // Remove any previous cost text children
   for (let i = gfx.children.length - 1; i >= 0; i--) {
     const child = gfx.children[i];
-    if (child instanceof Text) {
+    if (child instanceof Text || child instanceof Sprite) {
       child.destroy();
     }
   }
@@ -857,10 +860,18 @@ function ensureSlotCostText(gfx: Graphics, slot: SeabedSlot, affordable = false)
   const style = affordable ? COST_STYLE_AFFORDABLE : COST_STYLE_LOCKED;
   const text = new Text({ text: label, style });
   text.resolution = ZOOM_MAX;
-  text.anchor.set(0.5, 0);
-  text.x = slot.x;
-  text.y = slot.y + 6; // below padlock
+  const iconSprite = new Sprite(iconTexture('nacre'));
+  iconSprite.width = COST_ICON_SIZE;
+  iconSprite.height = COST_ICON_SIZE;
+  iconSprite.alpha = affordable ? 1 : 0.45;
+  // Centre "N [icon]" below the padlock
+  const total = text.width + 2 + COST_ICON_SIZE;
+  text.x = slot.x - total / 2;
+  text.y = slot.y + 6;
+  iconSprite.x = text.x + text.width + 2;
+  iconSprite.y = text.y - 1;
   gfx.addChild(text);
+  gfx.addChild(iconSprite);
 }
 
 function drawSlotHighlight(gfx: Graphics, slot: SeabedSlot, affordable = false): void {

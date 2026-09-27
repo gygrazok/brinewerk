@@ -1,7 +1,9 @@
 import type { Creature } from '../creatures/creature';
 import type { GameState } from '../core/game-state';
 import { getRareInfo } from '../creatures/creature';
-import { CREATURE_NAMES, CREATURE_ICONS, TYPE_MULTIPLIERS } from '../creatures/types';
+import { CREATURE_NAMES, TYPE_MULTIPLIERS } from '../creatures/types';
+import { rareIcon, typeIcon } from '../rendering/pixel-icons';
+import { icon, res } from './icons';
 import {
   calculateGeneticRate, nextMilestone, milestonesReached, PRODUCTION_GENE,
 } from '../creatures/production';
@@ -257,13 +259,13 @@ export async function showCreaturePanel(creature: Creature, opts: CreaturePanelO
     <div class="panel-body">
       <div class="preview-wrap" id="preview-container"></div>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-        <span class="type-badge">${CREATURE_ICONS[creature.type]} ${CREATURE_NAMES[creature.type]}</span>
+        <span class="type-badge">${icon(typeIcon(creature.type))} ${CREATURE_NAMES[creature.type]}</span>
   `;
 
   if (creature.rare) {
     html += `
         <span class="rare-badge" style="background:${rareInfo.color}20; color:${rareInfo.color}; border:1px solid ${rareInfo.color}40;">
-          ${rareInfo.icon} ${rareInfo.label.toUpperCase()}
+          ${icon(rareIcon(creature.rare))} ${rareInfo.label.toUpperCase()}
         </span>
     `;
   }
@@ -380,7 +382,7 @@ function renderDynamic(): void {
 
   if (opts.mode === 'registry') {
     setHtml(dyn, `
-      <div class="registry-note" title="${specimenBonusFormula(creature)}">📖 Collection specimen · ${formatPercent(specimenBonus(creature))} global production</div>
+      <div class="registry-note" title="${specimenBonusFormula(creature)}">${icon('collection')} Collection specimen · ${formatPercent(specimenBonus(creature))} global production</div>
       ${geneLine}
     `);
     setHtml(actions, '');
@@ -397,16 +399,16 @@ function renderDynamic(): void {
     const breakdown = `Base ${formatNumber(calculateGeneticRate(creature), 2)}/s × Lv ${creature.level}`
       + ` × milestones ×${Math.pow(2, milestonesReached(creature.level))}`
       + ` × global ${formatMultiplier(getPlanktonMultiplier(state))}`;
-    rateLines += `<div class="production" title="${breakdown}">+${formatNumber(rates.plankton, 2)} 🟢/s</div>`;
-    if (rates.minerite > 0) rateLines += `<div class="stat-dim">+${formatNumber(rates.minerite, 2)} 🔵/s</div>`;
-    if (rates.lux > 0) rateLines += `<div class="stat-dim">+${formatNumber(rates.lux, 2)} ✨/s</div>`;
+    rateLines += `<div class="production" title="${breakdown}">+${formatNumber(rates.plankton, 2)} ${res('plankton')}/s</div>`;
+    if (rates.minerite > 0) rateLines += `<div class="stat-dim">+${formatNumber(rates.minerite, 2)} ${res('minerite')}/s</div>`;
+    if (rates.lux > 0) rateLines += `<div class="stat-dim">+${formatNumber(rates.lux, 2)} ${res('lux')}/s</div>`;
   }
 
   const feedBtn = (count: number | 'max', label: string): string => {
     const q = quoteFeed(state, creature, count);
     const affordable = q.cost <= state.resources.plankton;
     const title = count === 'max' && affordable ? `${label} +${q.levels}` : label;
-    return `<button class="btn btn-secondary${affordable ? '' : ' unaffordable'}" data-action="feed" data-count="${count}">${title}<br><span class="btn-cost">${formatNumber(q.cost)} 🟢</span></button>`;
+    return `<button class="btn btn-secondary${affordable ? '' : ' unaffordable'}" data-action="feed" data-count="${count}">${title}<br><span class="btn-cost">${formatNumber(q.cost)} ${res('plankton')}</span></button>`;
   };
 
   setHtml(dyn, `
@@ -430,15 +432,15 @@ function renderDynamic(): void {
     const existing = getRegisteredSpecimen(state, creature);
     const bonus = specimenBonus(creature);
     const label = existing
-      ? `📖 Replace specimen · ${formatPercent(specimenBonus(existing))} → ${formatPercent(bonus)}`
-      : `📖 Add to collection · ${formatPercent(bonus)} global production`;
+      ? `${icon('collection')} Replace specimen · ${formatPercent(specimenBonus(existing))} → ${formatPercent(bonus)}`
+      : `${icon('collection')} Add to collection · ${formatPercent(bonus)} global production`;
     actionsHtml += `<button class="btn btn-secondary" data-action="register" title="${specimenBonusFormula(creature)}">${label}</button>`;
   }
   if (isReleaseUnlocked(state) && opts.onRelease) {
     const nacreYield = calculateNacreYield(creature, state);
     actionsHtml += nacreYield > 0
-      ? `<button class="btn btn-secondary" data-action="release" title="Nacre = (Lv / 10)² × gene quality × rare tier">⚬ Release for ${formatNumber(nacreYield)} Nacre</button>`
-      : `<button class="btn btn-secondary disabled">⚬ Nacre yield 0 below Lv ${nextNacreLevel(creature, state)}</button>`;
+      ? `<button class="btn btn-secondary" data-action="release" title="Nacre = (Lv / 10)² × gene quality × rare tier">${res('nacre')} Release for ${formatNumber(nacreYield)} Nacre</button>`
+      : `<button class="btn btn-secondary disabled">${res('nacre')} Nacre yield 0 below Lv ${nextNacreLevel(creature, state)}</button>`;
   }
   setHtml(actions, actionsHtml);
 }
@@ -502,8 +504,8 @@ function showReleaseConfirm(creature: Creature, opts: CreaturePanelOptions): voi
   showConfirm({
     title: `Release ${creature.name}?`,
     text: 'Removes the creature from the pool permanently. Level and slot are lost.',
-    highlight: `⚬ ${nacre} Nacre`,
-    confirmLabel: `Release ⚬${nacre}`,
+    highlight: `${res('nacre')} ${nacre} Nacre`,
+    confirmLabel: 'Release',
     onConfirm: () => opts.onRelease?.(creature),
   });
 }
@@ -516,7 +518,7 @@ function showRegisterConfirm(creature: Creature, opts: CreaturePanelOptions): vo
   showConfirm({
     title: `Add ${creature.name} to the collection?`,
     text: `Removes the creature from the pool permanently. The bonus applies to plankton, minerite and lux.${replaceText}`,
-    highlight: `📖 ${formatPercent(specimenBonus(creature))} global production`,
+    highlight: `${icon('collection')} ${formatPercent(specimenBonus(creature))} global production`,
     confirmLabel: existing ? 'Replace' : 'Add',
     onConfirm: () => opts.onRegister?.(creature),
   });

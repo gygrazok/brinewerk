@@ -1,18 +1,11 @@
-import type { GameState, ResourceBundle } from '../core/game-state';
+import type { GameState } from '../core/game-state';
 import {
   UPGRADES, getUpgradeLevel, purchaseUpgrade, getUpgradeCostResource, isUpgradeVisible,
   type UpgradeDefinition,
 } from '../systems/upgrades';
 import { formatNumber } from '../util/format';
 import { createModal } from './modal';
-
-const RESOURCE_ICONS: Record<keyof ResourceBundle, string> = {
-  plankton: '🟢',
-  minerite: '🔵',
-  lux: '✨',
-  nacre: '⚬',
-  coral: '🪸',
-};
+import { icon, res } from './icons';
 
 let stateRef: GameState | null = null;
 let onPurchaseCb: (() => void) | null = null;
@@ -86,7 +79,7 @@ function renderContent(modal: HTMLElement, state: GameState, signal: AbortSignal
 
   let cardsHtml = '';
   for (const { def, level, isMaxed, cost, resource, affordable } of bucketed) {
-    const costIcon = RESOURCE_ICONS[resource];
+    const costIcon = res(resource);
 
     const levelStr = isMaxed
       ? '<span class="upgrade-max">MAX</span>'
@@ -99,7 +92,7 @@ function renderContent(modal: HTMLElement, state: GameState, signal: AbortSignal
     cardsHtml += `
       <div class="upgrade-card${isMaxed ? ' maxed' : ''}" data-id="${def.id}">
         <div class="upgrade-card-top">
-          <span class="upgrade-icon">${def.icon}</span>
+          <span class="upgrade-icon">${icon(def.icon, 'lg')}</span>
           <div class="upgrade-info">
             <div class="upgrade-name">${def.name}</div>
             <div class="upgrade-desc">${def.description}</div>
@@ -116,7 +109,7 @@ function renderContent(modal: HTMLElement, state: GameState, signal: AbortSignal
 
   modal.innerHTML = `
     <div class="upgrade-header">
-      <span class="upgrade-title">⬆ Upgrades</span>
+      <span class="upgrade-title">${icon('upgrades')} Upgrades</span>
       <button class="btn btn-ghost upgrade-close" id="upgrade-close-btn">✕</button>
     </div>
     <div class="upgrade-list">

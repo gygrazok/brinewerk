@@ -63,7 +63,6 @@ export type PivotMode = 'center' | 'inverted';
 export interface RareInfo {
   id: string;
   label: string;
-  icon: string;
   /** Relative spawn weight within the pool (higher = more common among rares) */
   weight: number;
   color: string;
@@ -77,35 +76,35 @@ export interface RareInfo {
 
 export const RARE_EFFECTS: RareInfo[] = [
   // --- Tier 1: starter rares (unlocked by default) ---
-  { id: 'metallic', label: 'Metallic', icon: '\u2699', weight: 10, tier: 1, color: '#c0c8d0' },
-  { id: 'shiny', label: 'Shiny', icon: '\u2728', weight: 10, tier: 1, color: '#ffe040' },
+  { id: 'metallic', label: 'Metallic', weight: 10, tier: 1, color: '#c0c8d0' },
+  { id: 'shiny', label: 'Shiny', weight: 10, tier: 1, color: '#ffe040' },
 
   // --- Tier 2: uncommon rares (unlocked via upgrades) ---
-  { id: 'glitch', label: 'Glitch', icon: '\u25A6', weight: 8, tier: 2, color: '#00ff88' },
-  { id: 'fire', label: 'On Fire', icon: '\uD83D\uDD25', weight: 8, tier: 2, color: '#ff6020' },
-  { id: 'frost', label: 'Frost', icon: '\u2744', weight: 8, tier: 2, color: '#80d0ff' },
-  { id: 'nebula', label: 'Nebula', icon: '\u2605', weight: 6, tier: 2, color: '#c0a0ff' },
-  { id: 'toxic', label: 'Toxic', icon: '\u2623', weight: 6, tier: 2, color: '#80ff40' },
-  { id: 'phantom', label: 'Phantom', icon: '\uD83D\uDC7B', weight: 6, tier: 2, color: '#a080c0' },
-  { id: 'rotating', label: 'Rotating', icon: '\uD83C\uDF00', weight: 8, tier: 2, color: '#60c0e0', types: [CreatureType.Stellarid, CreatureType.Nucleid, CreatureType.Craboid], pivotMode: 'center' },
-  { id: 'upside-down', label: 'Upside Down', icon: '\uD83D\uDD03', weight: 8, tier: 2, color: '#e0a060', types: [CreatureType.Blobid, CreatureType.Corallid], pivotMode: 'inverted' },
-  { id: 'wave', label: 'Wave', icon: '\u223F', weight: 8, tier: 2, color: '#40c0ff' },
-  { id: 'rainbow', label: 'Rainbow', icon: '\uD83C\uDF08', weight: 6, tier: 2, color: '#ff80c0' },
-  { id: 'electric', label: 'Electric', icon: '\u26A1', weight: 6, tier: 2, color: '#80d0ff' },
-  { id: 'pulse', label: 'Pulse', icon: '\u2665', weight: 6, tier: 2, color: '#ff6080', pivotMode: 'center' },
+  { id: 'glitch', label: 'Glitch', weight: 8, tier: 2, color: '#00ff88' },
+  { id: 'fire', label: 'On Fire', weight: 8, tier: 2, color: '#ff6020' },
+  { id: 'frost', label: 'Frost', weight: 8, tier: 2, color: '#80d0ff' },
+  { id: 'nebula', label: 'Nebula', weight: 6, tier: 2, color: '#c0a0ff' },
+  { id: 'toxic', label: 'Toxic', weight: 6, tier: 2, color: '#80ff40' },
+  { id: 'phantom', label: 'Phantom', weight: 6, tier: 2, color: '#a080c0' },
+  { id: 'rotating', label: 'Rotating', weight: 8, tier: 2, color: '#60c0e0', types: [CreatureType.Stellarid, CreatureType.Nucleid, CreatureType.Craboid], pivotMode: 'center' },
+  { id: 'upside-down', label: 'Upside Down', weight: 8, tier: 2, color: '#e0a060', types: [CreatureType.Blobid, CreatureType.Corallid], pivotMode: 'inverted' },
+  { id: 'wave', label: 'Wave', weight: 8, tier: 2, color: '#40c0ff' },
+  { id: 'rainbow', label: 'Rainbow', weight: 6, tier: 2, color: '#ff80c0' },
+  { id: 'electric', label: 'Electric', weight: 6, tier: 2, color: '#80d0ff' },
+  { id: 'pulse', label: 'Pulse', weight: 6, tier: 2, color: '#ff6080', pivotMode: 'center' },
 
   // --- Tier 3: legendary rares (late-game unlocks) ---
-  { id: 'hologram', label: 'Hologram', icon: '\u25C7', weight: 5, tier: 3, color: '#60a0ff' },
-  { id: 'negative', label: 'Negative', icon: '\u25D1', weight: 5, tier: 3, color: '#e0e0e0' },
-  { id: 'shadow', label: 'Shadow', icon: '\u2592', weight: 5, tier: 3, color: '#404060' },
-  { id: 'tiny', label: 'Tiny', icon: '\u2022', weight: 5, tier: 3, color: '#a0e060', pivotMode: 'center' },
-  { id: 'holy', label: 'Holy', icon: '\u2742', weight: 4, tier: 3, color: '#fff8e0' },
-  { id: 'xray', label: 'X-Ray', icon: '\u2622', weight: 4, tier: 3, color: '#a0c0e0' },
-  { id: 'thermal', label: 'Thermal', icon: '\uD83C\uDF21', weight: 4, tier: 3, color: '#ff6040' },
-  { id: 'crt', label: 'CRT', icon: '\u25AA', weight: 3, tier: 3, color: '#90a060' },
-  { id: 'caustic', label: 'Caustic', icon: '\u224B', weight: 3, tier: 3, color: '#70c8e0' },
-  { id: 'stained', label: 'Stained Glass', icon: '\u2B21', weight: 3, tier: 3, color: '#c06080' },
-  { id: 'liquify', label: 'Liquify', icon: '\uD83D\uDCA7', weight: 3, tier: 3, color: '#80b0d0' },
+  { id: 'hologram', label: 'Hologram', weight: 5, tier: 3, color: '#60a0ff' },
+  { id: 'negative', label: 'Negative', weight: 5, tier: 3, color: '#e0e0e0' },
+  { id: 'shadow', label: 'Shadow', weight: 5, tier: 3, color: '#404060' },
+  { id: 'tiny', label: 'Tiny', weight: 5, tier: 3, color: '#a0e060', pivotMode: 'center' },
+  { id: 'holy', label: 'Holy', weight: 4, tier: 3, color: '#fff8e0' },
+  { id: 'xray', label: 'X-Ray', weight: 4, tier: 3, color: '#a0c0e0' },
+  { id: 'thermal', label: 'Thermal', weight: 4, tier: 3, color: '#ff6040' },
+  { id: 'crt', label: 'CRT', weight: 3, tier: 3, color: '#90a060' },
+  { id: 'caustic', label: 'Caustic', weight: 3, tier: 3, color: '#70c8e0' },
+  { id: 'stained', label: 'Stained Glass', weight: 3, tier: 3, color: '#c06080' },
+  { id: 'liquify', label: 'Liquify', weight: 3, tier: 3, color: '#80b0d0' },
 ];
 
 /** IDs of every rare effect in the given tiers. */
@@ -153,7 +152,7 @@ export function rollRare(
   return eligible[eligible.length - 1].id as RareEffect;
 }
 
-const NONE_RARE: RareInfo = { id: 'none', label: '', icon: '', weight: 0, tier: 1, color: '#8ba0a8' };
+const NONE_RARE: RareInfo = { id: 'none', label: '', weight: 0, tier: 1, color: '#8ba0a8' };
 
 export function getRareInfo(rare: RareEffect | null): RareInfo {
   if (!rare) return NONE_RARE;

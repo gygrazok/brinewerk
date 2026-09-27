@@ -4,11 +4,12 @@ import { getUpgradeLevel } from '../systems/upgrades';
 import { isReleaseUnlocked } from '../systems/achievements';
 import { hasShallowSlot } from '../systems/coords';
 import { formatNumber } from '../util/format';
+import { iconEl } from './icons';
+import { RESOURCE_ICON } from '../rendering/pixel-icons';
 
 /** Resource definitions — easy to extend with new resources */
 interface ResourceDef {
   key: keyof GameState['resources'];
-  icon: string;
   showRate?: boolean;
   /** Function returning true when this resource's slot should be rendered. */
   visible?: (state: GameState) => boolean;
@@ -17,15 +18,15 @@ interface ResourceDef {
 }
 
 const RESOURCES: ResourceDef[] = [
-  { key: 'plankton', icon: '🟢', showRate: true,
+  { key: 'plankton', showRate: true,
     tooltip: 'Plankton · from all creatures + floating clumps · spent on feeding, upgrades, shore refresh' },
-  { key: 'minerite', icon: '🔵', showRate: true, visible: (s) => getUpgradeLevel(s, 'deep_drilling') > 0,
+  { key: 'minerite', showRate: true, visible: (s) => getUpgradeLevel(s, 'deep_drilling') > 0,
     tooltip: 'Minerite · from creatures in deep slots · spent on upgrades' },
-  { key: 'lux',      icon: '✨', showRate: true, visible: (s) => hasShallowSlot(s.pool),
+  { key: 'lux',      showRate: true, visible: (s) => hasShallowSlot(s.pool),
     tooltip: 'Lux · from creatures in shallow slots · spent on upgrades' },
-  { key: 'nacre',    icon: '⚬', visible: (s) => isReleaseUnlocked(s),
+  { key: 'nacre',    visible: (s) => isReleaseUnlocked(s),
     tooltip: 'Nacre · from releasing creatures · spent on slots and upgrades' },
-  { key: 'coral',    icon: '🪸', visible: (s) => s.resources.coral > 0,
+  { key: 'coral',    visible: (s) => s.resources.coral > 0,
     tooltip: 'Coral · click seabed coral · spent on rare refresh' },
 ];
 
@@ -60,6 +61,7 @@ function mount(bar: HTMLElement): Map<ResourceDef['key'], ResourceRow> {
     const value = document.createElement('span');
     value.className = 'res-value';
     item.appendChild(value);
+    item.appendChild(iconEl(RESOURCE_ICON[r.key]));
 
     let rate: HTMLSpanElement | null = null;
     if (r.showRate) {
@@ -89,7 +91,7 @@ export function updateHud(state: GameState): void {
     if (row.sep) row.sep.style.display = display;
     if (!visible) continue;
 
-    row.value.textContent = `${formatNumber(state.resources[r.key])} ${r.icon}`;
+    row.value.textContent = formatNumber(state.resources[r.key]);
 
     if (row.rate) {
       const rate = r.key === 'plankton' ? rates.plankton
