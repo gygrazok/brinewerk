@@ -7,6 +7,7 @@ depth instead of inlining; keep these docs lean and practical.
 ## Areas
 
 - [ACHIEVEMENTS.md](ACHIEVEMENTS.md) — data-driven achievement registry, polling trigger, feature-unlock selector pattern
+- [ECONOMY.md](ECONOMY.md): production formula, feeding, nacre, shore rarity, zoological registry
 
 <!-- As the codebase grows, add: rendering, state & migrations, collectibles, production/economy, pool & slots, tides & shore, modals. -->
 
