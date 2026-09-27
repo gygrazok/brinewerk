@@ -15,7 +15,9 @@ globalMul           = fertile_waters × pearl_bloom × mineral_feed × registry
 - `primary` is the type's production gene (`PRODUCTION_GENE` in `creatures/production.ts`):
   arms, tentacles, density, facets, claws.
 - Milestones (`LEVEL_MILESTONES`) double output at 10, 25, 50, 75, 100, 150, ...
-- Minerite (deep slots) and lux (shallow slots) scale with `sqrt(level)` and the registry multiplier.
+- Minerite (deep slots, after Deep Drilling) and lux (shallow slots, always on) scale with
+  `sqrt(level)` and the registry multiplier. Every creature produces a little lux;
+  Bioluminescence multiplies it by `1 + 2 × level × glow`.
 - Plankton clumps are worth `base + 2 s of passive income`, times Plankton Surge
   (`planktonClumpValue` in `economy/production-engine.ts`).
 

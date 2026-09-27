@@ -80,8 +80,10 @@ export const DEPTH_TERRAIN_MARGIN = 30;
 
 /** Passive minerite/s per deep slot, multiplied by the creature's trait deviation (0-1) and sqrt(level). */
 export const MINERITE_BASE_RATE = 0.1;
-/** Passive lux/s per shallow slot, multiplied by max(0, glow-0.5) * 2 and sqrt(level). */
-export const LUX_BASE_RATE = 0.05;
+/** Passive lux/s of any creature in a shallow slot, multiplied by sqrt(level). */
+export const LUX_BASE_RATE = 0.01;
+/** Bioluminescence: each level multiplies a creature's lux by (1 + BIOLUM_GLOW_BONUS * glow). */
+export const BIOLUM_GLOW_BONUS = 2;
 
 /**
  * Slot unlock cost by tier (position-based).

@@ -1,5 +1,6 @@
 import type { GameState, ResourceBundle } from '../core/game-state';
 import { isReleaseUnlocked } from './achievements';
+import { hasShallowSlot } from './coords';
 
 // ---------------------------------------------------------------------------
 // Upgrade definitions
@@ -25,6 +26,8 @@ const geometric = (base: number, growth: number) => (lv: number) => Math.ceil(ba
 const hasUpgrade = (id: string) => (state: GameState) => getUpgradeLevel(state, id) > 0;
 /** Nacre upgrades appear together with the nacre economy (release unlocked). */
 const nacreVisible = isReleaseUnlocked;
+/** Lux upgrades appear once the pool has a shallow slot, where lux is produced. */
+const luxVisible = (state: GameState) => hasShallowSlot(state.pool);
 
 export const UPGRADES: UpgradeDefinition[] = [
   // --- Plankton ---
@@ -154,10 +157,10 @@ export const UPGRADES: UpgradeDefinition[] = [
   {
     id: 'bioluminescence',
     name: 'Bioluminescence',
-    description: 'Glowing creatures placed in the shallow slots near the surface start producing lux.',
+    description: 'Creatures near the surface produce more lux. The brighter their glow, the bigger the boost.',
     icon: '💡',
-    maxLevel: 1,
-    costFn: costs([50]),
+    maxLevel: 5,
+    costFn: geometric(50, 3),
     effectFn: (lv) => lv,
     costResource: 'minerite',
     visible: hasUpgrade('deep_drilling'),
@@ -184,7 +187,7 @@ export const UPGRADES: UpgradeDefinition[] = [
     costFn: costs([100]),
     effectFn: (lv) => lv,
     costResource: 'lux',
-    visible: hasUpgrade('bioluminescence'),
+    visible: luxVisible,
   },
   {
     id: 'glow_lure',
@@ -195,7 +198,7 @@ export const UPGRADES: UpgradeDefinition[] = [
     costFn: geometric(20, 2),
     effectFn: (lv) => lv * 0.01,
     costResource: 'lux',
-    visible: hasUpgrade('bioluminescence'),
+    visible: luxVisible,
   },
 ];
 

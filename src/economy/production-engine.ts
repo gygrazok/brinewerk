@@ -5,7 +5,7 @@ import { calculateTraitDeviation } from '../creatures/creature';
 import { unlockedSlots, getSlotDepth } from '../systems/coords';
 import { getUpgradeLevel, upgradeEffect } from '../systems/upgrades';
 import { getRegistryMultiplier } from '../systems/registry';
-import { MINERITE_BASE_RATE, LUX_BASE_RATE, COLLECTIBLE_PLANKTON_RATE_SECONDS } from '../core/balance';
+import { MINERITE_BASE_RATE, LUX_BASE_RATE, BIOLUM_GLOW_BONUS, COLLECTIBLE_PLANKTON_RATE_SECONDS } from '../core/balance';
 
 /** Cached creature-id lookup map — invalidated when creatures array is mutated */
 let cachedMap: Map<string, Creature> | null = null;
@@ -33,7 +33,8 @@ interface ProductionFlags {
   /** Global multiplier on minerite and lux (registry). */
   secondaryMul: number;
   deepDrilling: boolean;
-  biolum: boolean;
+  /** Bioluminescence level: scales each creature's lux by its glow gene. */
+  biolumLevel: number;
 }
 
 /** Product of every global plankton multiplier: upgrades and registry. */
@@ -51,7 +52,7 @@ function getProductionFlags(state: GameState): ProductionFlags {
     planktonMul: getPlanktonMultiplier(state),
     secondaryMul: getRegistryMultiplier(state),
     deepDrilling: getUpgradeLevel(state, 'deep_drilling') > 0,
-    biolum: getUpgradeLevel(state, 'bioluminescence') > 0,
+    biolumLevel: getUpgradeLevel(state, 'bioluminescence'),
   };
 }
 
@@ -65,8 +66,9 @@ function computeSlotYield(slot: SeabedSlot, creature: Creature, flags: Productio
   if (flags.deepDrilling && depth === 'deep') {
     minerite = MINERITE_BASE_RATE * calculateTraitDeviation(creature) * levelScale;
   }
-  if (flags.biolum && depth === 'shallow') {
-    lux = LUX_BASE_RATE * Math.max(0, creature.genes.glow - 0.5) * 2 * levelScale;
+  if (depth === 'shallow') {
+    const glowMul = 1 + BIOLUM_GLOW_BONUS * flags.biolumLevel * creature.genes.glow;
+    lux = LUX_BASE_RATE * glowMul * levelScale;
   }
   return { plankton, minerite, lux };
 }

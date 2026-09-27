@@ -2,6 +2,7 @@ import type { GameState } from '../core/game-state';
 import { getProductionRates } from '../economy/production-engine';
 import { getUpgradeLevel } from '../systems/upgrades';
 import { isReleaseUnlocked } from '../systems/achievements';
+import { hasShallowSlot } from '../systems/coords';
 import { formatNumber } from '../util/format';
 
 /** Resource definitions — easy to extend with new resources */
@@ -16,7 +17,7 @@ interface ResourceDef {
 const RESOURCES: ResourceDef[] = [
   { key: 'plankton', icon: '🟢', showRate: true },
   { key: 'minerite', icon: '🔵', showRate: true, visible: (s) => getUpgradeLevel(s, 'deep_drilling') > 0 },
-  { key: 'lux',      icon: '✨', showRate: true, visible: (s) => getUpgradeLevel(s, 'bioluminescence') > 0 },
+  { key: 'lux',      icon: '✨', showRate: true, visible: (s) => hasShallowSlot(s.pool) },
   { key: 'nacre',    icon: '⚬', visible: (s) => isReleaseUnlocked(s) },
   { key: 'coral',    icon: '🪸', visible: (s) => s.resources.coral > 0 },
 ];

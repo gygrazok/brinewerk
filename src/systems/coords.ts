@@ -11,6 +11,11 @@ export function getSlotDepth(slot: SeabedSlot): SlotDepth {
   return 'mid';
 }
 
+/** True when at least one shallow slot is unlocked, i.e. the pool can produce lux. */
+export function hasShallowSlot(pool: SeabedPool): boolean {
+  return unlockedSlots(pool).some((s) => getSlotDepth(s) === 'shallow');
+}
+
 /** Get a slot by its ID */
 export function getSlotById(pool: SeabedPool, id: string): SeabedSlot | undefined {
   return pool.slots[id];
