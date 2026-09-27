@@ -11,7 +11,7 @@ import { feedCreature } from './systems/feeding';
 import { registerCreature } from './systems/registry';
 import { forceInitialTide } from './systems/tides';
 import {
-  setOnTakeCreature, setOnRegisterCreature, setOnReleaseCreature, renderShoreButton, updateShoreModal,
+  setOnTakeCreature, setOnRegisterCreature, setOnReleaseCreature, setOnCollectUnique, renderShoreButton, updateShoreModal,
   isShoreModalOpen, destroyShoreModal, openShoreModal,
 } from './ui/shore-modal';
 import { setOnOpenSpecimen, destroyRegistryModal } from './ui/registry-modal';
@@ -253,6 +253,11 @@ async function init() {
   // Shore → release directly for species material (consumes the tide's pickup)
   setOnReleaseCreature((creature) => {
     grantReleaseRewards(state, creature);
+    refreshAll();
+  });
+
+  // Shore unique → Collection; it starts wandering the pool
+  setOnCollectUnique(() => {
     refreshAll();
   });
 

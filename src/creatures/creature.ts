@@ -79,7 +79,7 @@ export const RARE_EFFECTS: RareInfo[] = [
   { id: 'metallic', label: 'Metallic', weight: 10, tier: 1, color: '#c0c8d0' },
   { id: 'shiny', label: 'Shiny', weight: 10, tier: 1, color: '#ffe040' },
 
-  // --- Tier 2: uncommon rares (unlocked via upgrades) ---
+  // --- Tier 2: uncommon rares (unlocked by registering tier-1 specimens) ---
   { id: 'glitch', label: 'Glitch', weight: 8, tier: 2, color: '#00ff88' },
   { id: 'fire', label: 'On Fire', weight: 8, tier: 2, color: '#ff6020' },
   { id: 'frost', label: 'Frost', weight: 8, tier: 2, color: '#80d0ff' },
@@ -93,7 +93,7 @@ export const RARE_EFFECTS: RareInfo[] = [
   { id: 'electric', label: 'Electric', weight: 6, tier: 2, color: '#80d0ff' },
   { id: 'pulse', label: 'Pulse', weight: 6, tier: 2, color: '#ff6080', pivotMode: 'center' },
 
-  // --- Tier 3: legendary rares (late-game unlocks) ---
+  // --- Tier 3: legendary rares (unlocked by registering tier-2 specimens) ---
   { id: 'hologram', label: 'Hologram', weight: 5, tier: 3, color: '#60a0ff' },
   { id: 'negative', label: 'Negative', weight: 5, tier: 3, color: '#e0e0e0' },
   { id: 'shadow', label: 'Shadow', weight: 5, tier: 3, color: '#404060' },
@@ -125,12 +125,14 @@ const DEFAULT_UNLOCKED_RARES: ReadonlySet<string> = new Set(rareIdsForTiers(new 
  * @param rareChance    Probability of getting any rare at all (e.g. 0.01 = 1%)
  * @param unlockedRares Set of rare effect IDs currently in the pool
  * @param creatureType  Optional creature type for type-restricted effects
+ * @param weightOf      Spawn weight of an eligible effect (default: its base weight)
  */
 export function rollRare(
   rng: () => number,
   rareChance: number,
   unlockedRares: ReadonlySet<string>,
   creatureType?: CreatureType,
+  weightOf: (e: RareInfo) => number = (e) => e.weight,
 ): RareEffect | null {
   // First roll: is this creature rare at all?
   if (rng() >= rareChance) return null;
@@ -143,10 +145,10 @@ export function rollRare(
   if (eligible.length === 0) return null;
 
   // Weighted random pick from eligible effects
-  const totalWeight = eligible.reduce((s, e) => s + e.weight, 0);
+  const totalWeight = eligible.reduce((s, e) => s + weightOf(e), 0);
   let roll = rng() * totalWeight;
   for (const e of eligible) {
-    roll -= e.weight;
+    roll -= weightOf(e);
     if (roll <= 0) return e.id as RareEffect;
   }
   return eligible[eligible.length - 1].id as RareEffect;
@@ -200,7 +202,12 @@ export interface CreateCreatureOpts {
   rareChance?: number;
   /** Set of unlocked rare IDs (default: all tier-1 rares) */
   unlockedRares?: ReadonlySet<string>;
+  /** Spawn weight of a rare effect for the rolled type (default: base weight) */
+  rareWeight?: RareWeightFn;
 }
+
+/** Per-type spawn weight of a rare effect (see `getSpawnContext`: unseen combinations weigh more). */
+export type RareWeightFn = (type: CreatureType, rare: RareInfo) => number;
 
 export function createCreature(opts: CreateCreatureOpts = {}): Creature {
   const finalSeed = opts.seed ?? ((Date.now() + _nextId * 7919) & 0x7fffffff);
@@ -218,6 +225,7 @@ export function createCreature(opts: CreateCreatureOpts = {}): Creature {
           opts.rareChance ?? DEFAULT_RARE_CHANCE,
           opts.unlockedRares ?? DEFAULT_UNLOCKED_RARES,
           finalType,
+          opts.rareWeight ? (e) => opts.rareWeight!(finalType, e) : undefined,
         );
   const nameRng = mulberry32(finalSeed + 999);
   const name = generateName(finalType, nameRng);
@@ -230,6 +238,7 @@ export function createCreature(opts: CreateCreatureOpts = {}): Creature {
 export interface SpawnContext {
   rareChance: number;
   unlockedRares: string[];
+  rareWeight?: RareWeightFn;
 }
 
 /**
@@ -251,5 +260,6 @@ export function spawnCreature(
     forceRare: opts?.forceRare,
     rareChance: ctx.rareChance,
     unlockedRares: new Set(ctx.unlockedRares),
+    rareWeight: ctx.rareWeight,
   });
 }

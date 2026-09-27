@@ -22,6 +22,9 @@ import { openRegistryModal } from './registry-modal';
 import { getCompletedCount, getTotalCount, isRegistryUnlocked } from '../systems/achievements';
 import { formatNumber, formatPercent, formatMultiplier } from '../util/format';
 import { createModal } from './modal';
+import { getUniqueInfo, type UniqueId } from '../creatures/uniques';
+import { mountUniquePreview } from '../rendering/uniques';
+import { collectShoreUnique } from '../systems/uniques';
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -31,6 +34,9 @@ let selectedIndex: number | null = null;
 let onTakeCreatureCb: ((creature: Creature) => void) | null = null;
 let onRegisterCreatureCb: ((creature: Creature) => void) | null = null;
 let onReleaseCreatureCb: ((creature: Creature) => void) | null = null;
+let onCollectUniqueCb: ((id: UniqueId) => void) | null = null;
+/** Stops the animated unique preview on the shore card, if mounted. */
+let stopUniquePreview: (() => void) | null = null;
 let stateRef: GameState | null = null;
 let bottomBarMounted = false;
 /** Cached refs into the bottom bar, populated on first mount. */
@@ -45,6 +51,8 @@ let activePreviews: CreaturePreviewApp[] = [];
 function destroyPreviews(): void {
   for (const p of activePreviews) p.destroy();
   activePreviews = [];
+  stopUniquePreview?.();
+  stopUniquePreview = null;
 }
 
 const controller = createModal({
@@ -77,6 +85,11 @@ export function setOnRegisterCreature(cb: (creature: Creature) => void): void {
 /** Called when the player releases a shore creature for material (uses the tide's pickup). */
 export function setOnReleaseCreature(cb: (creature: Creature) => void): void {
   onReleaseCreatureCb = cb;
+}
+
+/** Called after the shore unique is moved into the Collection. */
+export function setOnCollectUnique(cb: (id: UniqueId) => void): void {
+  onCollectUniqueCb = cb;
 }
 
 export function isShoreModalOpen(): boolean {
@@ -138,7 +151,11 @@ export function renderShoreButton(state: GameState): void {
   const btn = document.getElementById('shore-btn');
   if (!btn || !shoreBtnTextEl) return;
 
-  if (!state.shoreTaken && state.shore.length > 0) {
+  btn.classList.toggle('btn-unique', state.shoreUnique !== null);
+  if (state.shoreUnique) {
+    shoreBtnTextEl.textContent = ' Unique on shore';
+    btn.classList.add('btn-pulse');
+  } else if (!state.shoreTaken && state.shore.length > 0) {
     shoreBtnTextEl.textContent = ` Shore (${state.shore.length})`;
     btn.classList.add('btn-pulse');
   } else {
@@ -222,7 +239,7 @@ function renderModalContent(modal: HTMLElement, state: GameState, signal: AbortS
     <div class="shore-timer" id="shore-timer"></div>
     <div class="shore-actions" id="shore-actions">
       <button class="btn btn-secondary shore-action-btn" id="shore-refresh" title="New shore + 1 pickup. Cost = max(100, 30 s of plankton production), ×2 per refresh this tide; resets on tide">Refresh<br><span class="btn-cost" id="shore-refresh-cost"></span></button>
-      <button class="btn btn-secondary btn-rare shore-action-btn" id="shore-rare-refresh" title="New shore + 1 pickup; first creature is guaranteed rare (unlocked tiers only)">Rare Refresh<br><span class="btn-cost">${SHORE_RARE_REFRESH_COST} ${res('coral')}</span></button>
+      <button class="btn btn-secondary btn-rare shore-action-btn" id="shore-rare-refresh" title="New shore + 1 pickup; one creature is guaranteed rare (unlocked tiers only)">Rare Refresh<br><span class="btn-cost">${SHORE_RARE_REFRESH_COST} ${res('coral')}</span></button>
     </div>
     <div class="shore-creatures" id="shore-creatures"></div>
     <div class="shore-stats" id="shore-stats"></div>
@@ -296,14 +313,16 @@ function renderCreatureCards(state: GameState, signal: AbortSignal): void {
   const container = document.getElementById('shore-creatures');
   if (!container) return;
 
+  const uniqueHtml = state.shoreUnique ? uniqueCardHtml(state.shoreUnique) : '';
   if (state.shoreTaken || state.shore.length === 0) {
-    container.innerHTML = '<div class="shore-empty-msg">Waiting for the next tide...</div>';
+    container.innerHTML = uniqueHtml + '<div class="shore-empty-msg">Waiting for the next tide...</div>';
+    mountUniqueCard(state, signal);
     renderStats(state, null);
     updateTakeButton(state);
     return;
   }
 
-  let html = '';
+  let html = uniqueHtml;
   for (let i = 0; i < state.shore.length; i++) {
     const c = state.shore[i];
     const rareInfo = c.rare ? getRareInfo(c.rare) : null;
@@ -337,7 +356,9 @@ function renderCreatureCards(state: GameState, signal: AbortSignal): void {
     }
   }
 
-  container.querySelectorAll('.shore-creature-card').forEach((card) => {
+  mountUniqueCard(state, signal);
+
+  container.querySelectorAll('.shore-creature-card[data-index]').forEach((card) => {
     card.addEventListener('click', () => {
       const idx = parseInt((card as HTMLElement).dataset.index!, 10);
       selectedIndex = idx;
@@ -352,7 +373,7 @@ function renderCreatureCards(state: GameState, signal: AbortSignal): void {
 function updateSelection(state: GameState): void {
   const container = document.getElementById('shore-creatures');
   if (container) {
-    container.querySelectorAll('.shore-creature-card').forEach((card) => {
+    container.querySelectorAll('.shore-creature-card[data-index]').forEach((card) => {
       const idx = parseInt((card as HTMLElement).dataset.index!, 10);
       const selected = idx === selectedIndex;
       const c = state.shore[idx];
@@ -367,6 +388,36 @@ function updateSelection(state: GameState): void {
 
   renderStats(state, selectedIndex !== null ? state.shore[selectedIndex] : null);
   updateTakeButton(state);
+}
+
+function uniqueCardHtml(id: UniqueId): string {
+  const info = getUniqueInfo(id);
+  return `
+    <div class="shore-creature-card shore-unique-card" style="border-color:${info.color}">
+      <div class="shore-card-preview" id="shore-unique-preview"></div>
+      <div class="shore-card-info">
+        <div class="shore-card-name">${info.name}</div>
+        <span class="shore-card-rare" style="color:${info.color}; border-color:${info.color}40; background:${info.color}15;">${icon('unique')} Unique</span>
+        <button class="btn btn-primary shore-unique-btn" id="shore-unique-btn" title="Adds to the Collection's Unique row; does not use the tide's pickup. No level, no production; wanders the pool once collected">${icon('collection')} Add to collection</button>
+      </div>
+    </div>
+  `;
+}
+
+/** Start the unique card's animated preview and wire its collect button. */
+function mountUniqueCard(state: GameState, signal: AbortSignal): void {
+  const host = document.getElementById('shore-unique-preview');
+  if (!host || !state.shoreUnique) return;
+  stopUniquePreview?.();
+  stopUniquePreview = mountUniquePreview(state.shoreUnique, host, 120);
+  document.getElementById('shore-unique-btn')!.addEventListener('click', () => {
+    if (!stateRef) return;
+    const id = collectShoreUnique(stateRef);
+    if (!id) return;
+    controller.rerender();
+    renderShoreButton(stateRef);
+    onCollectUniqueCb?.(id);
+  }, { signal });
 }
 
 /** "NEW" when the creature's registry slot is empty, "↑" when it beats the registered specimen. */
@@ -591,6 +642,10 @@ function injectStyles(): void {
     .shore-trait-bar-fill { height: 100%; border-radius: 2px; transition: width 0.3s ease; }
     .shore-trait-val { width: 34px; text-align: right; font-size: 12px; color: var(--text-dim); flex-shrink: 0; }
 
+    .shore-unique-card { cursor: default; box-shadow: 0 0 14px rgba(240, 200, 80, 0.35); }
+    .shore-unique-card:hover { background: var(--bg-deep); }
+    .shore-unique-btn { font-size: 12px; margin-top: 4px; }
+    #shore-btn.btn-unique { border-color: #f0c040; color: #ffe9a0; }
     .shore-card-reg {
       display: inline-block; font-size: 11px; padding: 1px 6px;
       border: 1px solid var(--accent); border-radius: 3px; color: var(--accent-hi);

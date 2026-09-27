@@ -1,9 +1,10 @@
 import type { Creature } from '../creatures/creature';
+import type { UniqueId } from '../creatures/uniques';
 import { CreatureType } from '../creatures/types';
 import { SEABED_SLOTS } from '../systems/seabed-layout';
 
 const SAVE_KEY = 'brinewerk_save';
-const CURRENT_SAVE_VERSION = 15;
+const CURRENT_SAVE_VERSION = 16;
 
 // --- Seabed pool (v3+) ---
 
@@ -60,6 +61,12 @@ export interface GameState {
   registry: Record<string, Creature>;
   /** Registry keys the player has seen at least once (shore or pool) */
   sightings: Record<string, boolean>;
+  /** Hidden pity: consecutive shore batches without a rare (see systems/rarity.ts) */
+  rarePity: number;
+  /** Unique creatures found: uniqueId → true */
+  uniques: Record<string, boolean>;
+  /** Unique waiting on the shore until collected (survives tides) */
+  shoreUnique: UniqueId | null;
 }
 
 export function createDefaultState(): GameState {
@@ -85,6 +92,9 @@ export function createDefaultState(): GameState {
     achievements: {},
     registry: {},
     sightings: {},
+    rarePity: 0,
+    uniques: {},
+    shoreUnique: null,
   };
 }
 
@@ -352,6 +362,22 @@ function migrateState(data: Record<string, unknown>): GameState {
     }
     if (d.materials === undefined) d.materials = emptyMaterials();
     data.saveVersion = 15;
+  }
+
+  // V15 → V16: rare tiers unlock through the Collection. The Strange Tides / Abyssal
+  // Legends purchases are refunded (15 nacre, 100 lux); add pity counter and uniques.
+  if ((data.saveVersion as number) < 16) {
+    const d = data as Record<string, unknown>;
+    const upgrades = (d.upgrades as Record<string, number>) ?? {};
+    const resources = d.resources as ResourceBundle;
+    if (upgrades.strange_tides) resources.nacre += 15;
+    if (upgrades.abyssal_legends) resources.lux += 100;
+    delete upgrades.strange_tides;
+    delete upgrades.abyssal_legends;
+    if (d.rarePity === undefined) d.rarePity = 0;
+    if (d.uniques === undefined) d.uniques = {};
+    if (d.shoreUnique === undefined) d.shoreUnique = null;
+    data.saveVersion = 16;
   }
 
   // Validate critical fields exist after migration

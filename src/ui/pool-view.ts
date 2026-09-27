@@ -23,6 +23,9 @@ import { getRenderSettings } from '../rendering/render-settings';
 import { formatNumber } from '../util/format';
 import { iconTexture } from '../rendering/pixel-icons';
 import { isAtCap } from '../systems/growth';
+import {
+  type WandererLayer, createWandererLayer, syncWanderers, updateWanderers, destroyWandererLayer,
+} from './unique-wanderers';
 const SLOT_SIZE = 80;
 const CREATURE_DISPLAY = 64;
 const SLOT_BG = 0x0d2228;
@@ -73,6 +76,8 @@ export interface PoolView {
   /** "Lv N" labels under occupied slots, keyed by slot id */
   _levelLayer: Container;
   _levelTexts: Map<string, Text>;
+  /** Found uniques drifting over the pool (decorative, above creatures) */
+  _wanderers: WandererLayer;
   _app: Application;
   _worldW: number;
   _worldH: number;
@@ -140,6 +145,8 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
   gridContainer.addChild(slotLayer);
   gridContainer.addChild(collectibleLayer);
   gridContainer.addChild(creatureLayer);
+  const wanderers = createWandererLayer(pool.worldWidth, pool.worldHeight);
+  gridContainer.addChild(wanderers.container);
   const levelLayer = new Container();
   levelLayer.eventMode = 'none';
   gridContainer.addChild(levelLayer);
@@ -168,6 +175,7 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
     _slotGlowGraphics: new Map(),
     _levelLayer: levelLayer,
     _levelTexts: new Map(),
+    _wanderers: wanderers,
     _app: app,
     _worldW: pool.worldWidth,
     _worldH: pool.worldHeight,
@@ -443,6 +451,8 @@ export function destroyPoolView(poolView: PoolView): void {
   for (const text of poolView._levelTexts.values()) text.destroy();
   poolView._levelTexts.clear();
 
+  destroyWandererLayer(poolView._wanderers);
+
   // Destroy seabed background (textures + containers)
   if (poolView._seabedBg) {
     destroySeabedBackground(poolView._seabedBg);
@@ -641,6 +651,7 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
   }
 
   syncLevelLabels(poolView, state);
+  syncWanderers(poolView._wanderers, state);
 }
 
 /** Keep one "Lv N" label under each occupied slot. */
@@ -752,6 +763,8 @@ export function updatePoolVisuals(poolView: PoolView, deltaSec: number, totalTim
       updateCreatureVisual(visual, deltaSec, totalTime);
     }
   }
+
+  updateWanderers(poolView._wanderers, deltaSec, totalTime, (x, y) => isInViewport(poolView, x, y, cullMargin));
 }
 
 // --- Drawing helpers ---

@@ -4,6 +4,7 @@ import { disableSaving } from '../core/game-loop';
 import { forceTide } from '../systems/tides';
 import { createCreature, RARE_EFFECTS, type RareEffect } from '../creatures/creature';
 import { CreatureType, CREATURE_NAMES } from '../creatures/types';
+import { UNIQUES, type UniqueId } from '../creatures/uniques';
 
 export interface DebugMenuOptions {
   onStateChange: () => void;
@@ -78,6 +79,10 @@ export function initDebugMenu(
       <div class="debug-row">
         <button data-action="spawn">Spawn → Shore</button>
       </div>
+      <div class="debug-row">
+        <select id="dbg-unique"></select>
+        <button data-action="spawn-unique">Unique → Shore</button>
+      </div>
       <div class="debug-section">Grid</div>
       <div class="debug-row">
         <button data-action="reset-grid">Reset Grid</button>
@@ -105,6 +110,14 @@ export function initDebugMenu(
     opt.value = eff.id;
     opt.textContent = eff.label;
     rareSelect.appendChild(opt);
+  }
+
+  const uniqueSelect = panel.querySelector('#dbg-unique') as HTMLSelectElement;
+  for (const u of UNIQUES) {
+    const opt = document.createElement('option');
+    opt.value = u.id;
+    opt.textContent = u.name;
+    uniqueSelect.appendChild(opt);
   }
 
   panel.addEventListener('click', (e) => {
@@ -151,6 +164,9 @@ export function initDebugMenu(
         state.shore.push(creature);
         break;
       }
+      case 'spawn-unique':
+        state.shoreUnique = uniqueSelect.value as UniqueId;
+        break;
       case 'reset-grid': {
         // Reset pool to default seabed layout, remove creatures from slots
         const def = createDefaultState();

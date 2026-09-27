@@ -2,6 +2,15 @@
 
 /** Rare effect system */
 export const DEFAULT_RARE_CHANCE = 0.03; // 3% base chance of any rare (raised by lure upgrades)
+/** Collection-gated rare tiers: registered specimens of tier t-1 needed before tier t can roll. */
+export const RARE_TIER_UNLOCK: Record<number, number> = { 2: 3, 3: 8 };
+/** Hidden pity: after this many shore batches in a row without a rare, the next one holds one. */
+export const RARE_PITY_BATCHES = 8;
+/** Spawn-weight multiplier for rare effects whose species × effect combination was never sighted. */
+export const UNSEEN_RARE_WEIGHT = 3;
+/** Unique spawn chance per shore creature: MIN × (MAX / MIN)^(collection completion). */
+export const UNIQUE_CHANCE_MIN = 1e-5;
+export const UNIQUE_CHANCE_MAX = 1e-3;
 
 /** Shore mechanics */
 export const SHORE_CREATURE_COUNT = 2;                     // creatures per tide

@@ -77,6 +77,20 @@ export function getRegisteredCount(state: GameState): number {
   return Object.keys(state.registry).length;
 }
 
+/** Registered specimens of a given tier (0 = common, 1-3 = rare tier). */
+export function getRegisteredCountOfTier(state: GameState, tier: number): number {
+  let n = 0;
+  for (const specimen of Object.values(state.registry)) {
+    if ((specimen.rare ? getRareInfo(specimen.rare).tier : 0) === tier) n++;
+  }
+  return n;
+}
+
+/** Fraction of registry slots filled, 0-1. */
+export function getCollectionCompletion(state: GameState): number {
+  return getRegisteredCount(state) / REGISTRY_SLOTS.length;
+}
+
 // ---------------------------------------------------------------------------
 // Sightings & registration
 // ---------------------------------------------------------------------------

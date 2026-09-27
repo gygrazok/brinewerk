@@ -9,24 +9,31 @@ import {
 import { allSlots } from './coords';
 import { mulberry32 } from '../util/prng';
 import { getUpgradeLevel, getUpgradeEffect } from './upgrades';
-import { getSpawnContext } from './rarity';
+import { getSpawnContext, isPityDue, recordBatchRarity } from './rarity';
+import { rollShoreUnique } from './uniques';
 import { recordSighting } from './registry';
 import { getProductionRates } from '../economy/production-engine';
 
 /** Creature types available from tides */
 const TIDE_TYPES = [CreatureType.Stellarid, CreatureType.Blobid, CreatureType.Corallid, CreatureType.Nucleid, CreatureType.Craboid];
 
-/** Generate shore creatures. If forceRareOnFirst is true, the first creature is guaranteed rare. */
-function generateShoreCreatures(state: GameState, forceRareOnFirst = false): Creature[] {
+/**
+ * Generate a shore batch. One random creature is guaranteed rare when `forceRare` is set
+ * or the hidden pity counter is due. Each creature also rolls for a unique.
+ */
+function generateShoreCreatures(state: GameState, forceRare = false): Creature[] {
   const rng = mulberry32(Date.now());
   const ctx = getSpawnContext(state);
   const creatures: Creature[] = [];
   const shoreCount = getUpgradeEffect('bountiful_shore', getUpgradeLevel(state, 'bountiful_shore'));
+  const forcedIndex = forceRare || isPityDue(state) ? Math.floor(rng() * shoreCount) : -1;
   for (let i = 0; i < shoreCount; i++) {
     const type = TIDE_TYPES[Math.floor(rng() * TIDE_TYPES.length)];
-    const rareChance = forceRareOnFirst && i === 0 ? 1.0 : ctx.rareChance;
+    const rareChance = i === forcedIndex ? 1.0 : ctx.rareChance;
     creatures.push(spawnCreature({ ...ctx, rareChance }, { type }));
   }
+  recordBatchRarity(state, creatures);
+  rollShoreUnique(state, rng, creatures.length);
   for (const c of creatures) recordSighting(state, c);
   return creatures;
 }

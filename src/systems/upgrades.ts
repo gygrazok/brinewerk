@@ -2,7 +2,7 @@ import type { GameState, ResourceBundle } from '../core/game-state';
 import { isReleaseUnlocked, isSpeciesMature } from './achievements';
 import { CreatureType, CREATURE_NAMES, MATERIAL_NAMES } from '../creatures/types';
 import { hasShallowSlot } from './coords';
-import { RARE_EFFECTS } from '../creatures/creature';
+import { RARE_PITY_BATCHES } from '../core/balance';
 import { formatMultiplier } from '../util/format';
 import type { IconId } from '../rendering/icon-data';
 
@@ -29,7 +29,6 @@ export interface UpgradeDefinition {
 const costs = (arr: number[]) => (lv: number) => arr[lv] ?? Infinity;
 const geometric = (base: number, growth: number) => (lv: number) => Math.ceil(base * Math.pow(growth, lv));
 
-const TIER_COUNT = (tier: number) => RARE_EFFECTS.filter((e) => e.tier === tier).length;
 
 const hasUpgrade = (id: string) => (state: GameState) => getUpgradeLevel(state, id) > 0;
 /** Nacre upgrades appear together with the nacre economy (release unlocked). */
@@ -149,17 +148,6 @@ export const UPGRADES: UpgradeDefinition[] = [
     visible: nacreVisible,
   },
   {
-    id: 'strange_tides',
-    name: 'Strange Tides',
-    description: `Unlocks ${TIER_COUNT(2)} tier-2 rare effects`,
-    icon: 'up-strange_tides',
-    maxLevel: 1,
-    costFn: costs([15]),
-    effectFn: (lv) => lv,
-    costResource: 'nacre',
-    visible: nacreVisible,
-  },
-  {
     id: 'deep_drilling',
     name: 'Deep Drilling',
     description: 'Unlocks minerite production in deep slots',
@@ -199,12 +187,13 @@ export const UPGRADES: UpgradeDefinition[] = [
 
   // --- Lux ---
   {
-    id: 'abyssal_legends',
-    name: 'Abyssal Legends',
-    description: `Unlocks ${TIER_COUNT(3)} tier-3 rare effects`,
-    icon: 'up-abyssal_legends',
-    maxLevel: 1,
-    costFn: costs([100]),
+    id: 'tide_omen',
+    name: 'Tide Omen',
+    description: `At least 1 rare every ${RARE_PITY_BATCHES} shore batches (tides + refreshes); -1 batch per level`,
+    effectLabel: (e) => `every ${RARE_PITY_BATCHES - e} batches`,
+    icon: 'up-tide_omen',
+    maxLevel: 3,
+    costFn: geometric(40, 3),
     effectFn: (lv) => lv,
     costResource: 'lux',
     visible: luxVisible,

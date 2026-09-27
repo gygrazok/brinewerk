@@ -9,14 +9,15 @@ import {
   REGISTRY_SLOTS, type RegistrySlotDef,
   getRegistryMultiplier, getRegisteredCount, isSighted, specimenBonus, specimenBonusFormula,
 } from '../systems/registry';
-import { getUnlockedRareTiers } from '../systems/rarity';
-import { formatMultiplier, formatPercent } from '../util/format';
+import { getUnlockedRareTiers, getTierUnlockProgress } from '../systems/rarity';
+import { UNIQUES } from '../creatures/uniques';
+import { renderUniqueThumbnail } from '../rendering/uniques';
+import { getFoundUniques, getUniqueChance, isUniqueFound } from '../systems/uniques';
+import { formatMultiplier, formatNumber, formatPercent } from '../util/format';
 import { createModal } from './modal';
 
 /** Colour strip under each cell: common, then rare tiers 1-3. */
 const TIER_COLORS: Record<number, string> = { 0: '#3a5a5f', 1: '#c0c8d0', 2: '#a070e0', 3: '#f0c040' };
-/** Upgrade that unlocks each rare tier, for locked-cell tooltips. */
-const TIER_UNLOCK_HINT: Record<number, string> = { 2: 'Strange Tides', 3: 'Abyssal Legends' };
 
 let stateRef: GameState | null = null;
 let onOpenSpecimenCb: ((creature: Creature) => void) | null = null;
@@ -66,17 +67,53 @@ function thumbnailFor(creature: Creature): HTMLCanvasElement {
   return canvas;
 }
 
-function cellTitle(def: RegistrySlotDef, specimen: Creature | undefined, sighted: boolean, tierUnlocked: boolean): string {
+/** "Tier 2 locked: 1/3 T1 specimens registered" */
+function tierLockText(state: GameState, tier: number): string {
+  const { have, need } = getTierUnlockProgress(state, tier);
+  return `Tier ${tier} locked: ${Math.min(have, need)}/${need} T${tier - 1} specimens registered`;
+}
+
+function cellTitle(state: GameState, def: RegistrySlotDef, specimen: Creature | undefined, sighted: boolean, tierUnlocked: boolean): string {
   const effect = def.rare ? `${getRareInfo(def.rare).label} (T${def.tier})` : 'Common';
   if (specimen) return `${effect} · ${specimen.name} · ${formatPercent(specimenBonus(specimen))} (${specimenBonusFormula(specimen)})`;
   if (sighted) return `${effect} · sighted, empty slot`;
-  if (!tierUnlocked) return `Unknown · tier ${def.tier} locked (requires ${TIER_UNLOCK_HINT[def.tier]})`;
+  if (!tierUnlocked) return `Unknown · ${tierLockText(state, def.tier)}`;
   return 'Unknown · not yet sighted';
+}
+
+/** "1 in 12.3K" */
+function oneIn(p: number): string {
+  return `1 in ${formatNumber(Math.round(1 / p))}`;
+}
+
+function renderUniqueSection(state: GameState): string {
+  const chance = oneIn(getUniqueChance(state));
+  let cells = '';
+  for (const u of UNIQUES) {
+    const found = isUniqueFound(state, u.id);
+    const title = found
+      ? `${u.name} · Unique · no level, no production`
+      : `Unknown unique · spawn chance per shore creature: ${chance} (1 in 100K at 0% Collection, 1 in 1K at 100%)`;
+    const border = found ? ` style="border-color:${u.color}"` : '';
+    cells += `<div class="reg-cell reg-unique ${found ? 'found' : 'unknown'}" data-unique="${u.id}" title="${title}"${border}></div>`;
+  }
+  return `
+    <div class="reg-section">
+      <div class="reg-section-head">
+        <span>${icon('unique')} Unique</span>
+        <span class="reg-count">${getFoundUniques(state).length}/${UNIQUES.length}</span>
+      </div>
+      <div class="reg-grid">${cells}</div>
+    </div>
+  `;
 }
 
 function renderContent(modal: HTMLElement, state: GameState, signal: AbortSignal): void {
   const unlockedTiers = getUnlockedRareTiers(state);
   const total = REGISTRY_SLOTS.length;
+  // Only the next locked tier is shown: later tiers chain behind it
+  const nextLocked = [2, 3].find((t) => !unlockedTiers.has(t));
+  const lockHtml = nextLocked ? `<div class="reg-hint reg-lock">${tierLockText(state, nextLocked)}</div>` : '';
 
   let sectionsHtml = '';
   for (const type of Object.values(CreatureType)) {
@@ -95,7 +132,7 @@ function renderContent(modal: HTMLElement, state: GameState, signal: AbortSignal
       const badge = specimen && def.rare ? `<span class="reg-icon">${cellIcon}</span>` : '';
       const body = specimen ? '' : `<span class="reg-q">${sighted ? cellIcon : '?'}</span>`;
       cells += `
-        <div class="reg-cell ${cls}" data-key="${def.key}" title="${cellTitle(def, specimen, sighted, tierUnlocked)}"${border}>
+        <div class="reg-cell ${cls}" data-key="${def.key}" title="${cellTitle(state, def, specimen, sighted, tierUnlocked)}"${border}>
           ${body}${badge}
           <span class="reg-tier" style="background:${TIER_COLORS[def.tier]}"></span>
         </div>
@@ -120,8 +157,15 @@ function renderContent(modal: HTMLElement, state: GameState, signal: AbortSignal
       <button class="btn btn-ghost" id="registry-close-btn">✕</button>
     </div>
     <div class="reg-hint">1 slot per species × effect. Specimen bonus = tier base (Common 5%, T1 10%, T2 25%, T3 50%) × gene quality (1 + 2 × avg. trait distance from 50%). Bonuses add up into one multiplier on plankton, minerite and lux.</div>
-    <div class="reg-body">${sectionsHtml}</div>
+    ${lockHtml}
+    <div class="reg-body">${renderUniqueSection(state)}${sectionsHtml}</div>
   `;
+
+  // Uniques: silhouettes until found (static frames, rendered once per open)
+  modal.querySelectorAll<HTMLElement>('.reg-unique').forEach((cell) => {
+    const id = cell.dataset.unique as (typeof UNIQUES)[number]['id'];
+    cell.appendChild(renderUniqueThumbnail(id, !isUniqueFound(state, id)));
+  });
 
   // Mount cached thumbnails into filled cells
   modal.querySelectorAll<HTMLElement>('.reg-cell.filled').forEach((cell) => {
@@ -197,6 +241,9 @@ function injectStyles(): void {
       position: absolute; top: 1px; right: 3px;
       font-size: 11px; line-height: 1;
     }
+    .reg-lock { color: var(--accent-hi); }
+    .reg-unique.found { border-width: 2px; }
+    .reg-unique.unknown canvas { opacity: 0.9; }
     .reg-tier {
       position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
       opacity: 0.8;

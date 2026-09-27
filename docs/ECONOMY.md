@@ -56,10 +56,32 @@ optimal release point. Nacre buys slots (`2 × 3^(tier−1)`) and nacre upgrades
 
 ## Shore & rarity
 
-- Rare chance and unlocked tiers are derived from upgrades (`systems/rarity.ts`,
-  `getSpawnContext`), never stored in state. Tier 2: Strange Tides; tier 3: Abyssal Legends.
+Everything below lives in `systems/rarity.ts` (`getSpawnContext`) and is derived from
+upgrades and the Collection; only the pity counter is stored.
+
+- **Rare chance**: 3% + Rare Lure + Glow Lure, per creature.
+- **Tiers unlock through the Collection** (`RARE_TIER_UNLOCK`): tier 2 rolls once 3 tier-1
+  specimens are registered, tier 3 once 8 tier-2 specimens are. No announcement; the
+  Collection shows progress toward the next locked tier.
+- **Hidden pity** (`state.rarePity`): consecutive shore batches (tides and refreshes)
+  without a rare. When the next batch would reach `RARE_PITY_BATCHES − Tide Omen` (8, down
+  to 5) one random creature is forced rare. Not shown in the UI.
+- **Unseen priority**: effects whose species × effect key was never sighted weigh ×3
+  (`UNSEEN_RARE_WEIGHT`) in the effect pick.
 - Refresh cost: `max(100, 30 s of income) × 2^refreshesThisTide`, reset on natural tide.
-- Rare refresh: 10 coral, first creature guaranteed rare.
+- Rare refresh: 10 coral, one random creature guaranteed rare.
+
+## Uniques
+
+`creatures/uniques.ts` (catalogue), `rendering/uniques/` (one hand-drawn renderer per
+unique, `(time) → PixelGrid`, facing right), `systems/uniques.ts` (rolls).
+
+- Five one-off creatures with no genotype, level or production. They only fill the
+  Collection's Unique row (not part of the 125 registry slots or its multiplier).
+- Each shore creature rolls `1e-5 × 100^completion` (1 in 100K at 0% Collection, 1 in 1K
+  at 100%), outside pity and tier gates. A hit sets `state.shoreUnique`, which waits on the
+  shore across tides until collected; collecting does not use the tide's pickup.
+- Found uniques wander the pool as decorative sprites (`ui/unique-wanderers.ts`).
 
 ## Zoological registry
 
