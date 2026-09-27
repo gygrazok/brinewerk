@@ -3,14 +3,18 @@ import { initGameLoop, getState, getClock, onTide, onAchievement } from './core/
 import { initRenderer } from './rendering/renderer';
 import { createPoolView, destroyPoolView, syncPoolVisuals, updatePoolVisuals, panToWorldPos } from './ui/pool-view';
 import { destroyCreatureVisual } from './rendering/creature-renderer';
-import { showCreaturePanel, hideCreaturePanel, type CreaturePanelOptions } from './ui/creature-panel';
+import { showCreaturePanel, hideCreaturePanel, updateCreaturePanel } from './ui/creature-panel';
 import { getCreatureAt, placeCreature, removeCreature, findEmptySlot, expandPool } from './systems/pool';
 import { releaseCreature } from './systems/release';
+import { feedCreature } from './systems/feeding';
+import { registerCreature } from './systems/registry';
 import { forceInitialTide } from './systems/tides';
 import {
-  setOnTakeCreature, renderShoreButton, updateShoreModal,
+  setOnTakeCreature, setOnRegisterCreature, renderShoreButton, updateShoreModal,
   isShoreModalOpen, destroyShoreModal, openShoreModal,
 } from './ui/shore-modal';
+import { setOnOpenSpecimen, destroyRegistryModal } from './ui/registry-modal';
+import { planktonClumpValue } from './economy/production-engine';
 import { updateHud } from './ui/hud';
 import { initDebugMenu } from './ui/debug-menu';
 import { injectTheme } from './ui/theme';
@@ -19,7 +23,6 @@ import { destroyRareFilterCache } from './rendering/shader-loader';
 import { getUpgradeLevel, getUpgradeEffect } from './systems/upgrades';
 import { isUpgradeModalOpen, updateUpgradeModal, setOnUpgradePurchase, destroyUpgradeModal } from './ui/upgrade-modal';
 import { isAchievementModalOpen, updateAchievementModal, destroyAchievementModal } from './ui/achievement-modal';
-import { isReleaseUnlocked } from './systems/achievements';
 import { showAchievementToast } from './ui/achievement-toast';
 import { createCollectibleManager, updateCollectibles, clearCollectibles, clickCollect, forceSpawnCoral, type CollectibleManager } from './systems/collectibles';
 import {
@@ -142,6 +145,13 @@ async function init() {
   let heldCreature: import('./creatures/creature').Creature | null = null;
   let targetSlotId: string | null = null;
 
+  /** Refresh everything that depends on pool contents or resources. */
+  const refreshAll = () => {
+    syncPoolVisuals(poolView, state);
+    updateHud(state);
+    renderShoreButton(state);
+  };
+
   poolView.onSlotClick = (slotId: string) => {
     // Place held creature
     if (heldCreature) {
@@ -156,17 +166,21 @@ async function init() {
 
     const creature = getCreatureAt(state, slotId);
     if (creature) {
-      const panelOpts: CreaturePanelOptions = {
-        releaseUnlocked: isReleaseUnlocked(state),
+      showCreaturePanel(creature, {
         state,
+        mode: 'pool',
+        onFeed: (c, count) => {
+          if (feedCreature(state, c, count)) refreshAll();
+        },
         onRelease: (c) => {
           releaseCreature(state, c.id);
-          syncPoolVisuals(poolView, state);
-          updateHud(state);
-          renderShoreButton(state);
+          refreshAll();
         },
-      };
-      showCreaturePanel(creature, panelOpts);
+        onRegister: (c) => {
+          registerCreature(state, c);
+          refreshAll();
+        },
+      });
     } else {
       // Empty slot: open shore modal and target this slot for placement
       hideCreaturePanel();
@@ -226,6 +240,17 @@ async function init() {
     }
   });
 
+  // Shore → registry directly (consumes the tide's pickup)
+  setOnRegisterCreature((creature) => {
+    registerCreature(state, creature);
+    refreshAll();
+  });
+
+  // Registry grid → read-only specimen view
+  setOnOpenSpecimen((creature) => {
+    showCreaturePanel(creature, { state, mode: 'registry' });
+  });
+
   // Tide callback
   onTide(() => {
     renderShoreButton(state);
@@ -276,13 +301,12 @@ async function init() {
       );
       syncCollectibleVisuals(collectibleLayer, collectibleMgr, state.pool.worldWidth);
 
-      // Apply plankton surge upgrade to collectible plankton
-      const surgeMul = getUpgradeEffect('plankton_surge', getUpgradeLevel(state, 'plankton_surge'));
+      // Plankton clumps scale with passive income (and Plankton Surge)
       if (collected.plankton > 0) {
-        state.resources.plankton += collected.plankton * surgeMul;
-        // Update event amounts for popups
         for (const ev of collected.events) {
-          if (ev.resource === 'plankton') ev.amount = Math.round(ev.amount * surgeMul);
+          if (ev.resource !== 'plankton') continue;
+          ev.amount = Math.round(planktonClumpValue(state, ev.amount));
+          state.resources.plankton += ev.amount;
         }
       }
       if (collected.minerite > 0) state.resources.minerite += collected.minerite;
@@ -305,6 +329,7 @@ async function init() {
       if (isShoreModalOpen()) updateShoreModal(state);
       if (isUpgradeModalOpen()) updateUpgradeModal(state);
       if (isAchievementModalOpen()) updateAchievementModal(state);
+      updateCreaturePanel();
     }
   });
 
@@ -357,6 +382,7 @@ function cleanup(): void {
   destroyShoreModal();
   destroyUpgradeModal();
   destroyAchievementModal();
+  destroyRegistryModal();
   hideCreaturePanel();
 }
 

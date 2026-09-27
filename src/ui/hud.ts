@@ -2,6 +2,7 @@ import type { GameState } from '../core/game-state';
 import { getProductionRates } from '../economy/production-engine';
 import { getUpgradeLevel } from '../systems/upgrades';
 import { isReleaseUnlocked } from '../systems/achievements';
+import { formatNumber } from '../util/format';
 
 /** Resource definitions — easy to extend with new resources */
 interface ResourceDef {
@@ -79,15 +80,14 @@ export function updateHud(state: GameState): void {
     if (row.sep) row.sep.style.display = display;
     if (!visible) continue;
 
-    const val = Math.floor(state.resources[r.key]);
-    row.value.textContent = `${val} ${r.icon}`;
+    row.value.textContent = `${formatNumber(state.resources[r.key])} ${r.icon}`;
 
     if (row.rate) {
       const rate = r.key === 'plankton' ? rates.plankton
                  : r.key === 'minerite' ? rates.minerite
                  : r.key === 'lux'      ? rates.lux
                  : 0;
-      row.rate.textContent = `+${rate.toFixed(2)}/s`;
+      row.rate.textContent = `+${formatNumber(rate, 2)}/s`;
     }
   }
 }

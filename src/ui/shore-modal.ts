@@ -1,20 +1,22 @@
 import type { GameState } from '../core/game-state';
 import type { Creature } from '../creatures/creature';
 import { getRareInfo } from '../creatures/creature';
-import { CREATURE_NAMES, CREATURE_ICONS } from '../creatures/types';
+import { CREATURE_NAMES, CREATURE_ICONS, TYPE_MULTIPLIERS } from '../creatures/types';
+import { calculateGeneticRate } from '../creatures/production';
 import { getDisplayTraits, TRAIT_COLORS } from '../genetics/traits';
 import { createCreaturePreviewApp, type CreaturePreviewApp } from '../rendering/creature-preview';
 import { findEmptySlot } from '../systems/pool';
-import {
-  SHORE_REFRESH_COST, SHORE_RARE_REFRESH_COST,
-} from '../core/balance';
+import { SHORE_RARE_REFRESH_COST } from '../core/balance';
 import {
   pickUpCreature, refreshShore, rareRefreshShore, flushTide,
-  getTideTimeRemaining, isTideReady,
+  getTideTimeRemaining, isTideReady, getRefreshCost,
 } from '../systems/tides';
+import { getRegisteredSpecimen, specimenBonus, getRegisteredCount, REGISTRY_SLOTS } from '../systems/registry';
 import { openUpgradeModal } from './upgrade-modal';
 import { openAchievementModal } from './achievement-modal';
-import { getCompletedCount, getTotalCount } from '../systems/achievements';
+import { openRegistryModal } from './registry-modal';
+import { getCompletedCount, getTotalCount, isRegistryUnlocked } from '../systems/achievements';
+import { formatNumber, formatPercent, formatMultiplier } from '../util/format';
 import { createModal } from './modal';
 
 // ---------------------------------------------------------------------------
@@ -23,11 +25,13 @@ import { createModal } from './modal';
 
 let selectedIndex: number | null = null;
 let onTakeCreatureCb: ((creature: Creature) => void) | null = null;
+let onRegisterCreatureCb: ((creature: Creature) => void) | null = null;
 let stateRef: GameState | null = null;
 let bottomBarMounted = false;
 /** Cached refs into the bottom bar, populated on first mount. */
 let shoreBtnTextEl: HTMLSpanElement | null = null;
 let achBtnEl: HTMLButtonElement | null = null;
+let registryBtnEl: HTMLButtonElement | null = null;
 /** Track last known tide timestamp to detect new tide arrivals */
 let lastKnownTideTimestamp = 0;
 /** Active PixiJS creature previews */
@@ -58,6 +62,11 @@ const controller = createModal({
 
 export function setOnTakeCreature(cb: (creature: Creature) => void): void {
   onTakeCreatureCb = cb;
+}
+
+/** Called when the player sends a shore creature straight to the registry (uses the tide's pickup). */
+export function setOnRegisterCreature(cb: (creature: Creature) => void): void {
+  onRegisterCreatureCb = cb;
 }
 
 export function isShoreModalOpen(): boolean {
@@ -97,6 +106,14 @@ export function renderShoreButton(state: GameState): void {
     });
     bar.appendChild(upgradesBtn);
 
+    registryBtnEl = document.createElement('button');
+    registryBtnEl.id = 'registry-btn';
+    registryBtnEl.className = 'btn btn-secondary';
+    registryBtnEl.addEventListener('click', () => {
+      if (stateRef) openRegistryModal(stateRef);
+    });
+    bar.appendChild(registryBtnEl);
+
     achBtnEl = document.createElement('button');
     achBtnEl.id = 'achievements-btn';
     achBtnEl.className = 'btn btn-secondary';
@@ -129,6 +146,11 @@ export function renderShoreButton(state: GameState): void {
 
   if (achBtnEl) {
     achBtnEl.textContent = `🏆 ${getCompletedCount(state)}/${getTotalCount()}`;
+  }
+  if (registryBtnEl) {
+    const unlocked = isRegistryUnlocked(state);
+    registryBtnEl.style.display = unlocked ? '' : 'none';
+    if (unlocked) registryBtnEl.textContent = `📖 ${getRegisteredCount(state)}/${REGISTRY_SLOTS.length}`;
   }
 }
 
@@ -170,6 +192,7 @@ export function destroyShoreModal(): void {
   bottomBarMounted = false;
   shoreBtnTextEl = null;
   achBtnEl = null;
+  registryBtnEl = null;
   const bar = document.getElementById('bottom-bar');
   if (bar) bar.textContent = '';
 }
@@ -189,13 +212,14 @@ function renderModalContent(modal: HTMLElement, state: GameState, signal: AbortS
     </div>
     <div class="shore-timer" id="shore-timer"></div>
     <div class="shore-actions" id="shore-actions">
-      <button class="btn btn-secondary shore-action-btn" id="shore-refresh">Refresh<br><span class="btn-cost">${SHORE_REFRESH_COST} 🟢</span></button>
+      <button class="btn btn-secondary shore-action-btn" id="shore-refresh">Refresh<br><span class="btn-cost" id="shore-refresh-cost"></span></button>
       <button class="btn btn-secondary btn-rare shore-action-btn" id="shore-rare-refresh">Rare Refresh<br><span class="btn-cost">${SHORE_RARE_REFRESH_COST} 🪸</span></button>
     </div>
     <div class="shore-creatures" id="shore-creatures"></div>
     <div class="shore-stats" id="shore-stats"></div>
     <div class="shore-take-area" id="shore-take-area">
       <button class="btn btn-primary shore-take-btn disabled" id="shore-take-btn">Select a creature</button>
+      <button class="btn btn-secondary shore-register-btn" id="shore-register-btn" style="display:none"></button>
     </div>
   `;
 
@@ -228,6 +252,16 @@ function renderModalContent(modal: HTMLElement, state: GameState, signal: AbortS
     }
   }, { signal });
 
+  document.getElementById('shore-register-btn')!.addEventListener('click', () => {
+    if (selectedIndex === null || !stateRef) return;
+    const creature = pickUpCreature(stateRef, selectedIndex);
+    if (creature) {
+      controller.close();
+      renderShoreButton(stateRef);
+      onRegisterCreatureCb?.(creature);
+    }
+  }, { signal });
+
   renderCreatureCards(state, signal);
   updateTimer(state);
   updateRefreshButtons(state);
@@ -244,7 +278,7 @@ function renderCreatureCards(state: GameState, signal: AbortSignal): void {
 
   if (state.shoreTaken || state.shore.length === 0) {
     container.innerHTML = '<div class="shore-empty-msg">Waiting for the next tide...</div>';
-    renderStats(null);
+    renderStats(state, null);
     updateTakeButton(state);
     return;
   }
@@ -256,6 +290,7 @@ function renderCreatureCards(state: GameState, signal: AbortSignal): void {
     const rareBadge = rareInfo
       ? `<span class="shore-card-rare" style="color:${rareInfo.color}; border-color:${rareInfo.color}40; background:${rareInfo.color}15;">${rareInfo.icon} ${rareInfo.label}</span>`
       : '';
+    const regBadge = registryBadge(state, c);
 
     html += `
       <div class="shore-creature-card" data-index="${i}">
@@ -264,6 +299,7 @@ function renderCreatureCards(state: GameState, signal: AbortSignal): void {
           <div class="shore-card-name">${c.name}</div>
           <div class="shore-card-type">${CREATURE_ICONS[c.type]} ${CREATURE_NAMES[c.type]}</div>
           ${rareBadge}
+          ${regBadge}
         </div>
       </div>
     `;
@@ -309,15 +345,24 @@ function updateSelection(state: GameState): void {
     });
   }
 
-  renderStats(selectedIndex !== null ? state.shore[selectedIndex] : null);
+  renderStats(state, selectedIndex !== null ? state.shore[selectedIndex] : null);
   updateTakeButton(state);
+}
+
+/** "NEW" when the creature's registry slot is empty, "↑" when it beats the registered specimen. */
+function registryBadge(state: GameState, creature: Creature): string {
+  if (!isRegistryUnlocked(state)) return '';
+  const existing = getRegisteredSpecimen(state, creature);
+  if (!existing) return '<span class="shore-card-reg">📖 NEW</span>';
+  if (specimenBonus(creature) > specimenBonus(existing)) return '<span class="shore-card-reg">📖 ↑</span>';
+  return '';
 }
 
 // ---------------------------------------------------------------------------
 // Stats panel (shown when a creature is selected)
 // ---------------------------------------------------------------------------
 
-function renderStats(creature: Creature | null): void {
+function renderStats(state: GameState, creature: Creature | null): void {
   const statsEl = document.getElementById('shore-stats');
   if (!statsEl) return;
 
@@ -327,7 +372,10 @@ function renderStats(creature: Creature | null): void {
   }
 
   const traits = getDisplayTraits(creature.type);
-  let html = '<div class="shore-stats-inner">';
+  const geneMul = calculateGeneticRate(creature) / TYPE_MULTIPLIERS[creature.type];
+  let summary = `Genes ${formatMultiplier(geneMul)}`;
+  if (isRegistryUnlocked(state)) summary += ` · Registry ${formatPercent(specimenBonus(creature))}`;
+  let html = `<div class="shore-stats-inner"><div class="shore-stats-summary">${summary}</div>`;
   for (const trait of traits) {
     const val = creature.genes[trait as keyof typeof creature.genes] as number;
     const color = TRAIT_COLORS[trait] ?? '#3aada8';
@@ -353,6 +401,7 @@ function renderStats(creature: Creature | null): void {
 function updateTakeButton(state: GameState): void {
   const takeBtn = document.getElementById('shore-take-btn');
   if (!takeBtn) return;
+  updateRegisterButton(state);
 
   const noSlots = findEmptySlot(state) === null;
 
@@ -369,6 +418,22 @@ function updateTakeButton(state: GameState): void {
     takeBtn.classList.add('disabled');
     takeBtn.textContent = 'Select a creature';
   }
+}
+
+/** Direct shore → registry button, shown for the selected creature once the registry is unlocked. */
+function updateRegisterButton(state: GameState): void {
+  const btn = document.getElementById('shore-register-btn');
+  if (!btn) return;
+  const creature = selectedIndex !== null && !state.shoreTaken ? state.shore[selectedIndex] : null;
+  if (!creature || !isRegistryUnlocked(state)) {
+    btn.style.display = 'none';
+    return;
+  }
+  const existing = getRegisteredSpecimen(state, creature);
+  btn.style.display = '';
+  btn.textContent = existing
+    ? `📖 Replace specimen · ${formatPercent(specimenBonus(existing))} → ${formatPercent(specimenBonus(creature))}`
+    : `📖 Send to registry · ${formatPercent(specimenBonus(creature))}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -407,7 +472,10 @@ function updateRefreshButtons(state: GameState): void {
   const refreshBtn = document.getElementById('shore-refresh');
   const rareBtn = document.getElementById('shore-rare-refresh');
   if (refreshBtn) {
-    refreshBtn.classList.toggle('unaffordable', state.resources.plankton < SHORE_REFRESH_COST);
+    const cost = getRefreshCost(state);
+    refreshBtn.classList.toggle('unaffordable', state.resources.plankton < cost);
+    const costEl = document.getElementById('shore-refresh-cost');
+    if (costEl) costEl.textContent = `${formatNumber(cost)} 🟢`;
   }
   if (rareBtn) {
     rareBtn.classList.toggle('unaffordable', state.resources.coral < SHORE_RARE_REFRESH_COST);
@@ -487,8 +555,14 @@ function injectStyles(): void {
     .shore-trait-bar-fill { height: 100%; border-radius: 2px; transition: width 0.3s ease; }
     .shore-trait-val { width: 34px; text-align: right; font-size: 12px; color: var(--text-dim); flex-shrink: 0; }
 
+    .shore-card-reg {
+      display: inline-block; font-size: 11px; padding: 1px 6px;
+      border: 1px solid var(--accent); border-radius: 3px; color: var(--accent-hi);
+    }
+    .shore-stats-summary { font-size: 13px; color: var(--accent-hi); text-align: center; padding-bottom: 4px; }
+
     /* Take button */
-    .shore-take-area { padding: 8px 16px 16px; flex-shrink: 0; }
+    .shore-take-area { padding: 8px 16px 16px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; }
 
     @media (max-width: 640px) {
       .shore-timer { font-size: 13px; }

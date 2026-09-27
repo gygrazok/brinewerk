@@ -259,3 +259,16 @@ export function destroyCreatureVisual(visual: CreatureVisual): void {
   visual.sprite.destroy({ children: true });
   visual.texture.destroy(true);
 }
+
+/**
+ * Static first-frame render of a creature onto a plain 2D canvas (no shaders, no Pixi).
+ * Cheap enough for dense grids such as the registry; scale it with CSS `image-rendering: pixelated`.
+ */
+export function renderCreatureThumbnail(creature: Creature): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width = CANVAS_PX;
+  canvas.height = CANVAS_PX;
+  const ctx = canvas.getContext('2d')!;
+  renderGridToCanvas(TYPE_RENDERERS[creature.type](creature.genes, 0, creature.seed), ctx);
+  return canvas;
+}

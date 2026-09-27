@@ -1,40 +1,44 @@
-/** Phase 1 balance constants */
+/** Game balance constants */
 
 /** Rare effect system */
-export const DEFAULT_RARE_CHANCE = 0.01; // 1% base chance of any rare
-/** Rare effect IDs unlocked at game start (tier 1) */
-export const DEFAULT_UNLOCKED_RARE_IDS: readonly string[] = ['metallic', 'shiny'];
+export const DEFAULT_RARE_CHANCE = 0.03; // 3% base chance of any rare (raised by lure upgrades)
 
 /** Shore mechanics */
 export const SHORE_CREATURE_COUNT = 2;                     // creatures per tide
-export const SHORE_REFRESH_COST = 100;                     // plankton cost to refresh shore
-export const SHORE_RARE_REFRESH_COST = 100;                // coral cost for rare-guaranteed refresh
+export const SHORE_REFRESH_COST = 100;                     // minimum plankton cost to refresh shore
+/** Refresh cost also scales with income: this many seconds of passive plankton production. */
+export const SHORE_REFRESH_RATE_SECONDS = 30;
+/** Each refresh within the same tide multiplies the next refresh cost by this factor. */
+export const SHORE_REFRESH_ESCALATION = 2;
+export const SHORE_RARE_REFRESH_COST = 10;                 // coral cost for rare-guaranteed refresh
 
 /** Tide timing (seconds) */
 export const TIDE_INTERVAL_MIN = 180; // 3 min
 export const TIDE_INTERVAL_MAX = 300; // 5 min
 
-/** Production formula: base = TYPE_MUL * (SIZE_BASE + size * SIZE_SCALE) * (ARMS_BASE + arms * ARMS_SCALE) */
-export const PROD_SIZE_BASE = 0.5;
-export const PROD_SIZE_SCALE = 0.5;
-export const PROD_ARMS_BASE = 0.8;
-export const PROD_ARMS_SCALE = 0.4;
+/**
+ * Genetic production rate: TYPE_MUL * 2^(GENE_EXPONENT * (size - 0.5)) * 2^(GENE_EXPONENT * (primary - 0.5)).
+ * An average creature (genes 0.5) yields TYPE_MUL; each gene at 1.0 multiplies it by 2^(GENE_EXPONENT/2).
+ */
+export const PROD_GENE_EXPONENT = 3;
 
-/** Shore pickup costs */
-export const PICKUP_BASE_COST = 20;
-/** Extra cost per unit of trait deviation (0 = average creature, full deviation adds this much) */
-export const PICKUP_DEVIATION_SCALE = 40;
-/** Pickup cost multiplier by rare tier */
-export const PICKUP_RARE_TIER_MULTIPLIERS: Record<number, number> = { 1: 2, 2: 3, 3: 5 };
+/** Feeding: level L → L+1 costs FEED_BASE_COST * FEED_COST_GROWTH^(L-1) plankton. */
+export const FEED_BASE_COST = 20;
+export const FEED_COST_GROWTH = 1.22;
+/** Reaching each of these levels doubles the creature's production. */
+export const LEVEL_MILESTONES: readonly number[] = [10, 25, 50, 75, 100, 150, 200, 250, 300, 400, 500];
 
 /** Initial game state */
 export const INITIAL_PLANKTON = 50;
 
-/** Nacre / creature release */
-export const NACRE_CONVERSION_RATE = 100; // plankton produced per 1 nacre
-export const NACRE_RARE_COMMON_MUL = 1.5; // rare chance >= 5%
-export const NACRE_RARE_UNCOMMON_MUL = 2.0; // rare chance 4-5%
-export const NACRE_RARE_RARE_MUL = 3.0; // rare chance < 4%
+/** Nacre / creature release: nacre = (level / NACRE_LEVEL_DIVISOR)^2 * (1 + NACRE_DEVIATION_SCALE * deviation) * rareMul */
+export const NACRE_LEVEL_DIVISOR = 10;
+export const NACRE_DEVIATION_SCALE = 2;
+export const NACRE_RARE_TIER_MULTIPLIERS: Record<number, number> = { 1: 1.5, 2: 2, 3: 3 };
+
+/** Zoological registry: per-specimen production bonus by rare tier (0 = common), scaled by (1 + REGISTRY_DEVIATION_SCALE * deviation). */
+export const REGISTRY_TIER_BONUS: Record<number, number> = { 0: 0.05, 1: 0.10, 2: 0.25, 3: 0.50 };
+export const REGISTRY_DEVIATION_SCALE = 2;
 
 
 /** Floating collectibles */
@@ -48,6 +52,8 @@ export const COLLECTIBLE_MAX_AGE = 30;                 // seconds before despawn
 export const COLLECTIBLE_COLLECT_RADIUS = 60;          // base mouse proximity (px)
 export const COLLECTIBLE_MAGNET_SPEED = 200;           // base magnetism speed (px/sec), accelerates over time
 export const COLLECTIBLE_PLANKTON_BASE = 5;            // base plankton per clump
+/** Each plankton clump is also worth this many seconds of passive plankton production. */
+export const COLLECTIBLE_PLANKTON_RATE_SECONDS = 2;
 export const COLLECTIBLE_PLANKTON_JITTER = 3;          // random ± amount
 export const COLLECTIBLE_MAX_ACTIVE = 15;              // max simultaneous clumps
 export const COLLECTIBLE_SPRITE_SIZE = 10;             // pixel grid resolution
@@ -72,18 +78,18 @@ export const DEPTH_SHALLOW_MAX = 350;
 /** A slot counts as deep when its y is within this many world px of the seabed profile. */
 export const DEPTH_TERRAIN_MARGIN = 30;
 
-/** Passive minerite/s per deep slot, multiplied by the creature's trait deviation (0-1). */
+/** Passive minerite/s per deep slot, multiplied by the creature's trait deviation (0-1) and sqrt(level). */
 export const MINERITE_BASE_RATE = 0.1;
-/** Passive lux/s per shallow slot, multiplied by max(0, glow-0.5) * 2. */
+/** Passive lux/s per shallow slot, multiplied by max(0, glow-0.5) * 2 and sqrt(level). */
 export const LUX_BASE_RATE = 0.05;
 
 /**
  * Slot unlock cost by tier (position-based).
- * Cost is in Nacre only, growing exponentially: 2^(tier-1).
+ * Cost is in Nacre only, growing exponentially: 2 * 3^(tier-1).
  * Tier 0 slots are free (starter, unlocked by default).
  */
 export function getSlotUnlockCost(tier: number): import('./game-state').ResourceBundle {
   if (tier <= 0) return { plankton: 0, minerite: 0, lux: 0, nacre: 0, coral: 0 };
-  const nacre = Math.pow(2, tier - 1); // 1, 2, 4, 8, ...
+  const nacre = 2 * Math.pow(3, tier - 1); // 2, 6, 18, 54
   return { plankton: 0, minerite: 0, lux: 0, nacre, coral: 0 };
 }

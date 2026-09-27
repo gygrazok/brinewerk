@@ -1,5 +1,8 @@
 import type { GameState, ResourceBundle } from '../core/game-state';
-import { UPGRADES, getUpgradeLevel, purchaseUpgrade, getUpgradeCostResource } from '../systems/upgrades';
+import {
+  UPGRADES, getUpgradeLevel, purchaseUpgrade, getUpgradeCostResource, isUpgradeVisible,
+} from '../systems/upgrades';
+import { formatNumber } from '../util/format';
 import { createModal } from './modal';
 
 const RESOURCE_ICONS: Record<keyof ResourceBundle, string> = {
@@ -12,6 +15,8 @@ const RESOURCE_ICONS: Record<keyof ResourceBundle, string> = {
 
 let stateRef: GameState | null = null;
 let onPurchaseCb: (() => void) | null = null;
+/** Number of upgrades shown at last render: a change (new tier unlocked) triggers a rerender. */
+let renderedCount = 0;
 
 const controller = createModal({
   id: 'upgrade',
@@ -35,7 +40,15 @@ export function closeUpgradeModal(): void {
 export function updateUpgradeModal(state: GameState): void {
   if (!controller.isOpen) return;
   stateRef = state;
+  if (visibleUpgrades(state).length !== renderedCount) {
+    controller.rerender();
+    return;
+  }
   updateBuyButtons(state);
+}
+
+function visibleUpgrades(state: GameState) {
+  return UPGRADES.filter((def) => isUpgradeVisible(state, def));
 }
 
 export function isUpgradeModalOpen(): boolean {
@@ -58,7 +71,9 @@ export function destroyUpgradeModal(): void {
 function renderContent(modal: HTMLElement, state: GameState, signal: AbortSignal): void {
   // Sort: affordable (not maxed) first, then unaffordable (not maxed), then maxed.
   // Within each bucket preserve UPGRADES declaration order.
-  const bucketed = UPGRADES.map((def) => {
+  const visible = visibleUpgrades(state);
+  renderedCount = visible.length;
+  const bucketed = visible.map((def) => {
     const level = getUpgradeLevel(state, def.id);
     const isMaxed = level >= def.maxLevel;
     const cost = isMaxed ? 0 : def.costFn(level);
@@ -78,7 +93,7 @@ function renderContent(modal: HTMLElement, state: GameState, signal: AbortSignal
 
     const buttonHtml = isMaxed
       ? '<span class="upgrade-purchased">Purchased</span>'
-      : `<button class="btn btn-secondary btn-sm upgrade-buy-btn${affordable ? '' : ' unaffordable'}" data-id="${def.id}">${cost} ${costIcon}</button>`;
+      : `<button class="btn btn-secondary btn-sm upgrade-buy-btn${affordable ? '' : ' unaffordable'}" data-id="${def.id}">${formatNumber(cost)} ${costIcon}</button>`;
 
     cardsHtml += `
       <div class="upgrade-card${isMaxed ? ' maxed' : ''}" data-id="${def.id}">
@@ -129,7 +144,7 @@ function updateBuyButtons(state: GameState): void {
   const modal = document.getElementById('upgrade-modal');
   if (!modal) return;
 
-  for (const def of UPGRADES) {
+  for (const def of visibleUpgrades(state)) {
     const level = getUpgradeLevel(state, def.id);
     if (level >= def.maxLevel) continue;
     const cost = def.costFn(level);

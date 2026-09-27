@@ -3,9 +3,7 @@ import { mulberry32 } from '../util/prng';
 import { randomGenotype } from '../genetics/genes';
 import { generateName } from '../genetics/taxonomy';
 import { getDisplayTraits } from '../genetics/traits';
-import { DEFAULT_RARE_CHANCE, DEFAULT_UNLOCKED_RARE_IDS } from '../core/balance';
-
-const DEFAULT_UNLOCKED_RARES: ReadonlySet<string> = new Set(DEFAULT_UNLOCKED_RARE_IDS);
+import { DEFAULT_RARE_CHANCE } from '../core/balance';
 
 export interface Genotype {
   arms: number;
@@ -110,6 +108,18 @@ export const RARE_EFFECTS: RareInfo[] = [
   { id: 'liquify', label: 'Liquify', icon: '\uD83D\uDCA7', weight: 3, tier: 3, color: '#80b0d0' },
 ];
 
+/** IDs of every rare effect in the given tiers. */
+export function rareIdsForTiers(tiers: ReadonlySet<number>): string[] {
+  return RARE_EFFECTS.filter((e) => tiers.has(e.tier)).map((e) => e.id);
+}
+
+/** Rare effects that can appear on a given creature type. */
+export function raresForType(type: CreatureType): RareInfo[] {
+  return RARE_EFFECTS.filter((e) => !e.types || e.types.includes(type));
+}
+
+const DEFAULT_UNLOCKED_RARES: ReadonlySet<string> = new Set(rareIdsForTiers(new Set([1])));
+
 /**
  * Roll for a rare effect.
  * @param rng           Seeded random function [0, 1)
@@ -175,8 +185,8 @@ export interface Creature {
   genes: Genotype;
   seed: number;
   rare: RareEffect | null;
-  /** Cumulative plankton produced by this creature (for nacre yield on release) */
-  lifetimePlankton: number;
+  /** Feeding level (starts at 1). Drives production, milestones and nacre yield. */
+  level: number;
 }
 
 let _nextId = 0;
@@ -187,7 +197,7 @@ export interface CreateCreatureOpts {
   forceRare?: RareEffect | null;
   /** Chance of any rare (default: DEFAULT_RARE_CHANCE from balance) */
   rareChance?: number;
-  /** Set of unlocked rare IDs (default: DEFAULT_UNLOCKED_RARES from balance) */
+  /** Set of unlocked rare IDs (default: all tier-1 rares) */
   unlockedRares?: ReadonlySet<string>;
 }
 
@@ -212,26 +222,33 @@ export function createCreature(opts: CreateCreatureOpts = {}): Creature {
   const name = generateName(finalType, nameRng);
   const id = `c_${Date.now()}_${_nextId++}`;
 
-  return { id, name, type: finalType, genes, seed: finalSeed, rare, lifetimePlankton: 0 };
+  return { id, name, type: finalType, genes, seed: finalSeed, rare, level: 1 };
+}
+
+/** Rare-roll parameters derived from the player's progression (see `getSpawnContext`). */
+export interface SpawnContext {
+  rareChance: number;
+  unlockedRares: string[];
 }
 
 /**
- * Canonical way to spawn a creature using the player's current game state.
+ * Canonical way to spawn a creature using the player's progression.
  * All gameplay systems (tides, breeding, expeditions, etc.) should use this
- * so that rareChance and unlockedRares are always pulled from the live state.
+ * with `getSpawnContext(state)` so rare chance and unlocked tiers stay in sync
+ * with upgrades.
  *
  * Use `createCreature` directly only for debug/tests or when you need to
  * bypass the state (e.g. force a specific rare).
  */
 export function spawnCreature(
-  state: { rareChance: number; unlockedRares: string[] },
+  ctx: SpawnContext,
   opts?: { type?: CreatureType; seed?: number; forceRare?: RareEffect | null },
 ): Creature {
   return createCreature({
     type: opts?.type,
     seed: opts?.seed,
     forceRare: opts?.forceRare,
-    rareChance: state.rareChance,
-    unlockedRares: new Set(state.unlockedRares),
+    rareChance: ctx.rareChance,
+    unlockedRares: new Set(ctx.unlockedRares),
   });
 }

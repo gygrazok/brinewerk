@@ -1,11 +1,17 @@
 import type { Creature } from '../creatures/creature';
 import type { GameState } from '../core/game-state';
 import { getRareInfo } from '../creatures/creature';
-import { CREATURE_NAMES, CREATURE_ICONS } from '../creatures/types';
-import { calculateProduction } from '../creatures/production';
+import { CREATURE_NAMES, CREATURE_ICONS, TYPE_MULTIPLIERS } from '../creatures/types';
+import { calculateGeneticRate, nextMilestone, PRODUCTION_GENE } from '../creatures/production';
 import { getDisplayTraits, TRAIT_COLORS } from '../genetics/traits';
 import { createCreaturePreviewApp, type CreaturePreviewApp } from '../rendering/creature-preview';
 import { calculateNacreYield } from '../systems/release';
+import { quoteFeed } from '../systems/feeding';
+import { findCreatureSlot } from '../systems/pool';
+import { getRegisteredSpecimen, specimenBonus } from '../systems/registry';
+import { isReleaseUnlocked, isRegistryUnlocked } from '../systems/achievements';
+import { getCreatureRates } from '../economy/production-engine';
+import { formatNumber, formatPercent, formatMultiplier } from '../util/format';
 
 let overlayEl: HTMLDivElement | null = null;
 let panelEl: HTMLDivElement | null = null;
@@ -132,31 +138,50 @@ function injectStyles(): void {
       font-size: 12px; color: var(--text-dim); flex-shrink: 0;
     }
 
-    #release-confirm-overlay {
+    #panel-confirm-overlay {
       position: fixed; inset: 0; z-index: 200;
       background: rgba(4, 10, 14, 0.75);
       display: flex; align-items: center; justify-content: center;
     }
-    #release-confirm-dialog {
+    #panel-confirm-dialog {
       background: var(--bg-panel); border: 1px solid var(--border);
       border-radius: 8px; padding: 24px;
       font-family: var(--font-body);
       color: var(--text); max-width: 320px;
       text-align: center;
     }
-    #release-confirm-dialog .confirm-title {
+    #panel-confirm-dialog .confirm-title {
       font-family: var(--font-display);
       font-size: 12px; color: var(--accent); margin-bottom: 12px;
     }
-    #release-confirm-dialog .confirm-text {
+    #panel-confirm-dialog .confirm-text {
       font-size: 14px; line-height: 1.5; margin-bottom: 16px; color: var(--text-dim);
     }
-    #release-confirm-dialog .confirm-nacre {
+    #panel-confirm-dialog .confirm-highlight {
       font-size: 18px; color: var(--accent); margin-bottom: 16px;
     }
-    #release-confirm-dialog .confirm-actions {
+    #panel-confirm-dialog .confirm-actions {
       display: flex; gap: 12px; justify-content: center;
     }
+
+    #creature-detail .level-row {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+    }
+    #creature-detail .level-value {
+      font-family: var(--font-display); font-size: 12px; color: var(--accent-hi);
+    }
+    #creature-detail .milestone { font-size: 12px; color: var(--text-dim); }
+    #creature-detail .stat-lines { display: flex; flex-direction: column; gap: 2px; }
+    #creature-detail .stat-dim { font-size: 12px; color: var(--text-dim); }
+    #creature-detail .feed-row { display: flex; gap: 6px; }
+    #creature-detail .feed-row .btn { flex: 1; padding: 6px 4px; }
+    #creature-detail .panel-actions { display: flex; flex-direction: column; gap: 8px; }
+    #creature-detail .registry-note {
+      font-size: 13px; color: var(--accent-hi);
+      border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px;
+      background: var(--bg-deep);
+    }
+    #creature-detail .trait-label.prod { color: var(--accent-hi); }
 
     @media (max-width: 640px) {
       #creature-detail .type-badge { font-size: 12px; }
@@ -164,8 +189,8 @@ function injectStyles(): void {
       #creature-detail .production { font-size: 13px; }
       #creature-detail .trait-label { font-size: 11px; width: 50px; }
       #creature-detail .trait-val { font-size: 11px; }
-      #release-confirm-dialog .confirm-text { font-size: 13px; }
-      #release-confirm-dialog .confirm-nacre { font-size: 16px; }
+      #panel-confirm-dialog .confirm-text { font-size: 13px; }
+      #panel-confirm-dialog .confirm-highlight { font-size: 16px; }
     }
   `;
   document.head.appendChild(style);
@@ -175,9 +200,6 @@ function ensurePanel(): { overlay: HTMLDivElement; panel: HTMLDivElement } {
   if (overlayEl && panelEl) return { overlay: overlayEl, panel: panelEl };
 
   injectStyles();
-
-  panelAbort?.abort();
-  panelAbort = new AbortController();
 
   overlayEl = document.createElement('div');
   overlayEl.id = 'creature-overlay';
@@ -200,26 +222,34 @@ function cleanupPreview(): void {
 }
 
 export interface CreaturePanelOptions {
-  releaseUnlocked?: boolean;
+  state: GameState;
+  /** 'pool' shows feeding and pool actions; 'registry' is a read-only specimen view. */
+  mode?: 'pool' | 'registry';
+  onFeed?: (creature: Creature, count: number | 'max') => void;
   onRelease?: (creature: Creature) => void;
-  state?: GameState;
+  onRegister?: (creature: Creature) => void;
 }
 
-export async function showCreaturePanel(creature: Creature, opts: CreaturePanelOptions = {}): Promise<void> {
+let currentCreature: Creature | null = null;
+let pointerHeld = false;
+let currentOpts: CreaturePanelOptions | null = null;
+
+export async function showCreaturePanel(creature: Creature, opts: CreaturePanelOptions): Promise<void> {
   const { overlay, panel } = ensurePanel();
 
   // Clean previous preview
   cleanupPreview();
+  currentCreature = creature;
+  currentOpts = opts;
 
   const rareInfo = getRareInfo(creature.rare);
-  const production = calculateProduction(creature);
   const traits = getDisplayTraits(creature.type);
+  const prodGenes = new Set<string>(['size', PRODUCTION_GENE[creature.type]]);
 
-  // Build HTML
   let html = `
     <div class="panel-header">
       <span style="color:var(--name); font-family:var(--font-display); font-size:13px;">${creature.name}</span>
-      <button class="btn btn-ghost panel-close" id="panel-close-btn">\u2715</button>
+      <button class="btn btn-ghost panel-close" id="panel-close-btn">✕</button>
     </div>
     <div class="panel-body">
       <div class="preview-wrap" id="preview-container"></div>
@@ -237,7 +267,7 @@ export async function showCreaturePanel(creature: Creature, opts: CreaturePanelO
 
   html += `
       </div>
-      <div class="production">+${production.toFixed(2)} plankton/s</div>
+      <div id="panel-dynamic" style="display:flex; flex-direction:column; gap:12px;"></div>
       <div class="traits">
   `;
 
@@ -245,9 +275,10 @@ export async function showCreaturePanel(creature: Creature, opts: CreaturePanelO
     const val = creature.genes[trait as keyof typeof creature.genes] as number;
     const color = TRAIT_COLORS[trait] ?? '#3aada8';
     const pct = Math.round(val * 100);
+    const isProd = prodGenes.has(trait);
     html += `
-        <div class="trait-row">
-          <span class="trait-label">${trait.toUpperCase()}</span>
+        <div class="trait-row"${isProd ? ' title="Drives plankton production"' : ''}>
+          <span class="trait-label${isProd ? ' prod' : ''}">${isProd ? '★ ' : ''}${trait.toUpperCase()}</span>
           <div class="trait-bar-bg">
             <div class="trait-bar-fill" style="width:${pct}%; background:${color};"></div>
           </div>
@@ -258,45 +289,33 @@ export async function showCreaturePanel(creature: Creature, opts: CreaturePanelO
 
   html += `
       </div>
-  `;
-
-  // Release button (only if feature is unlocked)
-  if (opts.releaseUnlocked) {
-    const nacreYield = calculateNacreYield(creature, opts.state);
-    if (nacreYield > 0) {
-      html += `
-        <button class="btn btn-secondary" id="release-btn">
-          ⚬ Release for ${nacreYield} Nacre
-        </button>
-      `;
-    } else {
-      html += `
-        <button class="btn btn-secondary disabled">
-          ⚬ 0 Nacre earned
-        </button>
-      `;
-    }
-  }
-
-  html += `
+      <div class="panel-actions" id="panel-actions"></div>
     </div>
   `;
 
   panel.innerHTML = html;
 
-  const signal = panelAbort?.signal;
+  // Fresh controller per open: listeners on the persistent panel element must not pile up
+  panelAbort?.abort();
+  panelAbort = new AbortController();
+  const signal = panelAbort.signal;
 
-  // Close button
   document.getElementById('panel-close-btn')!.addEventListener('click', () => hideCreaturePanel(), { signal });
 
-  // Release button
-  const releaseBtn = document.getElementById('release-btn');
-  if (releaseBtn && opts.onRelease) {
-    const onRelease = opts.onRelease;
-    releaseBtn.addEventListener('click', () => {
-      showReleaseConfirm(creature, onRelease, opts.state);
-    }, { signal });
-  }
+  // Delegated clicks: dynamic sections are re-rendered every second
+  panel.addEventListener('click', (e) => {
+    const target = (e.target as HTMLElement).closest<HTMLElement>('[data-action]');
+    if (!target || target.classList.contains('disabled') || target.classList.contains('unaffordable')) return;
+    handleAction(target.dataset.action!, target.dataset.count);
+  }, { signal });
+
+  // While a press is in progress, periodic re-renders would swap the button under the
+  // cursor and the click would land on the parent instead
+  panel.addEventListener('pointerdown', () => { pointerHeld = true; }, { signal });
+  window.addEventListener('pointerup', () => { pointerHeld = false; }, { signal });
+  window.addEventListener('pointercancel', () => { pointerHeld = false; }, { signal });
+
+  renderDynamic();
 
   // Setup PixiJS preview with creature visual (sprite + shader filters)
   const container = document.getElementById('preview-container')!;
@@ -310,19 +329,137 @@ export async function showCreaturePanel(creature: Creature, opts: CreaturePanelO
   panelOpen = true;
 }
 
-function showReleaseConfirm(creature: Creature, onRelease: (creature: Creature) => void, state?: GameState): void {
-  const nacreYield = calculateNacreYield(creature, state);
+/** Refresh live numbers (costs, rates, affordability) while the panel is open. */
+export function updateCreaturePanel(): void {
+  if (!panelOpen || pointerHeld) return;
+  renderDynamic();
+}
 
+/** Replace markup only when it changed, so idle buttons keep their DOM identity. */
+function setHtml(el: HTMLElement, html: string): void {
+  if (el.dataset.html === html) return;
+  el.dataset.html = html;
+  el.innerHTML = html;
+}
+
+function handleAction(action: string, count: string | undefined): void {
+  const creature = currentCreature;
+  const opts = currentOpts;
+  if (!creature || !opts) return;
+
+  switch (action) {
+    case 'feed':
+      opts.onFeed?.(creature, count === 'max' ? 'max' : Number(count));
+      renderDynamic();
+      break;
+    case 'register':
+      showRegisterConfirm(creature, opts);
+      break;
+    case 'release':
+      showReleaseConfirm(creature, opts);
+      break;
+  }
+}
+
+function renderDynamic(): void {
+  const creature = currentCreature;
+  const opts = currentOpts;
+  const dyn = document.getElementById('panel-dynamic');
+  const actions = document.getElementById('panel-actions');
+  if (!creature || !opts || !dyn || !actions) return;
+
+  const state = opts.state;
+  const geneMul = calculateGeneticRate(creature) / TYPE_MULTIPLIERS[creature.type];
+
+  if (opts.mode === 'registry') {
+    setHtml(dyn, `
+      <div class="registry-note">📖 Registry specimen · ${formatPercent(specimenBonus(creature))} production</div>
+      <div class="stat-dim">Genes ${formatMultiplier(geneMul)} vs. an average ${CREATURE_NAMES[creature.type]}</div>
+    `);
+    setHtml(actions, '');
+    return;
+  }
+
+  const slotId = findCreatureSlot(state, creature.id);
+  const slot = slotId ? state.pool.slots[slotId] : null;
+  const rates = slot ? getCreatureRates(state, slot, creature) : null;
+  const milestone = nextMilestone(creature.level);
+
+  let rateLines = '';
+  if (rates) {
+    rateLines += `<div class="production">+${formatNumber(rates.plankton, 2)} 🟢/s</div>`;
+    if (rates.minerite > 0) rateLines += `<div class="stat-dim">+${formatNumber(rates.minerite, 2)} 🔵/s</div>`;
+    if (rates.lux > 0) rateLines += `<div class="stat-dim">+${formatNumber(rates.lux, 2)} ✨/s</div>`;
+  }
+
+  const feedBtn = (count: number | 'max', label: string): string => {
+    const q = quoteFeed(state, creature, count);
+    const affordable = q.cost <= state.resources.plankton;
+    const title = count === 'max' && affordable ? `${label} +${q.levels}` : label;
+    return `<button class="btn btn-secondary${affordable ? '' : ' unaffordable'}" data-action="feed" data-count="${count}">${title}<br><span class="btn-cost">${formatNumber(q.cost)} 🟢</span></button>`;
+  };
+
+  setHtml(dyn, `
+    <div class="level-row">
+      <span class="level-value">Lv ${creature.level}</span>
+      <span class="milestone">${milestone ? `×2 at Lv ${milestone}` : 'All milestones'}</span>
+    </div>
+    <div class="stat-lines">
+      ${rateLines}
+      <div class="stat-dim">Genes ${formatMultiplier(geneMul)} vs. an average ${CREATURE_NAMES[creature.type]}</div>
+    </div>
+    <div class="feed-row">
+      ${feedBtn(1, 'Feed')}
+      ${feedBtn(10, '×10')}
+      ${feedBtn('max', 'Max')}
+    </div>
+  `);
+
+  let actionsHtml = '';
+  if (isRegistryUnlocked(state) && opts.onRegister) {
+    const existing = getRegisteredSpecimen(state, creature);
+    const bonus = specimenBonus(creature);
+    const label = existing
+      ? `📖 Replace specimen · ${formatPercent(specimenBonus(existing))} → ${formatPercent(bonus)}`
+      : `📖 Register · ${formatPercent(bonus)} production`;
+    actionsHtml += `<button class="btn btn-secondary" data-action="register">${label}</button>`;
+  }
+  if (isReleaseUnlocked(state) && opts.onRelease) {
+    const nacreYield = calculateNacreYield(creature, state);
+    actionsHtml += nacreYield > 0
+      ? `<button class="btn btn-secondary" data-action="release">⚬ Release for ${formatNumber(nacreYield)} Nacre</button>`
+      : `<button class="btn btn-secondary disabled">⚬ Feed to Lv ${nextNacreLevel(creature, state)} to earn Nacre</button>`;
+  }
+  setHtml(actions, actionsHtml);
+}
+
+/** Lowest level at which releasing this creature yields at least 1 nacre. */
+function nextNacreLevel(creature: Creature, state: GameState): number {
+  let level = creature.level;
+  while (calculateNacreYield({ ...creature, level }, state) < 1) level++;
+  return level;
+}
+
+interface ConfirmOptions {
+  title: string;
+  text: string;
+  highlight: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+}
+
+function showConfirm(o: ConfirmOptions): void {
+  if (document.getElementById('panel-confirm-overlay')) return;
   const confirmOverlay = document.createElement('div');
-  confirmOverlay.id = 'release-confirm-overlay';
+  confirmOverlay.id = 'panel-confirm-overlay';
   confirmOverlay.innerHTML = `
-    <div id="release-confirm-dialog">
-      <div class="confirm-title">Release ${creature.name}?</div>
-      <div class="confirm-text">It will return to the ocean forever.</div>
-      <div class="confirm-nacre">⚬ ${nacreYield} Nacre</div>
+    <div id="panel-confirm-dialog">
+      <div class="confirm-title">${o.title}</div>
+      <div class="confirm-text">${o.text}</div>
+      <div class="confirm-highlight">${o.highlight}</div>
       <div class="confirm-actions">
         <button class="btn btn-secondary" id="confirm-cancel">Cancel</button>
-        <button class="btn btn-primary" id="confirm-release">Release ⚬${nacreYield}</button>
+        <button class="btn btn-primary" id="confirm-ok">${o.confirmLabel}</button>
       </div>
     </div>
   `;
@@ -338,16 +475,41 @@ function showReleaseConfirm(creature: Creature, onRelease: (creature: Creature) 
     confirmOverlay.remove();
   };
 
-  document.getElementById('confirm-cancel')!.addEventListener('click', dismissDialog, { signal: dialogSignal });
+  confirmOverlay.querySelector('#confirm-cancel')!.addEventListener('click', dismissDialog, { signal: dialogSignal });
   confirmOverlay.addEventListener('click', (e) => {
     if (e.target === confirmOverlay) dismissDialog();
   }, { signal: dialogSignal });
 
-  document.getElementById('confirm-release')!.addEventListener('click', () => {
+  confirmOverlay.querySelector('#confirm-ok')!.addEventListener('click', () => {
     dismissDialog();
     hideCreaturePanel();
-    onRelease(creature);
+    o.onConfirm();
   }, { signal: dialogSignal });
+}
+
+function showReleaseConfirm(creature: Creature, opts: CreaturePanelOptions): void {
+  const nacre = formatNumber(calculateNacreYield(creature, opts.state));
+  showConfirm({
+    title: `Release ${creature.name}?`,
+    text: 'It will return to the ocean forever.',
+    highlight: `⚬ ${nacre} Nacre`,
+    confirmLabel: `Release ⚬${nacre}`,
+    onConfirm: () => opts.onRelease?.(creature),
+  });
+}
+
+function showRegisterConfirm(creature: Creature, opts: CreaturePanelOptions): void {
+  const existing = getRegisteredSpecimen(opts.state, creature);
+  const replaceText = existing
+    ? ` The current specimen (${existing.name}, ${formatPercent(specimenBonus(existing))}) will be discarded.`
+    : '';
+  showConfirm({
+    title: `Register ${creature.name}?`,
+    text: `It leaves the pool and joins the registry permanently.${replaceText}`,
+    highlight: `📖 ${formatPercent(specimenBonus(creature))} production`,
+    confirmLabel: existing ? 'Replace' : 'Register',
+    onConfirm: () => opts.onRegister?.(creature),
+  });
 }
 
 export function hideCreaturePanel(): void {
@@ -356,6 +518,8 @@ export function hideCreaturePanel(): void {
   panelAbort?.abort();
   panelAbort = null;
   cleanupPreview();
+  currentCreature = null;
+  currentOpts = null;
 
   if (overlayEl) overlayEl.classList.remove('open');
   if (panelEl) panelEl.classList.remove('open');

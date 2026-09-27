@@ -3,8 +3,9 @@ import type { Creature } from '../creatures/creature';
 import { calculateProduction } from '../creatures/production';
 import { calculateTraitDeviation } from '../creatures/creature';
 import { unlockedSlots, getSlotDepth } from '../systems/coords';
-import { getUpgradeLevel, getUpgradeEffect } from '../systems/upgrades';
-import { MINERITE_BASE_RATE, LUX_BASE_RATE } from '../core/balance';
+import { getUpgradeLevel, upgradeEffect } from '../systems/upgrades';
+import { getRegistryMultiplier } from '../systems/registry';
+import { MINERITE_BASE_RATE, LUX_BASE_RATE, COLLECTIBLE_PLANKTON_RATE_SECONDS } from '../core/balance';
 
 /** Cached creature-id lookup map — invalidated when creatures array is mutated */
 let cachedMap: Map<string, Creature> | null = null;
@@ -27,34 +28,45 @@ export interface ProductionRates {
 }
 
 interface ProductionFlags {
-  fertileMul: number;
+  /** Global multiplier on plankton (upgrades × registry). */
+  planktonMul: number;
+  /** Global multiplier on minerite and lux (registry). */
+  secondaryMul: number;
   deepDrilling: boolean;
   biolum: boolean;
 }
 
+/** Product of every global plankton multiplier: upgrades and registry. */
+export function getPlanktonMultiplier(state: GameState): number {
+  return (
+    upgradeEffect(state, 'fertile_waters') *
+    upgradeEffect(state, 'pearl_bloom') *
+    upgradeEffect(state, 'mineral_feed') *
+    getRegistryMultiplier(state)
+  );
+}
+
 function getProductionFlags(state: GameState): ProductionFlags {
   return {
-    fertileMul: getUpgradeEffect('fertile_waters', getUpgradeLevel(state, 'fertile_waters')),
+    planktonMul: getPlanktonMultiplier(state),
+    secondaryMul: getRegistryMultiplier(state),
     deepDrilling: getUpgradeLevel(state, 'deep_drilling') > 0,
     biolum: getUpgradeLevel(state, 'bioluminescence') > 0,
   };
 }
 
-/**
- * Per-slot yield before the fertile-waters plankton multiplier.
- * Plankton is returned raw so callers can apply fertileMul once at the end
- * (either to the live sum or to per-creature lifetime tracking).
- */
+/** Per-slot yield with global multipliers applied. */
 function computeSlotYield(slot: SeabedSlot, creature: Creature, flags: ProductionFlags): ProductionRates {
-  const plankton = calculateProduction(creature);
+  const plankton = calculateProduction(creature) * flags.planktonMul;
+  const levelScale = Math.sqrt(creature.level) * flags.secondaryMul;
   let minerite = 0;
   let lux = 0;
   const depth = getSlotDepth(slot);
   if (flags.deepDrilling && depth === 'deep') {
-    minerite = MINERITE_BASE_RATE * calculateTraitDeviation(creature);
+    minerite = MINERITE_BASE_RATE * calculateTraitDeviation(creature) * levelScale;
   }
   if (flags.biolum && depth === 'shallow') {
-    lux = LUX_BASE_RATE * Math.max(0, creature.genes.glow - 0.5) * 2;
+    lux = LUX_BASE_RATE * Math.max(0, creature.genes.glow - 0.5) * 2 * levelScale;
   }
   return { plankton, minerite, lux };
 }
@@ -85,7 +97,18 @@ export function getProductionRates(state: GameState): ProductionRates {
     minerite += y.minerite;
     lux += y.lux;
   });
-  return { plankton: plankton * flags.fertileMul, minerite, lux };
+  return { plankton, minerite, lux };
+}
+
+/** Rates a single creature would produce in a given slot, with global multipliers. */
+export function getCreatureRates(state: GameState, slot: SeabedSlot, creature: Creature): ProductionRates {
+  return computeSlotYield(slot, creature, getProductionFlags(state));
+}
+
+/** Value of a plankton clump with `baseAmount`: base plus a slice of passive income, times Plankton Surge. */
+export function planktonClumpValue(state: GameState, baseAmount: number): number {
+  const passive = getProductionRates(state).plankton;
+  return (baseAmount + passive * COLLECTIBLE_PLANKTON_RATE_SECONDS) * upgradeEffect(state, 'plankton_surge');
 }
 
 /** Advance resource production for one tick */
@@ -99,9 +122,8 @@ export function tickProduction(state: GameState, deltaSec: number): void {
     totalPlankton += y.plankton;
     totalMinerite += y.minerite;
     totalLux += y.lux;
-    creature.lifetimePlankton += y.plankton * deltaSec * flags.fertileMul;
   });
-  state.resources.plankton += totalPlankton * deltaSec * flags.fertileMul;
+  state.resources.plankton += totalPlankton * deltaSec;
   state.resources.minerite += totalMinerite * deltaSec;
   state.resources.lux += totalLux * deltaSec;
 }

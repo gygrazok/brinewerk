@@ -1,9 +1,8 @@
 import type { Creature } from '../creatures/creature';
 import { SEABED_SLOTS } from '../systems/seabed-layout';
-import { DEFAULT_RARE_CHANCE, DEFAULT_UNLOCKED_RARE_IDS } from './balance';
 
 const SAVE_KEY = 'brinewerk_save';
-const CURRENT_SAVE_VERSION = 13;
+const CURRENT_SAVE_VERSION = 14;
 
 // --- Seabed pool (v3+) ---
 
@@ -37,16 +36,18 @@ export interface GameState {
   lastSaveTimestamp: number;
   lastTideTimestamp: number;
   totalPlaytime: number; // seconds
-  /** Current chance of spawning any rare creature (upgradeable, default 1%) */
-  rareChance: number;
-  /** Set of rare effect IDs currently in the spawn pool */
-  unlockedRares: string[];
   /** Whether the player already took a creature this tide (limits to 1 per tide) */
   shoreTaken: boolean;
+  /** Paid shore refreshes since the last natural tide (drives refresh cost escalation) */
+  shoreRefreshes: number;
   /** Upgrade levels: upgradeId → current level (0 = not purchased) */
   upgrades: Record<string, number>;
   /** Completed achievements: achievementId → true */
   achievements: Record<string, boolean>;
+  /** Zoological registry: one specimen per `type:rare` key (see systems/registry.ts) */
+  registry: Record<string, Creature>;
+  /** Registry keys the player has seen at least once (shore or pool) */
+  sightings: Record<string, boolean>;
 }
 
 export function createDefaultState(): GameState {
@@ -65,11 +66,12 @@ export function createDefaultState(): GameState {
     lastSaveTimestamp: Date.now(),
     lastTideTimestamp: Date.now(),
     totalPlaytime: 0,
-    rareChance: DEFAULT_RARE_CHANCE,
-    unlockedRares: [...DEFAULT_UNLOCKED_RARE_IDS],
     shoreTaken: false,
+    shoreRefreshes: 0,
     upgrades: {},
     achievements: {},
+    registry: {},
+    sightings: {},
   };
 }
 
@@ -196,11 +198,8 @@ function migrateState(data: Record<string, unknown>): GameState {
     data.saveVersion = 5;
   }
 
-  // V5 → V6: add rareChance and unlockedRares for tiered rare system
+  // V5 → V6: rareChance/unlockedRares fields (dropped again in v14, now derived from upgrades)
   if ((data.saveVersion as number) < 6) {
-    const d = data as Record<string, unknown>;
-    if (d.rareChance === undefined) d.rareChance = DEFAULT_RARE_CHANCE;
-    if (d.unlockedRares === undefined) d.unlockedRares = [...DEFAULT_UNLOCKED_RARE_IDS];
     data.saveVersion = 6;
   }
 
@@ -289,6 +288,34 @@ function migrateState(data: Record<string, unknown>): GameState {
     backfill(creatures);
     backfill(shore);
     data.saveVersion = 13;
+  }
+
+  // V13 → V14: incremental core. Creatures gain a feeding level (lifetimePlankton
+  // dropped: nacre now derives from level); rare chance and unlocked rare tiers
+  // are derived from upgrades; add registry, sightings and refresh escalation.
+  if ((data.saveVersion as number) < 14) {
+    const d = data as Record<string, unknown>;
+    const toLevelled = (cs: Record<string, unknown>[]): void => {
+      for (const c of cs) {
+        if (c.level === undefined) c.level = 1;
+        delete c.lifetimePlankton;
+      }
+    };
+    toLevelled((d.creatures as Record<string, unknown>[]) ?? []);
+    toLevelled((d.shore as Record<string, unknown>[]) ?? []);
+    delete d.rareChance;
+    delete d.unlockedRares;
+    if (d.shoreRefreshes === undefined) d.shoreRefreshes = 0;
+    if (d.registry === undefined) d.registry = {};
+    if (d.sightings === undefined) {
+      // Seed sightings with owned + shore creatures (key format: systems/registry.ts registryKey)
+      const sightings: Record<string, boolean> = {};
+      for (const c of [...((d.creatures as Record<string, unknown>[]) ?? []), ...((d.shore as Record<string, unknown>[]) ?? [])]) {
+        sightings[`${c.type}:${c.rare ?? 'common'}`] = true;
+      }
+      d.sightings = sightings;
+    }
+    data.saveVersion = 14;
   }
 
   // Validate critical fields exist after migration

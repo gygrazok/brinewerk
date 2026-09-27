@@ -20,6 +20,7 @@ import {
 } from '../rendering/seabed-bg';
 import { cleanupEffectState } from '../rendering/effects/index';
 import { getRenderSettings } from '../rendering/render-settings';
+import { formatNumber } from '../util/format';
 const SLOT_SIZE = 80;
 const CREATURE_DISPLAY = 64;
 const SLOT_BG = 0x0d2228;
@@ -67,6 +68,9 @@ export interface PoolView {
   _seabedBg: SeabedBackground | null;
   _slotGlowLayer: Container;
   _slotGlowGraphics: Map<string, Graphics>;
+  /** "Lv N" labels under occupied slots, keyed by slot id */
+  _levelLayer: Container;
+  _levelTexts: Map<string, Text>;
   _app: Application;
   _worldW: number;
   _worldH: number;
@@ -134,6 +138,9 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
   gridContainer.addChild(slotLayer);
   gridContainer.addChild(collectibleLayer);
   gridContainer.addChild(creatureLayer);
+  const levelLayer = new Container();
+  levelLayer.eventMode = 'none';
+  gridContainer.addChild(levelLayer);
   viewport.addChild(gridContainer);
   app.stage.addChild(viewport);
 
@@ -157,6 +164,8 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
     _seabedBg: seabedBg,
     _slotGlowLayer: slotGlowLayer,
     _slotGlowGraphics: new Map(),
+    _levelLayer: levelLayer,
+    _levelTexts: new Map(),
     _app: app,
     _worldW: pool.worldWidth,
     _worldH: pool.worldHeight,
@@ -429,6 +438,9 @@ export function destroyPoolView(poolView: PoolView): void {
   for (const gfx of poolView._slotGlowGraphics.values()) gfx.destroy();
   poolView._slotGlowGraphics.clear();
 
+  for (const text of poolView._levelTexts.values()) text.destroy();
+  poolView._levelTexts.clear();
+
   // Destroy seabed background (textures + containers)
   if (poolView._seabedBg) {
     destroySeabedBackground(poolView._seabedBg);
@@ -625,6 +637,39 @@ export function syncPoolVisuals(poolView: PoolView, state: GameState): void {
       poolView.visuals.delete(id);
     }
   }
+
+  syncLevelLabels(poolView, state);
+}
+
+/** Keep one "Lv N" label under each occupied slot. */
+function syncLevelLabels(poolView: PoolView, state: GameState): void {
+  const occupied = new Set<string>();
+  for (const slot of allSlots(state.pool)) {
+    if (!slot.unlocked || !slot.creatureId) continue;
+    const creature = getCreatureAt(state, slot.id);
+    if (!creature) continue;
+    occupied.add(slot.id);
+
+    let text = poolView._levelTexts.get(slot.id);
+    if (!text) {
+      text = new Text({ text: '', style: LEVEL_STYLE });
+      text.resolution = ZOOM_MAX;
+      text.anchor.set(0.5, 0);
+      text.x = slot.x;
+      text.y = slot.y + SLOT_SIZE / 2 - 12;
+      poolView._levelLayer.addChild(text);
+      poolView._levelTexts.set(slot.id, text);
+    }
+    const label = `Lv ${creature.level}`;
+    if (text.text !== label) text.text = label;
+  }
+
+  for (const [id, text] of poolView._levelTexts) {
+    if (!occupied.has(id)) {
+      text.destroy();
+      poolView._levelTexts.delete(id);
+    }
+  }
 }
 
 /** Sync glow graphics behind occupied slots */
@@ -707,6 +752,14 @@ export function updatePoolVisuals(poolView: PoolView, deltaSec: number, totalTim
 
 // --- Drawing helpers ---
 
+const LEVEL_STYLE = new TextStyle({
+  fontFamily: '"Press Start 2P", monospace',
+  fontSize: 7,
+  fill: '#7eeee4',
+  align: 'center',
+  stroke: { color: '#060e12', width: 3 },
+});
+
 /** Shared text styles for cost labels on locked slots */
 const COST_STYLE_AFFORDABLE = new TextStyle({
   fontFamily: '"Press Start 2P", monospace',
@@ -729,7 +782,7 @@ function canAffordSlot(res: ResourceBundle, tier: number): boolean {
 
 /** Format slot cost as a display string */
 function formatSlotCost(cost: ResourceBundle): string {
-  if (cost.nacre > 0) return `${cost.nacre} \u26AC`;
+  if (cost.nacre > 0) return `${formatNumber(cost.nacre)}\u26AC`;
   return '';
 }
 

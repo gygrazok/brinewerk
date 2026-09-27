@@ -1,24 +1,18 @@
 import type { GameState } from '../core/game-state';
 import type { Creature } from '../creatures/creature';
-import { getRareInfo } from '../creatures/creature';
-import { NACRE_CONVERSION_RATE, NACRE_RARE_COMMON_MUL, NACRE_RARE_UNCOMMON_MUL, NACRE_RARE_RARE_MUL } from '../core/balance';
+import { calculateTraitDeviation, getRareInfo } from '../creatures/creature';
+import {
+  NACRE_LEVEL_DIVISOR, NACRE_DEVIATION_SCALE, NACRE_RARE_TIER_MULTIPLIERS,
+} from '../core/balance';
 import { findCreatureSlot, removeCreature } from './pool';
-import { getUpgradeLevel, getUpgradeEffect } from './upgrades';
+import { upgradeEffect } from './upgrades';
 
-/** Calculate nacre yield for releasing a creature */
-export function calculateNacreYield(creature: Creature, state?: GameState): number {
-  const baseNacre = creature.lifetimePlankton / NACRE_CONVERSION_RATE;
-
-  let rareMul = 1;
-  if (creature.rare) {
-    const info = getRareInfo(creature.rare);
-    if (info.tier === 1) rareMul = NACRE_RARE_COMMON_MUL;
-    else if (info.tier === 2) rareMul = NACRE_RARE_UNCOMMON_MUL;
-    else rareMul = NACRE_RARE_RARE_MUL; // tier 3
-  }
-
-  const nacreMul = state ? getUpgradeEffect('nacre_refinement', getUpgradeLevel(state, 'nacre_refinement')) : 1;
-  return Math.floor(baseNacre * rareMul * nacreMul);
+/** Nacre yield for releasing a creature: quadratic in level, scaled by trait quality and rarity. */
+export function calculateNacreYield(creature: Creature, state: GameState): number {
+  const levelPart = Math.pow(creature.level / NACRE_LEVEL_DIVISOR, 2);
+  const qualityMul = 1 + NACRE_DEVIATION_SCALE * calculateTraitDeviation(creature);
+  const rareMul = creature.rare ? NACRE_RARE_TIER_MULTIPLIERS[getRareInfo(creature.rare).tier] : 1;
+  return Math.floor(levelPart * qualityMul * rareMul * upgradeEffect(state, 'nacre_refinement'));
 }
 
 /** Release a creature from the pool. Returns nacre gained, or 0 if release failed. */
@@ -31,9 +25,7 @@ export function releaseCreature(state: GameState, creatureId: string): number {
 
   const nacre = calculateNacreYield(creature, state);
 
-  // Remove from slot
   removeCreature(state, slotId);
-  // Remove from creatures array
   state.creatures = state.creatures.filter(c => c.id !== creatureId);
 
   state.resources.nacre += nacre;

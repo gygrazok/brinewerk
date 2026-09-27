@@ -25,7 +25,7 @@ export interface AchievementDefinition {
 // Definitions
 // ---------------------------------------------------------------------------
 
-/** Achievement whose completion unlocks creature release + nacre visibility. */
+/** Achievement whose completion unlocks creature release, nacre and the zoological registry. */
 export const RELEASE_UNLOCK_ACHIEVEMENT_ID = 'tide_pool_keeper';
 
 export const ACHIEVEMENTS: AchievementDefinition[] = [
@@ -38,7 +38,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
       const placed = unlockedSlots(state.pool).filter(s => s.creatureId !== null).length;
       return placed >= 4;
     },
-    reward: { type: 'feature-unlock', label: 'Unlocks Nacre & Creature Release' },
+    reward: { type: 'feature-unlock', label: 'Unlocks Nacre, Creature Release & Registry' },
   },
 ];
 
@@ -75,4 +75,9 @@ export function getTotalCount(): number {
 /** True when the tide_pool_keeper achievement is complete — gates release/nacre. */
 export function isReleaseUnlocked(state: GameState): boolean {
   return state.achievements[RELEASE_UNLOCK_ACHIEVEMENT_ID] === true;
+}
+
+/** The registry opens together with release: both turn a pool creature into long-term progress. */
+export function isRegistryUnlocked(state: GameState): boolean {
+  return isReleaseUnlocked(state);
 }

@@ -50,11 +50,11 @@ export function initDebugMenu(
       <summary>DEBUG</summary>
       <div class="debug-section">Resources</div>
       <div class="debug-row">
-        <button data-action="add-plankton">+1k Plankton 🟢</button>
-        <button data-action="add-minerite">+100 Minerite 🔵</button>
+        <button data-action="add-plankton">+1M Plankton 🟢</button>
+        <button data-action="add-minerite">+1k Minerite 🔵</button>
       </div>
       <div class="debug-row">
-        <button data-action="add-lux">+50 Lux ✨</button>
+        <button data-action="add-lux">+500 Lux ✨</button>
         <button data-action="add-coral">+50 Coral 🪸</button>
       </div>
       <div class="debug-row">
@@ -114,13 +114,13 @@ export function initDebugMenu(
 
     switch (action) {
       case 'add-plankton':
-        state.resources.plankton += 1000;
+        state.resources.plankton += 1e6;
         break;
       case 'add-minerite':
-        state.resources.minerite += 100;
+        state.resources.minerite += 1000;
         break;
       case 'add-lux':
-        state.resources.lux += 50;
+        state.resources.lux += 500;
         break;
       case 'add-coral':
         state.resources.coral += 50;
