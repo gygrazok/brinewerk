@@ -374,7 +374,7 @@ function renderStats(state: GameState, creature: Creature | null): void {
   const traits = getDisplayTraits(creature.type);
   const geneMul = calculateGeneticRate(creature) / TYPE_MULTIPLIERS[creature.type];
   let summary = `Genes ${formatMultiplier(geneMul)}`;
-  if (isRegistryUnlocked(state)) summary += ` · Registry ${formatPercent(specimenBonus(creature))}`;
+  if (isRegistryUnlocked(state)) summary += ` · Collection ${formatPercent(specimenBonus(creature))}`;
   let html = `<div class="shore-stats-inner"><div class="shore-stats-summary">${summary}</div>`;
   for (const trait of traits) {
     const val = creature.genes[trait as keyof typeof creature.genes] as number;
@@ -433,7 +433,7 @@ function updateRegisterButton(state: GameState): void {
   btn.style.display = '';
   btn.textContent = existing
     ? `📖 Replace specimen · ${formatPercent(specimenBonus(existing))} → ${formatPercent(specimenBonus(creature))}`
-    : `📖 Send to registry · ${formatPercent(specimenBonus(creature))}`;
+    : `📖 Add to collection · ${formatPercent(specimenBonus(creature))}`;
 }
 
 // ---------------------------------------------------------------------------

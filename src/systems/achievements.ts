@@ -38,7 +38,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
       const placed = unlockedSlots(state.pool).filter(s => s.creatureId !== null).length;
       return placed >= 4;
     },
-    reward: { type: 'feature-unlock', label: 'Unlocks Nacre, Creature Release & Registry' },
+    reward: { type: 'feature-unlock', label: 'Unlocks Nacre, Creature Release & Collection' },
   },
 ];
 

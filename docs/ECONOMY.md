@@ -43,7 +43,8 @@ optimal release point. Nacre buys slots (`2 × 3^(tier−1)`) and nacre upgrades
 
 ## Zoological registry
 
-`systems/registry.ts`, UI in `ui/registry-modal.ts`.
+`systems/registry.ts`, UI in `ui/registry-modal.ts`. Player-facing name: **Collection**
+(code identifiers keep `registry`).
 
 - One slot per `type:rare` key (`common` for no effect): 125 slots. `REGISTRY_SLOTS`
   is built from `raresForType`, so type-restricted effects are respected automatically.

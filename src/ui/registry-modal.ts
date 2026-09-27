@@ -67,7 +67,7 @@ function thumbnailFor(creature: Creature): HTMLCanvasElement {
 function cellTitle(def: RegistrySlotDef, specimen: Creature | undefined, sighted: boolean, tierUnlocked: boolean): string {
   const effect = def.rare ? getRareInfo(def.rare).label : 'Common';
   if (specimen) return `${specimen.name} · ${effect} · ${formatPercent(specimenBonus(specimen))} production`;
-  if (sighted) return `${effect}: sighted, not registered`;
+  if (sighted) return `${effect}: sighted, not collected`;
   if (!tierUnlocked) return `Unknown · requires ${TIER_UNLOCK_HINT[def.tier]}`;
   return 'Unknown';
 }
@@ -112,7 +112,7 @@ function renderContent(modal: HTMLElement, state: GameState, signal: AbortSignal
 
   modal.innerHTML = `
     <div class="reg-header">
-      <span class="reg-title">📖 Registry</span>
+      <span class="reg-title">📖 Collection</span>
       <span class="reg-summary">${getRegisteredCount(state)}/${total} · ${formatMultiplier(getRegistryMultiplier(state))} production</span>
       <button class="btn btn-ghost" id="registry-close-btn">✕</button>
     </div>

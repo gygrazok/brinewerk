@@ -373,7 +373,7 @@ function renderDynamic(): void {
 
   if (opts.mode === 'registry') {
     setHtml(dyn, `
-      <div class="registry-note">📖 Registry specimen · ${formatPercent(specimenBonus(creature))} production</div>
+      <div class="registry-note">📖 Collection specimen · ${formatPercent(specimenBonus(creature))} production</div>
       <div class="stat-dim">Genes ${formatMultiplier(geneMul)} vs. an average ${CREATURE_NAMES[creature.type]}</div>
     `);
     setHtml(actions, '');
@@ -421,7 +421,7 @@ function renderDynamic(): void {
     const bonus = specimenBonus(creature);
     const label = existing
       ? `📖 Replace specimen · ${formatPercent(specimenBonus(existing))} → ${formatPercent(bonus)}`
-      : `📖 Register · ${formatPercent(bonus)} production`;
+      : `📖 Add to collection · ${formatPercent(bonus)} production`;
     actionsHtml += `<button class="btn btn-secondary" data-action="register">${label}</button>`;
   }
   if (isReleaseUnlocked(state) && opts.onRelease) {
@@ -504,10 +504,10 @@ function showRegisterConfirm(creature: Creature, opts: CreaturePanelOptions): vo
     ? ` The current specimen (${existing.name}, ${formatPercent(specimenBonus(existing))}) will be discarded.`
     : '';
   showConfirm({
-    title: `Register ${creature.name}?`,
-    text: `It leaves the pool and joins the registry permanently.${replaceText}`,
+    title: `Add ${creature.name} to the collection?`,
+    text: `It leaves the pool and joins the collection permanently.${replaceText}`,
     highlight: `📖 ${formatPercent(specimenBonus(creature))} production`,
-    confirmLabel: existing ? 'Replace' : 'Register',
+    confirmLabel: existing ? 'Replace' : 'Add',
     onConfirm: () => opts.onRegister?.(creature),
   });
 }
