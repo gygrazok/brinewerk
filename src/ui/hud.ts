@@ -61,10 +61,14 @@ function mount(bar: HTMLElement): Map<ResourceDef['key'], ResourceRow> {
     item.className = 'resource-item';
     item.title = r.tooltip;
 
+    // Amount + icon on one line, rate below
+    const top = document.createElement('div');
+    top.className = 'res-top';
     const value = document.createElement('span');
     value.className = 'res-value';
-    item.appendChild(value);
-    item.appendChild(iconEl(RESOURCE_ICON[r.key]));
+    top.appendChild(value);
+    top.appendChild(iconEl(RESOURCE_ICON[r.key]));
+    item.appendChild(top);
 
     let rate: HTMLSpanElement | null = null;
     if (r.showRate) {

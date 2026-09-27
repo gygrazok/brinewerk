@@ -30,7 +30,7 @@ export function injectTheme(): void {
       --font: var(--font-display); /* backwards compat */
 
       /* Zone heights */
-      --top-bar-h: 44px;
+      --top-bar-h: 54px;
       --bottom-bar-h: 48px;
     }
 
@@ -129,7 +129,9 @@ export function injectTheme(): void {
       display: inline-block;
     }
     .px-icon.lg { width: 27px; height: 27px; vertical-align: middle; }
-    .resource-item .px-icon { margin-left: 4px; }
+    .res-top { display: flex; align-items: center; gap: 4px; }
+    .res-top .px-icon, .material-item .px-icon { vertical-align: middle; }
+    .material-item { gap: 4px; }
     .material-group { display: flex; gap: 10px; }
     .material-item { display: flex; align-items: center; }
     .material-item .res-value { font-size: 13px; }
@@ -231,7 +233,7 @@ export function injectTheme(): void {
 
     @media (max-width: 640px) {
       :root {
-        --top-bar-h: 40px;
+        --top-bar-h: 48px;
         --bottom-bar-h: 44px;
       }
       .resource-item .res-value { font-size: 14px; }
