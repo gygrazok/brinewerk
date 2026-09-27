@@ -413,7 +413,9 @@ function renderDynamic(): void {
   const feedBtn = (count: number | 'max', label: string): string => {
     const q = quoteFeed(state, creature, count);
     const affordable = q.levels > 0 && q.cost <= state.resources.plankton;
-    const title = count === 'max' && affordable ? `${label} +${q.levels}` : label;
+    // Show the real level gain when it differs from the button's nominal count (max, or clamped by the cap)
+    const clamped = typeof count === 'number' && q.levels > 0 && q.levels < count;
+    const title = (count === 'max' && affordable) || clamped ? `${count === 'max' ? label : 'Feed'} +${q.levels}` : label;
     return `<button class="btn btn-secondary${affordable ? '' : ' unaffordable'}" data-action="feed" data-count="${count}">${title}<br><span class="btn-cost">${formatNumber(q.cost)} ${res('plankton')}</span></button>`;
   };
 

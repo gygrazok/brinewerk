@@ -10,9 +10,14 @@ export function formatNumber(n: number, decimals = 0): string {
   if (abs < 1000) {
     return abs < 10 && decimals > 0 ? n.toFixed(decimals) : Math.floor(n).toString();
   }
-  const tier = Math.floor(Math.log10(abs) / 3);
+  let tier = Math.floor(Math.log10(abs) / 3);
+  let scaled = n / Math.pow(1000, tier);
+  // 999.99K rounds to "1000K": promote to the next suffix instead
+  if (Math.abs(scaled) >= 999.5) {
+    tier++;
+    scaled /= 1000;
+  }
   if (tier >= SUFFIXES.length) return n.toExponential(2).replace('+', '');
-  const scaled = n / Math.pow(1000, tier);
   const digits = Math.abs(scaled) < 10 ? 2 : Math.abs(scaled) < 100 ? 1 : 0;
   return scaled.toFixed(digits) + SUFFIXES[tier];
 }

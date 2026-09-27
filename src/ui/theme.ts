@@ -136,6 +136,13 @@ export function injectTheme(): void {
     .material-item { display: flex; align-items: center; }
     .material-item .res-value { font-size: 13px; }
 
+    /* ── Scrollbars (modals, panels) ─────────── */
+    * { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
     /* ── Shared button styles ────────────────── */
 
     .btn {
