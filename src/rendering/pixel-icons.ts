@@ -23,6 +23,11 @@ export function typeIcon(type: CreatureType): IconId {
   return `type-${type}` as IconId;
 }
 
+/** Species material icon (dropped on release, spent on growth stages). */
+export function materialIcon(type: CreatureType): IconId {
+  return `mat-${type}` as IconId;
+}
+
 const canvasCache = new Map<IconId, HTMLCanvasElement>();
 const urlCache = new Map<IconId, string>();
 const textureCache = new Map<IconId, Texture>();

@@ -130,6 +130,9 @@ export function injectTheme(): void {
     }
     .px-icon.lg { width: 27px; height: 27px; vertical-align: middle; }
     .resource-item .px-icon { margin-left: 4px; }
+    .material-group { display: flex; gap: 10px; }
+    .material-item { display: flex; align-items: center; }
+    .material-item .res-value { font-size: 13px; }
 
     /* ── Shared button styles ────────────────── */
 

@@ -2,6 +2,7 @@ import type { GameState } from '../core/game-state';
 import type { Creature } from '../creatures/creature';
 import { FEED_BASE_COST, FEED_COST_GROWTH } from '../core/balance';
 import { upgradeEffect } from './upgrades';
+import { levelCap } from './growth';
 
 export interface FeedQuote {
   /** Levels that will be gained. */
@@ -16,14 +17,17 @@ export function feedCostAt(state: GameState, level: number): number {
 }
 
 /**
- * Cost of buying `count` levels starting from the creature's current level.
- * With `count = 'max'`, buys as many levels as the player can afford (at least a quote for 1).
+ * Cost of buying `count` levels starting from the creature's current level, clamped to the
+ * stage's level cap. With `count = 'max'`, buys as many levels as the player can afford
+ * (at least a quote for 1). A creature at its cap gets a zero-level quote.
  */
 export function quoteFeed(state: GameState, creature: Creature, count: number | 'max'): FeedQuote {
   const budget = state.resources.plankton;
+  const room = levelCap(creature) - creature.level;
+  if (room <= 0) return { levels: 0, cost: 0 };
   let levels = 0;
   let cost = 0;
-  const limit = count === 'max' ? Infinity : count;
+  const limit = Math.min(count === 'max' ? Infinity : count, room);
   while (levels < limit) {
     const next = feedCostAt(state, creature.level + levels);
     if (count === 'max' && cost + next > budget) break;
@@ -37,7 +41,7 @@ export function quoteFeed(state: GameState, creature: Creature, count: number | 
 /** Feed a creature. Returns true when levels were bought. */
 export function feedCreature(state: GameState, creature: Creature, count: number | 'max'): boolean {
   const quote = quoteFeed(state, creature, count);
-  if (quote.cost > state.resources.plankton) return false;
+  if (quote.levels === 0 || quote.cost > state.resources.plankton) return false;
   state.resources.plankton -= quote.cost;
   creature.level += quote.levels;
   return true;

@@ -136,6 +136,18 @@ export const UPGRADES: UpgradeDefinition[] = [
     visible: nacreVisible,
   },
   {
+    id: 'tidal_salvage',
+    name: 'Tidal Salvage',
+    description: '+25% species material from release per level',
+    effectLabel: formatMultiplier,
+    icon: 'up-tidal_salvage',
+    maxLevel: 5,
+    costFn: geometric(6, 2.5),
+    effectFn: (lv) => 1 + lv * 0.25,
+    costResource: 'nacre',
+    visible: nacreVisible,
+  },
+  {
     id: 'rare_lure',
     name: 'Rare Lure',
     description: '+1% rare creature chance per level',

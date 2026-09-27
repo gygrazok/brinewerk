@@ -1,8 +1,9 @@
 import type { Creature } from '../creatures/creature';
+import { CreatureType } from '../creatures/types';
 import { SEABED_SLOTS } from '../systems/seabed-layout';
 
 const SAVE_KEY = 'brinewerk_save';
-const CURRENT_SAVE_VERSION = 14;
+const CURRENT_SAVE_VERSION = 15;
 
 // --- Seabed pool (v3+) ---
 
@@ -26,12 +27,23 @@ export interface SeabedPool {
 
 export type ResourceBundle = { plankton: number; minerite: number; lux: number; nacre: number; coral: number };
 
+/** Species materials, one counter per creature type. */
+export type MaterialBundle = Record<CreatureType, number>;
+
+export function emptyMaterials(): MaterialBundle {
+  const m = {} as MaterialBundle;
+  for (const t of Object.values(CreatureType)) m[t] = 0;
+  return m;
+}
+
 export interface GameState {
   saveVersion: number;
   seabedSeed: number;
   creatures: Creature[];
   pool: SeabedPool;
   resources: ResourceBundle;
+  /** Species materials from release, spent on growth stages */
+  materials: MaterialBundle;
   shore: Creature[];
   lastSaveTimestamp: number;
   lastTideTimestamp: number;
@@ -62,6 +74,7 @@ export function createDefaultState(): GameState {
     creatures: [],
     pool,
     resources: { plankton: 0, minerite: 0, lux: 0, nacre: 0, coral: 0 },
+    materials: emptyMaterials(),
     shore: [],
     lastSaveTimestamp: Date.now(),
     lastTideTimestamp: Date.now(),
@@ -316,6 +329,29 @@ function migrateState(data: Record<string, unknown>): GameState {
       d.sightings = sightings;
     }
     data.saveVersion = 14;
+  }
+
+  // V14 → V15: growth stages. Each creature gets the stage whose cap first reaches its
+  // level (caps = 10, 25, 50, 75, 100, 150, ... as in balance LEVEL_MILESTONES), and the
+  // save gains a species-material inventory.
+  if ((data.saveVersion as number) < 15) {
+    const d = data as Record<string, unknown>;
+    const caps = [10, 25, 50, 75, 100, 150, 200, 250, 300, 400, 500];
+    const stageFor = (level: number): number => {
+      let s = 0;
+      while ((caps[s] ?? 500 + (s - caps.length + 1) * 100) < level) s++;
+      return s;
+    };
+    const registry = (d.registry as Record<string, Record<string, unknown>>) ?? {};
+    for (const c of [
+      ...((d.creatures as Record<string, unknown>[]) ?? []),
+      ...((d.shore as Record<string, unknown>[]) ?? []),
+      ...Object.values(registry),
+    ]) {
+      if (c.stage === undefined) c.stage = stageFor((c.level as number) ?? 1);
+    }
+    if (d.materials === undefined) d.materials = emptyMaterials();
+    data.saveVersion = 15;
   }
 
   // Validate critical fields exist after migration

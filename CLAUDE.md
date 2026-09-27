@@ -89,7 +89,7 @@ Key non-source files:
 Deep-dive per-area docs live in `docs/`. Start here when touching a system:
 
 - [Achievements](docs/ACHIEVEMENTS.md) — data-driven registry, 1 Hz polling, feature-unlock selector pattern
-- [Economy & Registry](docs/ECONOMY.md): production formula, feeding, nacre, rarity, zoological registry
+- [Economy & Registry](docs/ECONOMY.md): production formula, feeding, growth stages, nacre, rarity, zoological registry
 
 Keep this list a line per area — put the actual content inside the area doc, not here.
 
@@ -116,7 +116,7 @@ Keep this list a line per area — put the actual content inside the area doc, n
 ### State Management
 - Single `GameState` object in `src/core/game-state.ts`
 - Saved to localStorage every 30s and on significant actions
-- Save versioning with migration chain (currently v14) — always increment `CURRENT_SAVE_VERSION` and add a migration step when changing the state shape
+- Save versioning with migration chain (currently v15) — always increment `CURRENT_SAVE_VERSION` and add a migration step when changing the state shape
 - Offline progress calculated from `lastSaveTimestamp` on load
 
 ### Adding a New Rare Effect

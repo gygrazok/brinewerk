@@ -6,6 +6,7 @@ import {
 } from '../core/balance';
 import { findCreatureSlot, removeCreature } from './pool';
 import { upgradeEffect } from './upgrades';
+import { materialYield } from './growth';
 
 /** Nacre yield for releasing a creature: quadratic in level, scaled by trait quality and rarity. */
 export function calculateNacreYield(creature: Creature, state: GameState): number {
@@ -15,19 +16,22 @@ export function calculateNacreYield(creature: Creature, state: GameState): numbe
   return Math.floor(levelPart * qualityMul * rareMul * upgradeEffect(state, 'nacre_refinement'));
 }
 
-/** Release a creature from the pool. Returns nacre gained, or 0 if release failed. */
-export function releaseCreature(state: GameState, creatureId: string): number {
+/** Credit nacre and species material for a released creature (pool or shore). */
+export function grantReleaseRewards(state: GameState, creature: Creature): void {
+  state.resources.nacre += calculateNacreYield(creature, state);
+  state.materials[creature.type] += materialYield(creature, state);
+}
+
+/** Release a creature from the pool. Returns true on success. */
+export function releaseCreature(state: GameState, creatureId: string): boolean {
   const slotId = findCreatureSlot(state, creatureId);
-  if (!slotId) return 0;
+  if (!slotId) return false;
 
   const creature = state.creatures.find(c => c.id === creatureId);
-  if (!creature) return 0;
+  if (!creature) return false;
 
-  const nacre = calculateNacreYield(creature, state);
-
+  grantReleaseRewards(state, creature);
   removeCreature(state, slotId);
   state.creatures = state.creatures.filter(c => c.id !== creatureId);
-
-  state.resources.nacre += nacre;
-  return nacre;
+  return true;
 }

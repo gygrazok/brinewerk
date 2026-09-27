@@ -25,8 +25,17 @@ export const PROD_GENE_EXPONENT = 3;
 /** Feeding: level L → L+1 costs FEED_BASE_COST * FEED_COST_GROWTH^(L-1) plankton. */
 export const FEED_BASE_COST = 20;
 export const FEED_COST_GROWTH = 1.22;
-/** Reaching each of these levels doubles the creature's production. */
+/** Reaching each of these levels doubles the creature's production. They are also the growth-stage level caps. */
 export const LEVEL_MILESTONES: readonly number[] = [10, 25, 50, 75, 100, 150, 200, 250, 300, 400, 500];
+
+/** Growth stages: cap step once the milestone list is exhausted. */
+export const STAGE_CAP_STEP_AFTER_LAST = 100;
+/** Stage-up cost in species material: STAGE_COST_BASE * STAGE_COST_GROWTH^stage (2, 5, 13, 32, 79, ...). */
+export const STAGE_COST_BASE = 2;
+export const STAGE_COST_GROWTH = 2.5;
+/** Species material from release: floor((1 + level / MATERIAL_LEVEL_DIVISOR) * rareMul). */
+export const MATERIAL_LEVEL_DIVISOR = 10;
+export const MATERIAL_RARE_TIER_MULTIPLIERS: Record<number, number> = { 1: 1.5, 2: 2, 3: 3 };
 
 /** Initial game state */
 export const INITIAL_PLANKTON = 50;

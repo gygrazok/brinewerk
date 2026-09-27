@@ -5,7 +5,8 @@ import { isReleaseUnlocked } from '../systems/achievements';
 import { hasShallowSlot } from '../systems/coords';
 import { formatNumber } from '../util/format';
 import { iconEl } from './icons';
-import { RESOURCE_ICON } from '../rendering/pixel-icons';
+import { RESOURCE_ICON, materialIcon } from '../rendering/pixel-icons';
+import { CreatureType, MATERIAL_NAMES, CREATURE_NAMES } from '../creatures/types';
 
 /** Resource definitions — easy to extend with new resources */
 interface ResourceDef {
@@ -38,6 +39,8 @@ interface ResourceRow {
 }
 
 let rows: Map<ResourceDef['key'], ResourceRow> | null = null;
+/** Species material counters, shown once the player owns any of that material. */
+let materialRows: Map<CreatureType, { item: HTMLDivElement; value: HTMLSpanElement }> | null = null;
 
 function mount(bar: HTMLElement): Map<ResourceDef['key'], ResourceRow> {
   bar.textContent = '';
@@ -73,6 +76,22 @@ function mount(bar: HTMLElement): Map<ResourceDef['key'], ResourceRow> {
     list.appendChild(item);
     map.set(r.key, { item, sep, value, rate });
   });
+
+  materialRows = new Map();
+  const matGroup = document.createElement('div');
+  matGroup.className = 'resource-item material-group';
+  for (const t of Object.values(CreatureType)) {
+    const item = document.createElement('div');
+    item.className = 'material-item';
+    item.title = `${MATERIAL_NAMES[t]} · from releasing ${CREATURE_NAMES[t]} · spent on ${CREATURE_NAMES[t]} growth stages`;
+    const value = document.createElement('span');
+    value.className = 'res-value';
+    item.appendChild(value);
+    item.appendChild(iconEl(materialIcon(t)));
+    matGroup.appendChild(item);
+    materialRows.set(t, { item, value });
+  }
+  list.appendChild(matGroup);
   return map;
 }
 
@@ -101,10 +120,19 @@ export function updateHud(state: GameState): void {
       row.rate.textContent = `+${formatNumber(rate, 2)}/s`;
     }
   }
+
+  if (materialRows) {
+    for (const [t, row] of materialRows) {
+      const amount = state.materials[t];
+      row.item.style.display = amount > 0 ? '' : 'none';
+      if (amount > 0) row.value.textContent = formatNumber(amount);
+    }
+  }
 }
 
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     rows = null;
+    materialRows = null;
   });
 }

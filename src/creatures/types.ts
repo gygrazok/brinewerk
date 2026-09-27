@@ -14,6 +14,15 @@ export const CREATURE_NAMES: Record<CreatureType, string> = {
   [CreatureType.Craboid]: 'Craboid',
 };
 
+/** Species material dropped on release, spent on growth stages. */
+export const MATERIAL_NAMES: Record<CreatureType, string> = {
+  [CreatureType.Stellarid]: 'Spicules',
+  [CreatureType.Blobid]: 'Gel',
+  [CreatureType.Corallid]: 'Calcite',
+  [CreatureType.Nucleid]: 'Prisms',
+  [CreatureType.Craboid]: 'Chitin',
+};
+
 /** Base plankton multiplier per type */
 export const TYPE_MULTIPLIERS: Record<CreatureType, number> = {
   [CreatureType.Stellarid]: 1.0,

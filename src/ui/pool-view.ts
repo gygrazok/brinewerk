@@ -22,6 +22,7 @@ import { cleanupEffectState } from '../rendering/effects/index';
 import { getRenderSettings } from '../rendering/render-settings';
 import { formatNumber } from '../util/format';
 import { iconTexture } from '../rendering/pixel-icons';
+import { isAtCap } from '../systems/growth';
 const SLOT_SIZE = 80;
 const CREATURE_DISPLAY = 64;
 const SLOT_BG = 0x0d2228;
@@ -663,6 +664,8 @@ function syncLevelLabels(poolView: PoolView, state: GameState): void {
     }
     const label = `Lv ${creature.level}`;
     if (text.text !== label) text.text = label;
+    // Gold when capped: the creature needs a growth stage before feeding again
+    text.style = isAtCap(creature) ? LEVEL_STYLE_CAPPED : LEVEL_STYLE;
   }
 
   for (const [id, text] of poolView._levelTexts) {
@@ -757,6 +760,14 @@ const LEVEL_STYLE = new TextStyle({
   fontFamily: '"Press Start 2P", monospace',
   fontSize: 7,
   fill: '#7eeee4',
+  align: 'center',
+  stroke: { color: '#060e12', width: 3 },
+});
+
+const LEVEL_STYLE_CAPPED = new TextStyle({
+  fontFamily: '"Press Start 2P", monospace',
+  fontSize: 7,
+  fill: '#f4c434',
   align: 'center',
   stroke: { color: '#060e12', width: 3 },
 });

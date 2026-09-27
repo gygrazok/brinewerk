@@ -5,12 +5,13 @@ import { createPoolView, destroyPoolView, syncPoolVisuals, updatePoolVisuals, pa
 import { destroyCreatureVisual } from './rendering/creature-renderer';
 import { showCreaturePanel, hideCreaturePanel, updateCreaturePanel } from './ui/creature-panel';
 import { getCreatureAt, placeCreature, removeCreature, findEmptySlot, expandPool } from './systems/pool';
-import { releaseCreature } from './systems/release';
+import { releaseCreature, grantReleaseRewards } from './systems/release';
+import { stageUp } from './systems/growth';
 import { feedCreature } from './systems/feeding';
 import { registerCreature } from './systems/registry';
 import { forceInitialTide } from './systems/tides';
 import {
-  setOnTakeCreature, setOnRegisterCreature, renderShoreButton, updateShoreModal,
+  setOnTakeCreature, setOnRegisterCreature, setOnReleaseCreature, renderShoreButton, updateShoreModal,
   isShoreModalOpen, destroyShoreModal, openShoreModal,
 } from './ui/shore-modal';
 import { setOnOpenSpecimen, destroyRegistryModal } from './ui/registry-modal';
@@ -176,6 +177,9 @@ async function init() {
           releaseCreature(state, c.id);
           refreshAll();
         },
+        onStageUp: (c) => {
+          if (stageUp(state, c)) refreshAll();
+        },
         onRegister: (c) => {
           registerCreature(state, c);
           refreshAll();
@@ -243,6 +247,12 @@ async function init() {
   // Shore → registry directly (consumes the tide's pickup)
   setOnRegisterCreature((creature) => {
     registerCreature(state, creature);
+    refreshAll();
+  });
+
+  // Shore → release directly for species material (consumes the tide's pickup)
+  setOnReleaseCreature((creature) => {
+    grantReleaseRewards(state, creature);
     refreshAll();
   });
 

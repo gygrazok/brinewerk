@@ -29,6 +29,18 @@ supports ×N and "max affordable". The panel shows Feed / ×10 / Max.
 Tuning reference (greedy simulation, 50% active collection): levels 20 at 5 min,
 ~50 at 1 h, plateau around 60-70 without release/registry multipliers.
 
+## Growth stages & species materials
+
+`systems/growth.ts`. A creature's level is capped by its stage: caps are the milestone
+levels (10, 25, 50, 75, 100, 150, ... then +100). Feeding stops at the cap; a stage-up
+raises it and costs `ceil(2 × 2.5^stage)` material of the creature's own species
+(Spicules, Gel, Calcite, Prisms, Chitin; `MATERIAL_NAMES`).
+
+Material comes only from releasing that species: `floor((1 + level/10) × rareTierMul × tidal_salvage)`.
+Shore creatures can be released directly (uses the tide's pickup, yields 1+ material).
+Design intent: plankton feeding stays the between-stages loop; the decision moves to
+which creature gets the scarce material, and duplicates of a species gain value.
+
 ## Release (nacre)
 
 `nacre = (level/10)² × (1 + 2·deviation) × rareTierMul × nacre_refinement`

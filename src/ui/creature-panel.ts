@@ -1,8 +1,9 @@
 import type { Creature } from '../creatures/creature';
 import type { GameState } from '../core/game-state';
 import { getRareInfo } from '../creatures/creature';
-import { CREATURE_NAMES, TYPE_MULTIPLIERS } from '../creatures/types';
-import { rareIcon, typeIcon } from '../rendering/pixel-icons';
+import { CREATURE_NAMES, MATERIAL_NAMES, TYPE_MULTIPLIERS } from '../creatures/types';
+import { materialIcon, rareIcon, typeIcon } from '../rendering/pixel-icons';
+import { levelCap, isAtCap, stageUpCost, canStageUp, stageCap, materialYield } from '../systems/growth';
 import { icon, res } from './icons';
 import {
   calculateGeneticRate, nextMilestone, milestonesReached, PRODUCTION_GENE,
@@ -232,6 +233,7 @@ export interface CreaturePanelOptions {
   mode?: 'pool' | 'registry';
   onFeed?: (creature: Creature, count: number | 'max') => void;
   onRelease?: (creature: Creature) => void;
+  onStageUp?: (creature: Creature) => void;
   onRegister?: (creature: Creature) => void;
 }
 
@@ -363,6 +365,10 @@ function handleAction(action: string, count: string | undefined): void {
     case 'register':
       showRegisterConfirm(creature, opts);
       break;
+    case 'stage-up':
+      opts.onStageUp?.(creature);
+      renderDynamic();
+      break;
     case 'release':
       showReleaseConfirm(creature, opts);
       break;
@@ -406,25 +412,40 @@ function renderDynamic(): void {
 
   const feedBtn = (count: number | 'max', label: string): string => {
     const q = quoteFeed(state, creature, count);
-    const affordable = q.cost <= state.resources.plankton;
+    const affordable = q.levels > 0 && q.cost <= state.resources.plankton;
     const title = count === 'max' && affordable ? `${label} +${q.levels}` : label;
     return `<button class="btn btn-secondary${affordable ? '' : ' unaffordable'}" data-action="feed" data-count="${count}">${title}<br><span class="btn-cost">${formatNumber(q.cost)} ${res('plankton')}</span></button>`;
   };
 
+  const cap = levelCap(creature);
+  const mat = materialIcon(creature.type);
+  const matName = MATERIAL_NAMES[creature.type];
+  const stageTitle = `Stage ${creature.stage + 1}: level cap ${cap}. Next stage: cap ${stageCap(creature.stage + 1)}, costs ${stageUpCost(creature)} ${matName} (from releasing ${CREATURE_NAMES[creature.type]})`;
+  let growRow: string;
+  if (isAtCap(creature)) {
+    const ok = canStageUp(state, creature);
+    growRow = `<button class="btn btn-primary${ok ? '' : ' unaffordable'}" data-action="stage-up" title="${stageTitle}">`
+      + `Grow · cap ${stageCap(creature.stage + 1)} · ${formatNumber(stageUpCost(creature))} ${icon(mat)}`
+      + ` <span class="btn-cost">(${formatNumber(state.materials[creature.type])} owned)</span></button>`;
+  } else {
+    growRow = `
+    <div class="feed-row">
+      ${feedBtn(1, 'Feed')}
+      ${feedBtn(10, '×10')}
+      ${feedBtn('max', 'Max')}
+    </div>`;
+  }
+
   setHtml(dyn, `
     <div class="level-row">
-      <span class="level-value">Lv ${creature.level}</span>
+      <span class="level-value" title="${stageTitle}">Lv ${creature.level}/${cap}</span>
       <span class="milestone" title="Each milestone doubles production">${milestone ? `×2 at Lv ${milestone}` : 'All milestones reached'}</span>
     </div>
     <div class="stat-lines">
       ${rateLines}
       ${geneLine}
     </div>
-    <div class="feed-row">
-      ${feedBtn(1, 'Feed')}
-      ${feedBtn(10, '×10')}
-      ${feedBtn('max', 'Max')}
-    </div>
+    ${growRow}
   `);
 
   let actionsHtml = '';
@@ -438,9 +459,10 @@ function renderDynamic(): void {
   }
   if (isReleaseUnlocked(state) && opts.onRelease) {
     const nacreYield = calculateNacreYield(creature, state);
-    actionsHtml += nacreYield > 0
-      ? `<button class="btn btn-secondary" data-action="release" title="Nacre = (Lv / 10)² × gene quality × rare tier">${res('nacre')} Release for ${formatNumber(nacreYield)} Nacre</button>`
-      : `<button class="btn btn-secondary disabled">${res('nacre')} Nacre yield 0 below Lv ${nextNacreLevel(creature, state)}</button>`;
+    const nacrePart = nacreYield > 0 ? `+${formatNumber(nacreYield)} ${res('nacre')} ` : '';
+    const title = `Nacre = (Lv / 10)² × gene quality × rare tier${nacreYield > 0 ? '' : ` (0 below Lv ${nextNacreLevel(creature, state)})`}`
+      + ` · ${matName} = floor(1 + Lv / 10) × rare tier`;
+    actionsHtml += `<button class="btn btn-secondary" data-action="release" title="${title}">Release · ${nacrePart}+${formatNumber(materialYield(creature, state))} ${icon(mat)}</button>`;
   }
   setHtml(actions, actionsHtml);
 }
@@ -501,10 +523,11 @@ function showConfirm(o: ConfirmOptions): void {
 
 function showReleaseConfirm(creature: Creature, opts: CreaturePanelOptions): void {
   const nacre = formatNumber(calculateNacreYield(creature, opts.state));
+  const material = formatNumber(materialYield(creature, opts.state));
   showConfirm({
     title: `Release ${creature.name}?`,
     text: 'Removes the creature from the pool permanently. Level and slot are lost.',
-    highlight: `${res('nacre')} ${nacre} Nacre`,
+    highlight: `+${nacre} ${res('nacre')} · +${material} ${icon(materialIcon(creature.type))} ${MATERIAL_NAMES[creature.type]}`,
     confirmLabel: 'Release',
     onConfirm: () => opts.onRelease?.(creature),
   });

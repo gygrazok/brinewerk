@@ -2,7 +2,9 @@ import type { GameState } from '../core/game-state';
 import type { Creature } from '../creatures/creature';
 import { getRareInfo } from '../creatures/creature';
 import { CREATURE_NAMES, TYPE_MULTIPLIERS } from '../creatures/types';
-import { rareIcon, typeIcon } from '../rendering/pixel-icons';
+import { rareIcon, typeIcon, materialIcon } from '../rendering/pixel-icons';
+import { materialYield } from '../systems/growth';
+import { isReleaseUnlocked } from '../systems/achievements';
 import { icon, iconEl, res } from './icons';
 import { calculateGeneticRate } from '../creatures/production';
 import { getDisplayTraits, TRAIT_COLORS } from '../genetics/traits';
@@ -28,6 +30,7 @@ import { createModal } from './modal';
 let selectedIndex: number | null = null;
 let onTakeCreatureCb: ((creature: Creature) => void) | null = null;
 let onRegisterCreatureCb: ((creature: Creature) => void) | null = null;
+let onReleaseCreatureCb: ((creature: Creature) => void) | null = null;
 let stateRef: GameState | null = null;
 let bottomBarMounted = false;
 /** Cached refs into the bottom bar, populated on first mount. */
@@ -69,6 +72,11 @@ export function setOnTakeCreature(cb: (creature: Creature) => void): void {
 /** Called when the player sends a shore creature straight to the registry (uses the tide's pickup). */
 export function setOnRegisterCreature(cb: (creature: Creature) => void): void {
   onRegisterCreatureCb = cb;
+}
+
+/** Called when the player releases a shore creature for material (uses the tide's pickup). */
+export function setOnReleaseCreature(cb: (creature: Creature) => void): void {
+  onReleaseCreatureCb = cb;
 }
 
 export function isShoreModalOpen(): boolean {
@@ -221,6 +229,7 @@ function renderModalContent(modal: HTMLElement, state: GameState, signal: AbortS
     <div class="shore-take-area" id="shore-take-area">
       <button class="btn btn-primary shore-take-btn disabled" id="shore-take-btn">Select a creature</button>
       <button class="btn btn-secondary shore-register-btn" id="shore-register-btn" style="display:none"></button>
+      <button class="btn btn-secondary shore-release-btn" id="shore-release-btn" style="display:none"></button>
     </div>
   `;
 
@@ -260,6 +269,16 @@ function renderModalContent(modal: HTMLElement, state: GameState, signal: AbortS
       controller.close();
       renderShoreButton(stateRef);
       onRegisterCreatureCb?.(creature);
+    }
+  }, { signal });
+
+  document.getElementById('shore-release-btn')!.addEventListener('click', () => {
+    if (selectedIndex === null || !stateRef) return;
+    const creature = pickUpCreature(stateRef, selectedIndex);
+    if (creature) {
+      controller.close();
+      renderShoreButton(stateRef);
+      onReleaseCreatureCb?.(creature);
     }
   }, { signal });
 
@@ -405,6 +424,7 @@ function updateTakeButton(state: GameState): void {
   const takeBtn = document.getElementById('shore-take-btn');
   if (!takeBtn) return;
   updateRegisterButton(state);
+  updateReleaseButton(state);
 
   const noSlots = findEmptySlot(state) === null;
 
@@ -421,6 +441,19 @@ function updateTakeButton(state: GameState): void {
     takeBtn.classList.add('disabled');
     takeBtn.textContent = 'Select a creature';
   }
+}
+
+/** Direct shore → release button: turns the pickup into species material (+ nacre if any). */
+function updateReleaseButton(state: GameState): void {
+  const btn = document.getElementById('shore-release-btn');
+  if (!btn) return;
+  const creature = selectedIndex !== null && !state.shoreTaken ? state.shore[selectedIndex] : null;
+  if (!creature || !isReleaseUnlocked(state)) {
+    btn.style.display = 'none';
+    return;
+  }
+  btn.style.display = '';
+  btn.innerHTML = `Release · +${formatNumber(materialYield(creature, state))} ${icon(materialIcon(creature.type))}`;
 }
 
 /** Direct shore → registry button, shown for the selected creature once the registry is unlocked. */

@@ -186,6 +186,8 @@ export interface Creature {
   rare: RareEffect | null;
   /** Feeding level (starts at 1). Drives production, milestones and nacre yield. */
   level: number;
+  /** Growth stage (starts at 0). Caps the level; raised with species material. */
+  stage: number;
 }
 
 let _nextId = 0;
@@ -221,7 +223,7 @@ export function createCreature(opts: CreateCreatureOpts = {}): Creature {
   const name = generateName(finalType, nameRng);
   const id = `c_${Date.now()}_${_nextId++}`;
 
-  return { id, name, type: finalType, genes, seed: finalSeed, rare, level: 1 };
+  return { id, name, type: finalType, genes, seed: finalSeed, rare, level: 1, stage: 0 };
 }
 
 /** Rare-roll parameters derived from the player's progression (see `getSpawnContext`). */
