@@ -76,7 +76,7 @@ export interface PoolView {
   /** "Lv N" labels under occupied slots, keyed by slot id */
   _levelLayer: Container;
   _levelTexts: Map<string, Text>;
-  /** Found uniques drifting over the pool (decorative, above creatures) */
+  /** Found uniques drifting over the seabed (decorative, behind slots and creatures) */
   _wanderers: WandererLayer;
   _app: Application;
   _worldW: number;
@@ -133,6 +133,10 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
   seabedBg.container.isRenderGroup = true;
   gridContainer.addChild(seabedBg.container);
 
+  // Found uniques drift just above the seabed, behind slots, creatures and labels
+  const wanderers = createWandererLayer(pool.worldWidth, pool.worldHeight);
+  gridContainer.addChild(wanderers.container);
+
   // Slot glow layer (behind slots)
   const slotGlowLayer = new Container();
   gridContainer.addChild(slotGlowLayer);
@@ -145,8 +149,6 @@ export function createPoolView(app: Application, _state: GameState): PoolView {
   gridContainer.addChild(slotLayer);
   gridContainer.addChild(collectibleLayer);
   gridContainer.addChild(creatureLayer);
-  const wanderers = createWandererLayer(pool.worldWidth, pool.worldHeight);
-  gridContainer.addChild(wanderers.container);
   const levelLayer = new Container();
   levelLayer.eventMode = 'none';
   gridContainer.addChild(levelLayer);

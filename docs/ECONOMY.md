@@ -81,7 +81,8 @@ unique, `(time) → PixelGrid`, facing right), `systems/uniques.ts` (rolls).
 - Each shore creature rolls `1e-5 × 100^completion` (1 in 100K at 0% Collection, 1 in 1K
   at 100%), outside pity and tier gates. A hit sets `state.shoreUnique`, which waits on the
   shore across tides until collected; collecting does not use the tide's pickup.
-- Found uniques wander the pool as decorative sprites (`ui/unique-wanderers.ts`).
+- Found uniques wander the pool as decorative sprites on the layer right above the seabed,
+  behind slots, creatures and labels (`ui/unique-wanderers.ts`).
 
 ## Zoological registry
 
