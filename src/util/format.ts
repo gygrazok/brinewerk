@@ -1,8 +1,11 @@
-const SUFFIXES = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
+/** Suffixes up to quadrillion (1e15); anything larger switches to scientific notation (1.23e18). */
+const SUFFIXES = ['', 'K', 'M', 'B', 'T', 'Q'];
 
 /**
  * Compact number formatting for incremental-scale values.
- * < 1000 → plain (with `decimals` below 10), then K/M/B/... suffixes, then exponent notation.
+ * < 1000 → plain (with `decimals` below 10), then K/M/B/T/Q with 3 significant digits,
+ * then scientific notation. Output stays within 7 characters (e.g. "1.23e18"), so the HUD
+ * can use fixed-width cells.
  */
 export function formatNumber(n: number, decimals = 0): string {
   if (!Number.isFinite(n)) return '∞';
@@ -18,8 +21,8 @@ export function formatNumber(n: number, decimals = 0): string {
     scaled /= 1000;
   }
   if (tier >= SUFFIXES.length) return n.toExponential(2).replace('+', '');
-  const digits = Math.abs(scaled) < 10 ? 2 : Math.abs(scaled) < 100 ? 1 : 0;
-  return scaled.toFixed(digits) + SUFFIXES[tier];
+  // 3 significant digits: 1.23K, 12.3K, 123K (toPrecision also handles 99.99 → "100")
+  return scaled.toPrecision(3) + SUFFIXES[tier];
 }
 
 /** Format a multiplier as "×1.25" (or "×12.3K" at scale). */

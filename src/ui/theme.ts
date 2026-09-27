@@ -94,12 +94,23 @@ export function injectTheme(): void {
     }
     .resource-list::-webkit-scrollbar { display: none; }
 
+    /* Fixed-width cells so changing numbers never shift the layout */
     .resource-item {
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 1px;
       flex-shrink: 0;
+      width: 104px;
+    }
+    .resource-item .res-value, .resource-item .res-rate, .material-item .res-value {
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .res-top .res-value {
+      display: inline-block;
+      min-width: 7ch;
+      text-align: right;
     }
     .resource-item .res-value {
       font-family: var(--font-body);
@@ -132,8 +143,9 @@ export function injectTheme(): void {
     .res-top { display: flex; align-items: center; gap: 4px; }
     .res-top .px-icon, .material-item .px-icon { vertical-align: middle; }
     .material-item { gap: 4px; }
-    .material-group { display: flex; gap: 10px; }
+    .material-group { display: flex; gap: 10px; width: auto; flex-direction: row; }
     .material-item { display: flex; align-items: center; }
+    .material-item .res-value { display: inline-block; min-width: 5ch; text-align: right; }
     .material-item .res-value { font-size: 13px; }
 
     /* ── Scrollbars (modals, panels) ─────────── */
@@ -243,6 +255,7 @@ export function injectTheme(): void {
         --top-bar-h: 48px;
         --bottom-bar-h: 44px;
       }
+      .resource-item { width: 88px; }
       .resource-item .res-value { font-size: 14px; }
       .resource-item .res-rate { font-size: 11px; }
       .btn-primary { font-size: 13px; padding: 8px 12px; }
